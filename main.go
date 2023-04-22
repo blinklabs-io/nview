@@ -22,11 +22,11 @@ func main() {
 		// q
 		if event.Rune() == 113 {
 			app.Stop()
-		// f
-		} else if event.Rune() == 102 {
+		// f or right
+		} else if event.Rune() == 102 || event.Key() == tcell.KeyRight {
 			pages.SwitchToPage("Two")
-		// b
-		} else if event.Rune() == 98 {
+		// b or left
+		} else if event.Rune() == 98 || event.Key() == tcell.KeyLeft {
 			pages.SwitchToPage("Main")
 		}
 		return event
