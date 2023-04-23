@@ -8,14 +8,6 @@ import (
 var app = tview.NewApplication()
 var pages = tview.NewPages()
 
-var mainText = tview.NewTextView().
-	SetTextColor(tcell.ColorGreen).
-	SetText("(f) to go to next page (q) to quit")
-
-var twoText = tview.NewTextView().
-	SetTextColor(tcell.ColorGreen).
-	SetText("(b) to go to main page (q) to quit")
-
 func main() {
 	// capture inputs
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -33,10 +25,56 @@ func main() {
 	})
 
 	// Pages
-	pages.AddPage("Main", mainText, true, true)
-	pages.AddPage("Two", twoText, true, false)
+	pages.AddPage("Main", layout("main"), true, true)
+	pages.AddPage("Two", layout("two"), true, false)
 
 	if err := app.SetRoot(pages, true).EnableMouse(false).Run(); err != nil {
 		panic(err)
 	}
+}
+
+func layout(p string) *tview.Flex {
+	text := tview.NewTextView().SetTextColor(tcell.ColorGreen)
+	switch p {
+	case "two":
+		text.SetText("(b) to go to main page (q) to quit")
+	default:
+		text.SetText("(f) to go to next page (q) to quit")
+	}
+	flex := tview.NewFlex()
+	// Configure a flexible box, split into 3 rows
+	flex.SetDirection(tview.FlexRow).
+		// Row 1 is a box
+		AddItem(tview.NewBox().SetBorder(true),
+			0,
+			2,
+			false).
+		// Row 2 is a flex set of rows
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			// Row 1 is a flex set of columns
+			AddItem(tview.NewFlex().
+				// Column 1
+				AddItem(tview.NewBox().SetBorder(true),
+					0,
+					1,
+					true).
+				// Column 2
+				AddItem(tview.NewBox().SetBorder(true),
+					0,
+					4,
+					false),
+				0,
+				6,
+				false).
+			// Row 2
+			AddItem(tview.NewBox().SetBorder(true),
+				0,
+				1,
+				false),
+			0,
+			6,
+			false).
+		// Row 3
+		AddItem(text, 0, 1, false)
+	return flex
 }
