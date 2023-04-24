@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/gdamore/tcell/v2 v2.6.0
+	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/rivo/tview v0.0.0-20230406072732-e22ce9588bb4
 )
 
