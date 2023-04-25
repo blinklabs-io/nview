@@ -1,11 +1,16 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
-	"strconv"
+	"strings"
 
+	dto "github.com/prometheus/client_model/go"
 	"github.com/gdamore/tcell/v2"
+	"github.com/prometheus/common/expfmt"
 	"github.com/rivo/tview"
 )
 
@@ -24,42 +29,34 @@ func main() {
 		// q
 		if event.Rune() == 113 {
 			app.Stop()
-		// f or right
-		} else if event.Rune() == 102 || event.Key() == tcell.KeyRight {
-			pages.SwitchToPage("Two")
-		// b or left
-		} else if event.Rune() == 98 || event.Key() == tcell.KeyLeft {
+		// p or right
+		} else if event.Rune() == 112 || event.Key() == tcell.KeyRight {
+			pages.SwitchToPage("Prometheus")
+		// c or left
+		} else if event.Rune() == 99 || event.Key() == tcell.KeyLeft {
 			pages.SwitchToPage("Main")
 		}
 		return event
 	})
 
 	// Pages
-	pages.AddPage("Main", layout("main"), true, true)
-	pages.AddPage("Two", layout("two"), true, false)
+	pages.AddPage("Main", mainLayout(), true, true)
+	pages.AddPage("Prometheus", prometheusLayout(), true, false)
 
 	if err := app.SetRoot(pages, true).EnableMouse(false).Run(); err != nil {
 		panic(err)
 	}
 }
 
-func layout(p string) *tview.Flex {
-	// Load our config
-	cfg := GetConfig()
-	text := tview.NewTextView().SetTextColor(tcell.ColorGreen)
-	promText := tview.NewTextView().SetTextColor(tcell.ColorGreen).
-		SetText("Prometheus: http://" + cfg.Prometheus.Host + ":" + strconv.FormatUint(uint64(cfg.Prometheus.Port), 10) + "/metrics")
-	switch p {
-	case "two":
-		text.SetText("(b) to go to main page (q) to quit")
-	default:
-		text.SetText("(f) to go to next page (q) to quit")
-	}
+func mainLayout() *tview.Flex {
+	text := tview.NewTextView().
+		SetTextColor(tcell.ColorGreen).
+		SetText("(p) to open prometheus (q) to quit")
 	flex := tview.NewFlex()
 	// Configure a flexible box, split into 3 rows
 	flex.SetDirection(tview.FlexRow).
 		// Row 1 is a box
-		AddItem(promText,
+		AddItem(tview.NewBox().SetBorder(true),
 			0,
 			2,
 			false).
@@ -91,4 +88,133 @@ func layout(p string) *tview.Flex {
 		// Row 3
 		AddItem(text, 0, 1, false)
 	return flex
+}
+
+func prometheusLayout() *tview.Flex {
+	text := tview.NewTextView().
+		SetTextColor(tcell.ColorGreen).
+		SetText("(c) to close this page (q) to quit")
+	flex := tview.NewFlex()
+
+	var respBodyBytes []byte
+	respBodyBytes, statusCode, err := getNodeMetrics()
+	if err != nil {
+		return flex.AddItem(
+			tview.NewTextView().
+				SetTextColor(tcell.ColorGreen).
+				SetText(fmt.Sprintf("Failed getNodeMetrics: %s", err)),
+			0,
+			2,
+			false)
+	}
+	if statusCode != http.StatusOK {
+		return flex.AddItem(
+			tview.NewTextView().
+				SetTextColor(tcell.ColorGreen).
+				SetText(fmt.Sprintf("Failed HTTP: %d", statusCode)),
+			0,
+			1,
+			false)
+	}
+
+	// Parser code from: https://stackoverflow.com/a/74244922
+	// And modified to include our error flex items
+	// This code section is also available under CC BY-SA 4.0
+	// https://creativecommons.org/licenses/by-sa/4.0/
+	parser := &expfmt.TextParser{}
+	families, err := parser.TextToMetricFamilies(strings.NewReader(string(respBodyBytes)))
+	if err != nil {
+		return flex.AddItem(
+			tview.NewTextView().
+				SetTextColor(tcell.ColorGreen).
+				SetText(fmt.Sprintf("Failed parser: %s", err)),
+			0,
+			2,
+			true)
+	}
+	// {"name":[{"name":{"value":0}}]}
+	out := make(map[string][]map[string]map[string]interface{})
+	for key, val := range families {
+		family := out[key]
+		for _, m := range val.GetMetric() {
+			metric := make(map[string]interface{})
+			for _, label := range m.GetLabel() {
+				metric[label.GetName()] = label.GetValue()
+			}
+			switch val.GetType() {
+			case dto.MetricType_COUNTER:
+				metric["value"] = m.GetCounter().GetValue()
+			case dto.MetricType_GAUGE:
+				metric["value"] = m.GetGauge().GetValue()
+			case dto.MetricType_UNTYPED:
+				metric["value"] = m.GetUntyped().GetValue()
+			default:
+				return flex.AddItem(
+					tview.NewTextView().
+						SetTextColor(tcell.ColorGreen).
+						SetText(fmt.Sprintf("Failed unsupported type: %v", val.GetType())),
+					0,
+					2,
+					true)
+			}
+			family = append(family, map[string]map[string]interface{}{
+				val.GetName(): metric,
+			})
+		}
+		out[key] = family
+	}
+	b, err := json.MarshalIndent(out, "", "    ")
+	if err != nil {
+		return flex.AddItem(
+			tview.NewTextView().
+				SetTextColor(tcell.ColorGreen).
+				SetText(fmt.Sprintf("Failed JSON: %s", err)),
+			0,
+			2,
+			true)
+	}
+	// End Parser code
+
+	// Set up our text view with our response data
+	promText := tview.NewTextView().
+		SetTextColor(tcell.ColorGreen).
+		SetText(string(b))
+
+	// Configure a flexible box, split into 2 rows
+	flex.SetDirection(tview.FlexRow).
+		AddItem(promText, 0, 9, true).
+		AddItem(text, 0, 1, false)
+	return flex
+}
+
+func getNodeMetrics() ([]byte, int, error) {
+	// Load our config and get host/port
+	cfg := GetConfig()
+	url := fmt.Sprintf(
+		"http://%s:%d/metrics",
+		cfg.Prometheus.Host,
+		cfg.Prometheus.Port,
+	)
+	var respBodyBytes []byte
+	// Setup request
+	req, err := http.NewRequest(
+		http.MethodGet,
+		url,
+		nil,
+	)
+	if err != nil {
+		return respBodyBytes, http.StatusInternalServerError, err
+	}
+	// Get metrics from the node
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return respBodyBytes, http.StatusInternalServerError, err
+	}
+	// Read the entire response body and close it to prevent a memory leak
+	respBodyBytes, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return respBodyBytes, http.StatusInternalServerError, err
+	}
+	defer resp.Body.Close()
+	return respBodyBytes, resp.StatusCode, nil
 }
