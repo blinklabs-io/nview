@@ -117,53 +117,7 @@ func prometheusLayout() *tview.Flex {
 			false)
 	}
 
-	// Parser code from: https://stackoverflow.com/a/74244922
-	// And modified to include our error flex items
-	// This code section is also available under CC BY-SA 4.0
-	// https://creativecommons.org/licenses/by-sa/4.0/
-	parser := &expfmt.TextParser{}
-	families, err := parser.TextToMetricFamilies(strings.NewReader(string(respBodyBytes)))
-	if err != nil {
-		return flex.AddItem(
-			tview.NewTextView().
-				SetTextColor(tcell.ColorGreen).
-				SetText(fmt.Sprintf("Failed parser: %s", err)),
-			0,
-			2,
-			true)
-	}
-	// {"name":[{"name":{"value":0}}]}
-	out := make(map[string][]map[string]map[string]interface{})
-	for key, val := range families {
-		family := out[key]
-		for _, m := range val.GetMetric() {
-			metric := make(map[string]interface{})
-			for _, label := range m.GetLabel() {
-				metric[label.GetName()] = label.GetValue()
-			}
-			switch val.GetType() {
-			case dto.MetricType_COUNTER:
-				metric["value"] = m.GetCounter().GetValue()
-			case dto.MetricType_GAUGE:
-				metric["value"] = m.GetGauge().GetValue()
-			case dto.MetricType_UNTYPED:
-				metric["value"] = m.GetUntyped().GetValue()
-			default:
-				return flex.AddItem(
-					tview.NewTextView().
-						SetTextColor(tcell.ColorGreen).
-						SetText(fmt.Sprintf("Failed unsupported type: %v", val.GetType())),
-					0,
-					2,
-					true)
-			}
-			family = append(family, map[string]map[string]interface{}{
-				val.GetName(): metric,
-			})
-		}
-		out[key] = family
-	}
-	b, err := json.MarshalIndent(out, "", "    ")
+	b, err := prom2json(respBodyBytes)
 	if err != nil {
 		return flex.AddItem(
 			tview.NewTextView().
@@ -173,7 +127,6 @@ func prometheusLayout() *tview.Flex {
 			2,
 			true)
 	}
-	// End Parser code
 
 	// Set up our text view with our response data
 	promText := tview.NewTextView().
@@ -217,4 +170,34 @@ func getNodeMetrics() ([]byte, int, error) {
 	}
 	defer resp.Body.Close()
 	return respBodyBytes, resp.StatusCode, nil
+}
+
+func prom2json(prom []byte) ([]byte, error) {
+	// {"name": 0}
+	out := make(map[string]interface{})
+	b := []byte{}
+	parser := &expfmt.TextParser{}
+	families, err := parser.TextToMetricFamilies(strings.NewReader(string(prom)))
+	if err != nil {
+		return b, err
+	}
+	for _, val := range families {
+		for _, m := range val.GetMetric() {
+			switch val.GetType() {
+			case dto.MetricType_COUNTER:
+				out[val.GetName()] = m.GetCounter().GetValue()
+			case dto.MetricType_GAUGE:
+				out[val.GetName()] = m.GetGauge().GetValue()
+			case dto.MetricType_UNTYPED:
+				out[val.GetName()] = m.GetUntyped().GetValue()
+			default:
+				return b, err
+			}
+		}
+	}
+	b, err = json.MarshalIndent(out, "", "    ")
+	if err != nil {
+		return b, err
+	}
+	return b, nil
 }
