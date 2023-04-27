@@ -32,6 +32,7 @@ func (c *Config) LoadConfig() error {
 	}
 	return nil
 }
+
 // GetConfig returns the global config instance
 func GetConfig() *Config {
 	return globalConfig
