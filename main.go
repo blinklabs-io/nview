@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"strings"
 
-	dto "github.com/prometheus/client_model/go"
 	"github.com/gdamore/tcell/v2"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/rivo/tview"
 )
@@ -27,13 +28,11 @@ func main() {
 	// capture inputs
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		// q
-		if event.Rune() == 113 {
+		if event.Rune() == 113 { // q
 			app.Stop()
-		// p or right
-		} else if event.Rune() == 112 || event.Key() == tcell.KeyRight {
+		} else if event.Rune() == 112 || event.Key() == tcell.KeyRight { // p or right
 			pages.SwitchToPage("Prometheus")
-		// c or left
-		} else if event.Rune() == 99 || event.Key() == tcell.KeyLeft {
+		} else if event.Rune() == 99 || event.Key() == tcell.KeyLeft { // c or left
 			pages.SwitchToPage("Main")
 		}
 		return event
@@ -48,6 +47,7 @@ func main() {
 	}
 }
 
+// Main page layout
 func mainLayout() *tview.Flex {
 	text := tview.NewTextView().
 		SetTextColor(tcell.ColorGreen).
@@ -122,22 +122,73 @@ func prometheusLayout() *tview.Flex {
 		return flex.AddItem(
 			tview.NewTextView().
 				SetTextColor(tcell.ColorGreen).
-				SetText(fmt.Sprintf("Failed JSON: %s", err)),
+				SetText(fmt.Sprintf("Failed prom2json: %s", err)),
 			0,
 			2,
 			true)
 	}
 
+	var metrics *Metrics
+	if err := json.Unmarshal(b, &metrics); err != nil {
+		return flex.AddItem(
+			tview.NewTextView().
+				SetTextColor(tcell.ColorGreen).
+				SetText(fmt.Sprintf("Failed JSON unmarshal: %s", err)),
+			0,
+			2,
+			true)
+	}
+
+	// TODO: fetch uptime from node
+	var uptimes uint64 = 0
+
 	// Set up our text view with our response data
 	promText := tview.NewTextView().
 		SetTextColor(tcell.ColorGreen).
-		SetText(string(b))
+		SetText(fmt.Sprintf("Uptime: %s\nEpoch: %d", timeLeft(uptimes), metrics.EpochNum))
 
 	// Configure a flexible box, split into 2 rows
 	flex.SetDirection(tview.FlexRow).
 		AddItem(promText, 0, 9, true).
 		AddItem(text, 0, 1, false)
 	return flex
+}
+
+type Metrics struct {
+	BlockNum            uint64  `json:"cardano_node_metrics_blockNum_int"`
+	EpochNum            uint64  `json:"cardano_node_metrics_epoch_int"`
+	SlotInEpoch         uint64  `json:"cardano_node_metrics_slotInEpoch_int"`
+	SlotNum             uint64  `json:"cardano_node_metrics_slotNum_int"`
+	Density             float64 `json:"cardano_node_metrics_density_real"`
+	TxProcessed         uint64  `json:"cardano_node_metrics_txsProcessedNum_int"`
+	MempoolTx           uint64  `json:"cardano_node_metrics_txsInMempool_int"`
+	MempoolBytes        uint64  `json:"cardano_node_metrics_mempoolBytes_int"`
+	KesPeriod           uint64  `json:"cardano_node_metrics_currentKESPeriod_int"`
+	RemainingKesPeriods uint64  `json:"cardano_node_metrics_remainingKESPeriods_int"`
+	IsLeader            uint64  `json:"cardano_node_metrics_Forge_node_is_leader_int"`
+	Adopted             uint64  `json:"cardano_node_metrics_Forge_adopted_int"`
+	DidntAdopt          uint64  `json:"cardano_node_metrics_Forge_didnt_adopt_int"`
+	AboutToLead         uint64  `json:"cardano_node_metrics_Forge_forge_about_to_lead_int"`
+	MissedSlots         uint64  `json:"cardano_node_metrics_slotsMissedNum_int"`
+	MemLive             uint64  `json:"cardano_node_metrics_RTS_gcLiveBytes_int"`
+	MemHeap             uint64  `json:"cardano_node_metrics_RTS_gcHeapBytes_int"`
+	GcMinor             uint64  `json:"cardano_node_metrics_RTS_gcMinorNum_int"`
+	GcMajor             uint64  `json:"cardano_node_metrics_RTS_gcMajorNum_int"`
+	Forks               uint64  `json:"cardano_node_metrics_forks_int"`
+	BlockDelay          float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_s"`
+	BlockServed         uint64  `json:"cardano_node_metrics_served_block_count_int"`
+	BlocksLate          uint64  `json:"cardano_node_metrics_blockfetchclient_lateblocks"`
+	BlocksW1s           float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_cdfOne"`
+	BlocksW3s           float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_cdfThree"`
+	BlocksW5s           float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_cdfFive"`
+	PeersCold           uint64  `json:"cardano_node_metrics_peerSelection_cold"`
+	PeersWarm           uint64  `json:"cardano_node_metrics_peerSelection_warm"`
+	PeersHot            uint64  `json:"cardano_node_metrics_peerSelection_hot"`
+	ConnIncoming        uint64  `json:"cardano_node_metrics_connectionManager_incomingConns"`
+	ConnOutgoing        uint64  `json:"cardano_node_metrics_connectionManager_outgoingConns"`
+	ConnUniDir          uint64  `json:"cardano_node_metrics_connectionManager_unidirectionalConns"`
+	ConnBiDir           uint64  `json:"cardano_node_metrics_connectionManager_duplexConns"`
+	ConnDuplex          uint64  `json:"cardano_node_metrics_connectionManager_prunableConns"`
 }
 
 func getNodeMetrics() ([]byte, int, error) {
@@ -200,4 +251,16 @@ func prom2json(prom []byte) ([]byte, error) {
 		return b, err
 	}
 	return b, nil
+}
+
+func timeLeft(t uint64) string {
+	d := t / 60 / 60 / 24
+	h := math.Mod(float64(t/60/60), 24)
+	m := math.Mod(float64(t/60), 60)
+	s := math.Mod(float64(t), 60)
+	var result string
+	if d > 0 {
+		result = fmt.Sprintf("%dd ", d)
+	}
+	return fmt.Sprintf("%s%02d:%02d:%02d", result, int(h), int(m), int(s))
 }
