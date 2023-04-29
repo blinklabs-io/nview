@@ -18,6 +18,12 @@ import (
 var app = tview.NewApplication()
 var pages = tview.NewPages()
 
+var flex = tview.NewFlex()
+var text = tview.NewTextView().
+	SetTextColor(tcell.ColorGreen).
+	SetText("(r) to refresh prometheus (q) to quit")
+var promText = tview.NewTextView()
+
 func main() {
 	// Load our config
 	cfg := GetConfig()
@@ -25,133 +31,87 @@ func main() {
 		fmt.Printf("Failed to load config: %s", err)
 		os.Exit(1)
 	}
+
+	// Fetch data from Prometheus
+	promText.SetText(getPromText()).SetBorder(true)
+	flex.SetDirection(tview.FlexRow).
+		// Row 1 is a box
+		AddItem(tview.NewBox(),
+			0,
+			1,
+			false).
+		// Row 2 is a box with a border
+		AddItem(tview.NewBox().SetBorder(true),
+			0,
+			1,
+			false).
+		// Row 3 is a flex set of rows
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			// Row 1 - r3r1
+			AddItem(promText,
+				0,
+				6,
+				false).
+			// Row 2 - r3r2
+			AddItem(tview.NewBox().SetBorder(true),
+				0,
+				1,
+				false),
+			0,
+			7,
+			false).
+		// Row 4 is our footer
+		AddItem(text, 0, 1, false)
+
 	// capture inputs
-	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		// q
+	flex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Rune() == 113 { // q
 			app.Stop()
-		} else if event.Rune() == 112 || event.Key() == tcell.KeyRight { // p or right
-			pages.SwitchToPage("Prometheus")
-		} else if event.Rune() == 99 || event.Key() == tcell.KeyLeft { // c or left
-			pages.SwitchToPage("Main")
+		} else if event.Rune() == 114 { // r
+			promText.Clear()
+			promText.SetText(getPromText())
 		}
 		return event
 	})
 
 	// Pages
-	pages.AddPage("Main", mainLayout(), true, true)
-	pages.AddPage("Prometheus", prometheusLayout(), true, false)
+	pages.AddPage("Main", flex, true, true)
 
 	if err := app.SetRoot(pages, true).EnableMouse(false).Run(); err != nil {
 		panic(err)
 	}
 }
 
-// Main page layout
-func mainLayout() *tview.Flex {
-	text := tview.NewTextView().
-		SetTextColor(tcell.ColorGreen).
-		SetText("(p) to open prometheus (q) to quit")
-	flex := tview.NewFlex()
-	// Configure a flexible box, split into 3 rows
-	flex.SetDirection(tview.FlexRow).
-		// Row 1 is a box
-		AddItem(tview.NewBox().SetBorder(true),
-			0,
-			2,
-			false).
-		// Row 2 is a flex set of rows
-		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
-			// Row 1 is a flex set of columns
-			AddItem(tview.NewFlex().
-				// Column 1 - r2r1c1
-				AddItem(tview.NewBox().SetBorder(true),
-					0,
-					1,
-					true).
-				// Column 2 - r2r1c2
-				AddItem(tview.NewBox().SetBorder(true),
-					0,
-					4,
-					false),
-				0,
-				6,
-				false).
-			// Row 2 - r2r2
-			AddItem(tview.NewBox().SetBorder(true),
-				0,
-				1,
-				false),
-			0,
-			6,
-			false).
-		// Row 3
-		AddItem(text, 0, 1, false)
-	return flex
-}
-
-func prometheusLayout() *tview.Flex {
-	text := tview.NewTextView().
-		SetTextColor(tcell.ColorGreen).
-		SetText("(c) to close this page (q) to quit")
-	flex := tview.NewFlex()
-
+func getPromText() string {
 	var respBodyBytes []byte
 	respBodyBytes, statusCode, err := getNodeMetrics()
 	if err != nil {
-		return flex.AddItem(
-			tview.NewTextView().
-				SetTextColor(tcell.ColorGreen).
-				SetText(fmt.Sprintf("Failed getNodeMetrics: %s", err)),
-			0,
-			2,
-			false)
+		return fmt.Sprintf("Failed getNodeMetrics: %s", err)
 	}
 	if statusCode != http.StatusOK {
-		return flex.AddItem(
-			tview.NewTextView().
-				SetTextColor(tcell.ColorGreen).
-				SetText(fmt.Sprintf("Failed HTTP: %d", statusCode)),
-			0,
-			1,
-			false)
+		return fmt.Sprintf("Failed HTTP: %d", statusCode)
 	}
 
 	b, err := prom2json(respBodyBytes)
 	if err != nil {
-		return flex.AddItem(
-			tview.NewTextView().
-				SetTextColor(tcell.ColorGreen).
-				SetText(fmt.Sprintf("Failed prom2json: %s", err)),
-			0,
-			2,
-			true)
+		return fmt.Sprintf("Failed prom2json: %s", err)
 	}
 
 	var metrics *Metrics
 	if err := json.Unmarshal(b, &metrics); err != nil {
-		return flex.AddItem(
-			tview.NewTextView().
-				SetTextColor(tcell.ColorGreen).
-				SetText(fmt.Sprintf("Failed JSON unmarshal: %s", err)),
-			0,
-			2,
-			true)
+		return fmt.Sprintf("Failed JSON unmarshal: %s", err)
 	}
 
 	// TODO: fetch uptime from node
 	var uptimes uint64 = 0
 
-	// Set up our text view with our response data
-	promText := tview.NewTextView().
-		SetTextColor(tcell.ColorGreen).
-		SetText(fmt.Sprintf("Uptime: %s\nEpoch: %d", timeLeft(uptimes), metrics.EpochNum))
-
-	// Configure a flexible box, split into 2 rows
-	flex.SetDirection(tview.FlexRow).
-		AddItem(promText, 0, 9, true).
-		AddItem(text, 0, 1, false)
-	return flex
+	return fmt.Sprintf("Uptime: %s\nEpoch: %d\nBlock: %d\nSlot: %d\nSlot epoch: %d",
+		timeLeft(uptimes),
+		metrics.EpochNum,
+		metrics.BlockNum,
+		metrics.SlotNum,
+		metrics.SlotInEpoch,
+	)
 }
 
 type Metrics struct {
