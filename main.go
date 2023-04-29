@@ -20,9 +20,15 @@ var pages = tview.NewPages()
 
 var flex = tview.NewFlex()
 var text = tview.NewTextView().
+	SetDynamicColors(true).
 	SetTextColor(tcell.ColorGreen).
-	SetText("(r) to refresh prometheus (q) to quit")
-var promText = tview.NewTextView()
+	SetText(" [yellow](esc/q) Quit[white] | [yellow](r) Refresh Prometheus")
+var promText = tview.NewTextView().
+	SetChangedFunc(func() {
+		app.Draw()
+	})
+var headerText = tview.NewTextView()
+var promTable = tview.NewTable()
 
 func main() {
 	// Load our config
@@ -32,12 +38,23 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Exit if NODE_NAME is > 19 characters
+	if len([]rune(cfg.App.NodeName)) > 19 {
+		fmt.Println("Please keep node name at or below 19 characters in length!")
+		os.Exit(1)
+	}
+
 	// Fetch data from Prometheus
 	promText.SetText(getPromText()).SetBorder(true)
+	promTable = getPromTable()
+	// Set our header
+	headerText.SetText(fmt.Sprintf("> [green]%s[white] <", cfg.App.NodeName)).
+		SetDynamicColors(true).
+		SetTextAlign(tview.AlignCenter)
 	flex.SetDirection(tview.FlexRow).
-		// Row 1 is a box
-		AddItem(tview.NewBox(),
-			0,
+		// Row 1 is our application header
+		AddItem(headerText,
+			1,
 			1,
 			false).
 		// Row 2 is a box with a border
@@ -48,7 +65,7 @@ func main() {
 		// Row 3 is a flex set of rows
 		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
 			// Row 1 - r3r1
-			AddItem(promText,
+			AddItem(promTable,
 				0,
 				6,
 				false).
@@ -65,9 +82,10 @@ func main() {
 
 	// capture inputs
 	flex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Rune() == 113 { // q
+		if event.Rune() == 113 || event.Key() == tcell.KeyEscape { // q
 			app.Stop()
-		} else if event.Rune() == 114 { // r
+		}
+		if event.Rune() == 114 { // r
 			promText.Clear()
 			promText.SetText(getPromText())
 		}
@@ -82,26 +100,54 @@ func main() {
 	}
 }
 
-func getPromText() string {
+func getPromMetrics() *Metrics {
 	var respBodyBytes []byte
 	respBodyBytes, statusCode, err := getNodeMetrics()
 	if err != nil {
-		return fmt.Sprintf("Failed getNodeMetrics: %s", err)
+		fmt.Sprintf("Failed getNodeMetrics: %s", err)
+		os.Exit(1)
 	}
 	if statusCode != http.StatusOK {
-		return fmt.Sprintf("Failed HTTP: %d", statusCode)
+		fmt.Sprintf("Failed HTTP: %d", statusCode)
+		os.Exit(1)
 	}
 
 	b, err := prom2json(respBodyBytes)
 	if err != nil {
-		return fmt.Sprintf("Failed prom2json: %s", err)
+		fmt.Sprintf("Failed prom2json: %s", err)
+		os.Exit(1)
 	}
 
 	var metrics *Metrics
 	if err := json.Unmarshal(b, &metrics); err != nil {
-		return fmt.Sprintf("Failed JSON unmarshal: %s", err)
+		fmt.Sprintf("Failed JSON unmarshal: %s", err)
+		os.Exit(1)
 	}
+	return metrics
+}
 
+func getPromTable() *tview.Table {
+	metrics := getPromMetrics()
+	table := tview.NewTable()
+	// Populate table: 3 x 3
+	// Row 0
+	table.SetCell(0, 0, tview.NewTableCell(fmt.Sprintf(" Block      : [blue]%d[white]", metrics.BlockNum)))
+	table.SetCell(0, 1, tview.NewTableCell(fmt.Sprintf(" Tip (ref)  : [blue]%s", "N/A")))
+	table.SetCell(0, 2, tview.NewTableCell(fmt.Sprintf(" Forks      : [blue]%d", metrics.Forks)))
+	// Row 1
+	table.SetCell(1, 0, tview.NewTableCell(fmt.Sprintf(" Slot       : [blue]%d", metrics.SlotNum)))
+	table.SetCell(1, 1, tview.NewTableCell(fmt.Sprintf(" Tip (diff) : [blue]%s", "N/A")))
+	table.SetCell(1, 2, tview.NewTableCell(fmt.Sprintf(" Total Tx   : [blue]%d", metrics.TxProcessed)))
+	// Row 2
+	table.SetCell(2, 0, tview.NewTableCell(fmt.Sprintf(" Slot epoch : [blue]%d", metrics.SlotInEpoch)))
+	table.SetCell(2, 1, tview.NewTableCell(fmt.Sprintf(" Density    : [blue]%.2f", metrics.Density)))
+	mempoolTxKBytes := metrics.MempoolBytes / 1024
+	table.SetCell(2, 2, tview.NewTableCell(fmt.Sprintf(" Pending Tx : [blue]%d[white]/[blue]%d[white]K", metrics.MempoolTx, mempoolTxKBytes)))
+	return table
+}
+
+func getPromText() string {
+	metrics := getPromMetrics()
 	// TODO: fetch uptime from node
 	var uptimes uint64 = 0
 
