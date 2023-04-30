@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gdamore/tcell/v2"
 	dto "github.com/prometheus/client_model/go"
@@ -21,16 +24,18 @@ var pages = tview.NewPages()
 var flex = tview.NewFlex()
 var text = tview.NewTextView().
 	SetDynamicColors(true).
-	SetTextColor(tcell.ColorGreen).
-	SetText(" [yellow](esc/q) Quit[white] | [yellow](r) Refresh Prometheus")
-var promText = tview.NewTextView().
 	SetChangedFunc(func() {
 		app.Draw()
 	})
 var headerText = tview.NewTextView()
-var promTable = tview.NewTable()
+var footerText = tview.NewTextView().
+	SetDynamicColors(true).
+	SetTextColor(tcell.ColorGreen).
+	SetText(" [yellow](esc/q) Quit[white] | [yellow](r) Refresh Prometheus")
 
 func main() {
+	// Create a background context
+	ctx := context.Background()
 	// Load our config
 	cfg := GetConfig()
 	if err := cfg.LoadConfig(); err != nil {
@@ -45,8 +50,7 @@ func main() {
 	}
 
 	// Fetch data from Prometheus
-	promText.SetText(getPromText()).SetBorder(true)
-	promTable = getPromTable()
+	text.SetText(getPromText(ctx)).SetBorder(true)
 	// Set our header
 	headerText.SetText(fmt.Sprintf("> [green]%s[white] <", cfg.App.NodeName)).
 		SetDynamicColors(true).
@@ -57,19 +61,14 @@ func main() {
 			1,
 			1,
 			false).
-		// Row 2 is a box with a border
-		AddItem(tview.NewBox().SetBorder(true),
-			0,
-			1,
-			false).
-		// Row 3 is a flex set of rows
+		// Row 2 is a flex set of rows
 		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
-			// Row 1 - r3r1
-			AddItem(promTable,
+			// Row 1 - r2r1
+			AddItem(text,
 				0,
 				6,
 				false).
-			// Row 2 - r3r2
+			// Row 2 - r2r2
 			AddItem(tview.NewBox().SetBorder(true),
 				0,
 				1,
@@ -77,8 +76,8 @@ func main() {
 			0,
 			7,
 			false).
-		// Row 4 is our footer
-		AddItem(text, 0, 1, false)
+		// Row 3 is our footer
+		AddItem(footerText, 0, 1, false)
 
 	// capture inputs
 	flex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -86,8 +85,8 @@ func main() {
 			app.Stop()
 		}
 		if event.Rune() == 114 { // r
-			promText.Clear()
-			promText.SetText(getPromText())
+			text.Clear()
+			text.SetText(getPromText(ctx))
 		}
 		return event
 	})
@@ -100,64 +99,75 @@ func main() {
 	}
 }
 
-func getPromMetrics() *Metrics {
+func getPromMetrics(ctx context.Context) *Metrics {
 	var respBodyBytes []byte
-	respBodyBytes, statusCode, err := getNodeMetrics()
+	respBodyBytes, statusCode, err := getNodeMetrics(ctx)
 	if err != nil {
-		fmt.Sprintf("Failed getNodeMetrics: %s", err)
+		fmt.Printf("Failed getNodeMetrics: %s\n", err)
 		os.Exit(1)
 	}
 	if statusCode != http.StatusOK {
-		fmt.Sprintf("Failed HTTP: %d", statusCode)
+		fmt.Printf("Failed HTTP: %d\n", statusCode)
 		os.Exit(1)
 	}
 
 	b, err := prom2json(respBodyBytes)
 	if err != nil {
-		fmt.Sprintf("Failed prom2json: %s", err)
+		fmt.Printf("Failed prom2json: %s\n", err)
 		os.Exit(1)
 	}
 
 	var metrics *Metrics
 	if err := json.Unmarshal(b, &metrics); err != nil {
-		fmt.Sprintf("Failed JSON unmarshal: %s", err)
+		fmt.Printf("Failed JSON unmarshal: %s\n", err)
 		os.Exit(1)
 	}
 	return metrics
 }
 
-func getPromTable() *tview.Table {
-	metrics := getPromMetrics()
-	table := tview.NewTable()
-	// Populate table: 3 x 3
-	// Row 0
-	table.SetCell(0, 0, tview.NewTableCell(fmt.Sprintf(" Block      : [blue]%d[white]", metrics.BlockNum)))
-	table.SetCell(0, 1, tview.NewTableCell(fmt.Sprintf(" Tip (ref)  : [blue]%s", "N/A")))
-	table.SetCell(0, 2, tview.NewTableCell(fmt.Sprintf(" Forks      : [blue]%d", metrics.Forks)))
-	// Row 1
-	table.SetCell(1, 0, tview.NewTableCell(fmt.Sprintf(" Slot       : [blue]%d", metrics.SlotNum)))
-	table.SetCell(1, 1, tview.NewTableCell(fmt.Sprintf(" Tip (diff) : [blue]%s", "N/A")))
-	table.SetCell(1, 2, tview.NewTableCell(fmt.Sprintf(" Total Tx   : [blue]%d", metrics.TxProcessed)))
-	// Row 2
-	table.SetCell(2, 0, tview.NewTableCell(fmt.Sprintf(" Slot epoch : [blue]%d", metrics.SlotInEpoch)))
-	table.SetCell(2, 1, tview.NewTableCell(fmt.Sprintf(" Density    : [blue]%.2f", metrics.Density)))
-	mempoolTxKBytes := metrics.MempoolBytes / 1024
-	table.SetCell(2, 2, tview.NewTableCell(fmt.Sprintf(" Pending Tx : [blue]%d[white]/[blue]%d[white]K", metrics.MempoolTx, mempoolTxKBytes)))
-	return table
-}
-
-func getPromText() string {
-	metrics := getPromMetrics()
+func getPromText(ctx context.Context) string {
+	metrics := getPromMetrics(ctx)
 	// TODO: fetch uptime from node
 	var uptimes uint64 = 0
 
-	return fmt.Sprintf("Uptime: %s\nEpoch: %d\nBlock: %d\nSlot: %d\nSlot epoch: %d",
-		timeLeft(uptimes),
-		metrics.EpochNum,
-		metrics.BlockNum,
-		metrics.SlotNum,
-		metrics.SlotInEpoch,
-	)
+	//var nc = tview.TranslateANSI("\e[0m")
+	//var standout = tview.TranslateANSI("\e[7m")
+	//var bold = tview.TranslateANSI("\e[1m")
+
+	// Style / UI
+	//var width = 71
+	//var threeColWidth = (width-3)/2
+	//var threeCol2Start = threeColWidth+3
+	//var threeCol3Start = threeColWidth*2+4
+	//var threeCol1ValueWidth = threeColWidth-12
+	//var threeCol2ValueWidth = threeColWidth-12
+	//var threeCol3ValueWidth = threeColWidth-12
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", timeLeft(uptimes)))
+	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("- ", 10)))
+	sb.WriteString(fmt.Sprintf(" Epoch [blue]%d[white]\n", metrics.EpochNum))
+	sb.WriteString(fmt.Sprintf("\n"))
+	// Row 1
+	sb.WriteString(fmt.Sprintf(" Block      : [blue]%-22s[white]", strconv.FormatUint(metrics.BlockNum, 10)))
+	sb.WriteString(fmt.Sprintf(" Tip (ref)  : [blue]%-22s[white]", "N/A"))
+	sb.WriteString(fmt.Sprintf(" Forks      : [blue]%-22s[white]\n", strconv.FormatUint(metrics.Forks, 10)))
+	// Row 2
+	sb.WriteString(fmt.Sprintf(" Slot       : [blue]%-22s[white]", strconv.FormatUint(metrics.SlotNum, 10)))
+	sb.WriteString(fmt.Sprintf(" Tip (diff) : [blue]%-22s[white]", "N/A"))
+	sb.WriteString(fmt.Sprintf(" Total Tx   : [blue]%-22s[white]\n", strconv.FormatUint(metrics.TxProcessed, 10)))
+	// Row 3
+	sb.WriteString(fmt.Sprintf(" Slot epoch : [blue]%-22s[white]", strconv.FormatUint(metrics.SlotInEpoch, 10)))
+	sb.WriteString(fmt.Sprintf(" Density    : [blue]%-22s[white]", fmt.Sprintf("%3.5f", metrics.Density*100/1)))
+	mempoolTxKBytes := metrics.MempoolBytes / 1024
+	kWidth := strconv.Itoa(22 - len(strconv.FormatUint(metrics.MempoolTx, 10)) - len(strconv.FormatUint(mempoolTxKBytes, 10)))
+	sb.WriteString(fmt.Sprintf(" Pending Tx : [blue]%d[white]/[blue]%d[white]%-"+kWidth+"s\n",
+		metrics.MempoolTx,
+		mempoolTxKBytes,
+		"K",
+	))
+
+	return fmt.Sprint(sb.String())
 }
 
 type Metrics struct {
@@ -197,7 +207,7 @@ type Metrics struct {
 	ConnDuplex          uint64  `json:"cardano_node_metrics_connectionManager_prunableConns"`
 }
 
-func getNodeMetrics() ([]byte, int, error) {
+func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 	// Load our config and get host/port
 	cfg := GetConfig()
 	url := fmt.Sprintf(
@@ -215,6 +225,10 @@ func getNodeMetrics() ([]byte, int, error) {
 	if err != nil {
 		return respBodyBytes, http.StatusInternalServerError, err
 	}
+	// Set a 3 second timeout
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(time.Second*3))
+	defer cancel()
+	req.WithContext(ctx)
 	// Get metrics from the node
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
