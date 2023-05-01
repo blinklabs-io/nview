@@ -94,6 +94,15 @@ func main() {
 	// Pages
 	pages.AddPage("Main", flex, true, true)
 
+	// Start our background refresh timer
+	go func() {
+		for {
+			text.Clear()
+			text.SetText(getPromText(ctx))
+			time.Sleep(time.Second * 5)
+		}
+	}()
+
 	if err := app.SetRoot(pages, true).EnableMouse(false).Run(); err != nil {
 		panic(err)
 	}
@@ -135,19 +144,26 @@ func getPromText(ctx context.Context) string {
 	//var bold = tview.TranslateANSI("\e[1m")
 
 	// Style / UI
-	//var width = 71
-	//var threeColWidth = (width-3)/2
+	var width = 71
+	var threeColWidth = (width - 3) / 2
 	//var threeCol2Start = threeColWidth+3
 	//var threeCol3Start = threeColWidth*2+4
-	//var threeCol1ValueWidth = threeColWidth-12
+	var threeCol1ValueWidth = threeColWidth - 12
 	//var threeCol2ValueWidth = threeColWidth-12
 	//var threeCol3ValueWidth = threeColWidth-12
 
 	var sb strings.Builder
+
+	// Main section
 	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", timeLeft(uptimes)))
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("- ", 10)))
+
+	// Epoch
 	sb.WriteString(fmt.Sprintf(" Epoch [blue]%d[white]\n", metrics.EpochNum))
 	sb.WriteString(fmt.Sprintf("\n"))
+
+	// Blocks / Slots / Tx
+
 	// Row 1
 	sb.WriteString(fmt.Sprintf(" Block      : [blue]%-22s[white]", strconv.FormatUint(metrics.BlockNum, 10)))
 	sb.WriteString(fmt.Sprintf(" Tip (ref)  : [blue]%-22s[white]", "N/A"))
@@ -160,12 +176,48 @@ func getPromText(ctx context.Context) string {
 	sb.WriteString(fmt.Sprintf(" Slot epoch : [blue]%-22s[white]", strconv.FormatUint(metrics.SlotInEpoch, 10)))
 	sb.WriteString(fmt.Sprintf(" Density    : [blue]%-22s[white]", fmt.Sprintf("%3.5f", metrics.Density*100/1)))
 	mempoolTxKBytes := metrics.MempoolBytes / 1024
-	kWidth := strconv.Itoa(22 - len(strconv.FormatUint(metrics.MempoolTx, 10)) - len(strconv.FormatUint(mempoolTxKBytes, 10)))
+	kWidth := strconv.Itoa(threeCol1ValueWidth -
+		len(strconv.FormatUint(metrics.MempoolTx, 10)) -
+		len(strconv.FormatUint(mempoolTxKBytes, 10)))
 	sb.WriteString(fmt.Sprintf(" Pending Tx : [blue]%d[white]/[blue]%d[white]%-"+kWidth+"s\n",
 		metrics.MempoolTx,
 		mempoolTxKBytes,
 		"K",
 	))
+
+	// CONNECTIONS Divider
+	sb.WriteString(fmt.Sprintf("- [yellow]CONNECTIONS[white] %s\n", strings.Repeat("- ", width-13)))
+
+	// TODO: actually check for p2p
+	p2p := true
+	if p2p {
+		// Row 1
+		sb.WriteString(fmt.Sprintf(" P2P        : [green]%-22s[white]", "enabled"))
+		sb.WriteString(fmt.Sprintf(" Cold Peers : [blue]%-22s[white]", strconv.FormatUint(metrics.PeersCold, 10)))
+		sb.WriteString(fmt.Sprintf(" Uni-Dir    : [blue]%-22s[white]\n", strconv.FormatUint(metrics.ConnUniDir, 10)))
+		// Row 2
+		sb.WriteString(fmt.Sprintf(" Incoming   : [blue]%-22s[white]", strconv.FormatUint(metrics.ConnIncoming, 10)))
+		sb.WriteString(fmt.Sprintf(" Warm Peers : [blue]%-22s[white]", strconv.FormatUint(metrics.PeersWarm, 10)))
+		sb.WriteString(fmt.Sprintf(" Bi-Dir     : [blue]%-22s[white]\n", strconv.FormatUint(metrics.ConnBiDir, 10)))
+		// Row 3
+		sb.WriteString(fmt.Sprintf(" Outgoing   : [blue]%-22s[white]", strconv.FormatUint(metrics.ConnOutgoing, 10)))
+		sb.WriteString(fmt.Sprintf(" Hot Peers  : [blue]%-22s[white]", strconv.FormatUint(metrics.PeersHot, 10)))
+		sb.WriteString(fmt.Sprintf(" Duplex     : [blue]%-22s[white]\n", strconv.FormatUint(metrics.ConnDuplex, 10)))
+	} else {
+		sb.WriteString(fmt.Sprintf(" P2P        : [yellow]%-22s[white]\n", "disabled"))
+	}
+
+	// BLOCK PROPAGATION Divider
+	sb.WriteString(fmt.Sprintf("- [yellow]BLOCK PROPAGATION[white] %s\n", strings.Repeat("- ", width-16)))
+
+	// Row 1
+	sb.WriteString(fmt.Sprintf(" Last Delay : [blue]%s[white]%-18s", fmt.Sprintf("%.2f", metrics.BlockDelay), "s"))
+	sb.WriteString(fmt.Sprintf(" Served     : [blue]%-22s[white]", strconv.FormatUint(metrics.BlocksServed, 10)))
+	sb.WriteString(fmt.Sprintf(" Late (>5s) : [blue]%-22s[white]\n", strconv.FormatUint(metrics.BlocksLate, 10)))
+	// Row 2
+	sb.WriteString(fmt.Sprintf(" Within 1s  : [blue]%s[white]%-17s", fmt.Sprintf("%.2f", metrics.BlocksW1s*100), "%"))
+	sb.WriteString(fmt.Sprintf(" Within 3s  : [blue]%s[white]%-17s", fmt.Sprintf("%.2f", metrics.BlocksW3s*100), "%"))
+	sb.WriteString(fmt.Sprintf(" Within 5s  : [blue]%s[white]%-17s\n", fmt.Sprintf("%.2f", metrics.BlocksW5s*100), "%"))
 
 	return fmt.Sprint(sb.String())
 }
@@ -192,7 +244,7 @@ type Metrics struct {
 	GcMajor             uint64  `json:"cardano_node_metrics_RTS_gcMajorNum_int"`
 	Forks               uint64  `json:"cardano_node_metrics_forks_int"`
 	BlockDelay          float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_s"`
-	BlockServed         uint64  `json:"cardano_node_metrics_served_block_count_int"`
+	BlocksServed        uint64  `json:"cardano_node_metrics_served_block_count_int"`
 	BlocksLate          uint64  `json:"cardano_node_metrics_blockfetchclient_lateblocks"`
 	BlocksW1s           float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_cdfOne"`
 	BlocksW3s           float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_cdfThree"`
