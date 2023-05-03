@@ -149,8 +149,7 @@ func getPromText(ctx context.Context) string {
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("- ", 10)))
 
 	// Epoch
-	sb.WriteString(fmt.Sprintf(" Epoch [blue]%d[white]\n", metrics.EpochNum))
-	sb.WriteString(fmt.Sprintf("\n"))
+	sb.WriteString(fmt.Sprintf(" Epoch [blue]%d[white]\n\n", metrics.EpochNum))
 
 	// Blocks / Slots / Tx
 
@@ -287,7 +286,7 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 	// Set a 3 second timeout
 	ctx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cfg.Prometheus.Timeout))
 	defer cancel()
-	req.WithContext(ctx)
+	req = req.WithContext(ctx)
 	// Get metrics from the node
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
