@@ -61,20 +61,10 @@ func main() {
 			1,
 			1,
 			false).
-		// Row 2 is a flex set of rows
-		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
-			// Row 1 - r2r1
-			AddItem(text,
-				0,
-				6,
-				false).
-			// Row 2 - r2r2
-			AddItem(tview.NewBox().SetBorder(true),
-				0,
-				1,
-				false),
+		// Row 2 is our main text section
+		AddItem(text,
 			0,
-			7,
+			5,
 			false).
 		// Row 3 is our footer
 		AddItem(footerText, 0, 1, false)
@@ -149,8 +139,8 @@ func getPromText(ctx context.Context) string {
 	//var threeCol2Start = threeColWidth+3
 	//var threeCol3Start = threeColWidth*2+4
 	var threeCol1ValueWidth = threeColWidth - 12
-	//var threeCol2ValueWidth = threeColWidth-12
-	//var threeCol3ValueWidth = threeColWidth-12
+	var threeCol2ValueWidth = threeColWidth - 12
+	var threeCol3ValueWidth = threeColWidth - 12
 
 	var sb strings.Builder
 
@@ -165,16 +155,16 @@ func getPromText(ctx context.Context) string {
 	// Blocks / Slots / Tx
 
 	// Row 1
-	sb.WriteString(fmt.Sprintf(" Block      : [blue]%-22s[white]", strconv.FormatUint(metrics.BlockNum, 10)))
-	sb.WriteString(fmt.Sprintf(" Tip (ref)  : [blue]%-22s[white]", "N/A"))
-	sb.WriteString(fmt.Sprintf(" Forks      : [blue]%-22s[white]\n", strconv.FormatUint(metrics.Forks, 10)))
+	sb.WriteString(fmt.Sprintf(" Block      : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]", strconv.FormatUint(metrics.BlockNum, 10)))
+	sb.WriteString(fmt.Sprintf(" Tip (ref)  : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]", "N/A"))
+	sb.WriteString(fmt.Sprintf(" Forks      : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n", strconv.FormatUint(metrics.Forks, 10)))
 	// Row 2
-	sb.WriteString(fmt.Sprintf(" Slot       : [blue]%-22s[white]", strconv.FormatUint(metrics.SlotNum, 10)))
-	sb.WriteString(fmt.Sprintf(" Tip (diff) : [blue]%-22s[white]", "N/A"))
-	sb.WriteString(fmt.Sprintf(" Total Tx   : [blue]%-22s[white]\n", strconv.FormatUint(metrics.TxProcessed, 10)))
+	sb.WriteString(fmt.Sprintf(" Slot       : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]", strconv.FormatUint(metrics.SlotNum, 10)))
+	sb.WriteString(fmt.Sprintf(" Tip (diff) : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]", "N/A"))
+	sb.WriteString(fmt.Sprintf(" Total Tx   : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n", strconv.FormatUint(metrics.TxProcessed, 10)))
 	// Row 3
-	sb.WriteString(fmt.Sprintf(" Slot epoch : [blue]%-22s[white]", strconv.FormatUint(metrics.SlotInEpoch, 10)))
-	sb.WriteString(fmt.Sprintf(" Density    : [blue]%-22s[white]", fmt.Sprintf("%3.5f", metrics.Density*100/1)))
+	sb.WriteString(fmt.Sprintf(" Slot epoch : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]", strconv.FormatUint(metrics.SlotInEpoch, 10)))
+	sb.WriteString(fmt.Sprintf(" Density    : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]", fmt.Sprintf("%3.5f", metrics.Density*100/1)))
 	mempoolTxKBytes := metrics.MempoolBytes / 1024
 	kWidth := strconv.Itoa(threeCol1ValueWidth -
 		len(strconv.FormatUint(metrics.MempoolTx, 10)) -
@@ -192,19 +182,19 @@ func getPromText(ctx context.Context) string {
 	p2p := true
 	if p2p {
 		// Row 1
-		sb.WriteString(fmt.Sprintf(" P2P        : [green]%-22s[white]", "enabled"))
-		sb.WriteString(fmt.Sprintf(" Cold Peers : [blue]%-22s[white]", strconv.FormatUint(metrics.PeersCold, 10)))
-		sb.WriteString(fmt.Sprintf(" Uni-Dir    : [blue]%-22s[white]\n", strconv.FormatUint(metrics.ConnUniDir, 10)))
+		sb.WriteString(fmt.Sprintf(" P2P        : [green]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]", "enabled"))
+		sb.WriteString(fmt.Sprintf(" Cold Peers : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]", strconv.FormatUint(metrics.PeersCold, 10)))
+		sb.WriteString(fmt.Sprintf(" Uni-Dir    : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n", strconv.FormatUint(metrics.ConnUniDir, 10)))
 		// Row 2
-		sb.WriteString(fmt.Sprintf(" Incoming   : [blue]%-22s[white]", strconv.FormatUint(metrics.ConnIncoming, 10)))
-		sb.WriteString(fmt.Sprintf(" Warm Peers : [blue]%-22s[white]", strconv.FormatUint(metrics.PeersWarm, 10)))
-		sb.WriteString(fmt.Sprintf(" Bi-Dir     : [blue]%-22s[white]\n", strconv.FormatUint(metrics.ConnBiDir, 10)))
+		sb.WriteString(fmt.Sprintf(" Incoming   : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]", strconv.FormatUint(metrics.ConnIncoming, 10)))
+		sb.WriteString(fmt.Sprintf(" Warm Peers : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]", strconv.FormatUint(metrics.PeersWarm, 10)))
+		sb.WriteString(fmt.Sprintf(" Bi-Dir     : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n", strconv.FormatUint(metrics.ConnBiDir, 10)))
 		// Row 3
-		sb.WriteString(fmt.Sprintf(" Outgoing   : [blue]%-22s[white]", strconv.FormatUint(metrics.ConnOutgoing, 10)))
-		sb.WriteString(fmt.Sprintf(" Hot Peers  : [blue]%-22s[white]", strconv.FormatUint(metrics.PeersHot, 10)))
-		sb.WriteString(fmt.Sprintf(" Duplex     : [blue]%-22s[white]\n", strconv.FormatUint(metrics.ConnDuplex, 10)))
+		sb.WriteString(fmt.Sprintf(" Outgoing   : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]", strconv.FormatUint(metrics.ConnOutgoing, 10)))
+		sb.WriteString(fmt.Sprintf(" Hot Peers  : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]", strconv.FormatUint(metrics.PeersHot, 10)))
+		sb.WriteString(fmt.Sprintf(" Duplex     : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n", strconv.FormatUint(metrics.ConnDuplex, 10)))
 	} else {
-		sb.WriteString(fmt.Sprintf(" P2P        : [yellow]%-22s[white]\n", "disabled"))
+		sb.WriteString(fmt.Sprintf(" P2P        : [yellow]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]\n", "disabled"))
 	}
 
 	// BLOCK PROPAGATION Divider
@@ -215,9 +205,26 @@ func getPromText(ctx context.Context) string {
 	sb.WriteString(fmt.Sprintf(" Served     : [blue]%-22s[white]", strconv.FormatUint(metrics.BlocksServed, 10)))
 	sb.WriteString(fmt.Sprintf(" Late (>5s) : [blue]%-22s[white]\n", strconv.FormatUint(metrics.BlocksLate, 10)))
 	// Row 2
-	sb.WriteString(fmt.Sprintf(" Within 1s  : [blue]%s[white]%-17s", fmt.Sprintf("%.2f", metrics.BlocksW1s*100), "%"))
-	sb.WriteString(fmt.Sprintf(" Within 3s  : [blue]%s[white]%-17s", fmt.Sprintf("%.2f", metrics.BlocksW3s*100), "%"))
-	sb.WriteString(fmt.Sprintf(" Within 5s  : [blue]%s[white]%-17s\n", fmt.Sprintf("%.2f", metrics.BlocksW5s*100), "%"))
+	blk1s := fmt.Sprintf("%.2f", metrics.BlocksW1s*100)
+	sb.WriteString(fmt.Sprintf(" Within 1s  : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth - len(blk1s))+"s", blk1s, "%"))
+	blk3s := fmt.Sprintf("%.2f", metrics.BlocksW3s*100)
+	sb.WriteString(fmt.Sprintf(" Within 3s  : [blue]%s[white]%-"+strconv.Itoa(threeCol2ValueWidth - len(blk3s))+"s", blk3s, "%"))
+	blk5s := fmt.Sprintf("%.2f", metrics.BlocksW5s*100)
+	sb.WriteString(fmt.Sprintf(" Within 5s  : [blue]%s[white]%-"+strconv.Itoa(threeCol3ValueWidth - len(blk5s))+"s\n", blk5s, "%"))
+
+	// NODE RESOURCE USAGE Divider
+	sb.WriteString(fmt.Sprintf("- [yellow]NODE RESOURCE USAGE[white] %s\n", strings.Repeat("- ", width-17)))
+
+	// Row 1
+	sb.WriteString(fmt.Sprintf(" CPU (sys)  : [blue]%s[white]%-18s", fmt.Sprintf("%.1f", 99.0), "%"))
+	memLive := fmt.Sprintf("%.1f", float64(metrics.MemLive)/float64(1073741824))
+	sb.WriteString(fmt.Sprintf(" Mem (Live) : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth - len(memLive))+"s", memLive, "G"))
+	sb.WriteString(fmt.Sprintf(" GC Minor   : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n", strconv.FormatUint(metrics.GcMinor, 10)))
+	// Row 2
+	sb.WriteString(fmt.Sprintf(" Mem (RSS)  : [blue]%s[white]%-19s", fmt.Sprintf("%.1f", 1.2), "G"))
+	memHeap := fmt.Sprintf("%.1f", float64(metrics.MemHeap)/float64(1073741824))
+	sb.WriteString(fmt.Sprintf(" Mem (Heap) : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth - len(memHeap))+"s", memHeap, "G"))
+	sb.WriteString(fmt.Sprintf(" GC Major   : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n", strconv.FormatUint(metrics.GcMajor, 10)))
 
 	return fmt.Sprint(sb.String())
 }
