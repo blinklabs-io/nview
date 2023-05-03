@@ -9,17 +9,22 @@ BINARIES=nview
 
 .PHONY: build mod-tidy clean test
 
+all: format build
+
 # Alias for building program binary
 build: $(BINARIES)
 
-mod-tidy:
+tidy:
 	# Needed to fetch new dependencies and add them to go.mod
 	go mod tidy
 
 clean:
 	rm -f $(BINARIES)
 
-test: mod-tidy
+format: tidy
+	go fmt ./...
+
+test: tidy
 	go test -v ./...
 
 # Build our program binaries

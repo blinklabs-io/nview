@@ -206,11 +206,11 @@ func getPromText(ctx context.Context) string {
 	sb.WriteString(fmt.Sprintf(" Late (>5s) : [blue]%-22s[white]\n", strconv.FormatUint(metrics.BlocksLate, 10)))
 	// Row 2
 	blk1s := fmt.Sprintf("%.2f", metrics.BlocksW1s*100)
-	sb.WriteString(fmt.Sprintf(" Within 1s  : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth - len(blk1s))+"s", blk1s, "%"))
+	sb.WriteString(fmt.Sprintf(" Within 1s  : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth-len(blk1s))+"s", blk1s, "%"))
 	blk3s := fmt.Sprintf("%.2f", metrics.BlocksW3s*100)
-	sb.WriteString(fmt.Sprintf(" Within 3s  : [blue]%s[white]%-"+strconv.Itoa(threeCol2ValueWidth - len(blk3s))+"s", blk3s, "%"))
+	sb.WriteString(fmt.Sprintf(" Within 3s  : [blue]%s[white]%-"+strconv.Itoa(threeCol2ValueWidth-len(blk3s))+"s", blk3s, "%"))
 	blk5s := fmt.Sprintf("%.2f", metrics.BlocksW5s*100)
-	sb.WriteString(fmt.Sprintf(" Within 5s  : [blue]%s[white]%-"+strconv.Itoa(threeCol3ValueWidth - len(blk5s))+"s\n", blk5s, "%"))
+	sb.WriteString(fmt.Sprintf(" Within 5s  : [blue]%s[white]%-"+strconv.Itoa(threeCol3ValueWidth-len(blk5s))+"s\n", blk5s, "%"))
 
 	// NODE RESOURCE USAGE Divider
 	sb.WriteString(fmt.Sprintf("- [yellow]NODE RESOURCE USAGE[white] %s\n", strings.Repeat("- ", width-17)))
@@ -218,12 +218,12 @@ func getPromText(ctx context.Context) string {
 	// Row 1
 	sb.WriteString(fmt.Sprintf(" CPU (sys)  : [blue]%s[white]%-18s", fmt.Sprintf("%.1f", 99.0), "%"))
 	memLive := fmt.Sprintf("%.1f", float64(metrics.MemLive)/float64(1073741824))
-	sb.WriteString(fmt.Sprintf(" Mem (Live) : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth - len(memLive))+"s", memLive, "G"))
+	sb.WriteString(fmt.Sprintf(" Mem (Live) : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth-len(memLive))+"s", memLive, "G"))
 	sb.WriteString(fmt.Sprintf(" GC Minor   : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n", strconv.FormatUint(metrics.GcMinor, 10)))
 	// Row 2
 	sb.WriteString(fmt.Sprintf(" Mem (RSS)  : [blue]%s[white]%-19s", fmt.Sprintf("%.1f", 1.2), "G"))
 	memHeap := fmt.Sprintf("%.1f", float64(metrics.MemHeap)/float64(1073741824))
-	sb.WriteString(fmt.Sprintf(" Mem (Heap) : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth - len(memHeap))+"s", memHeap, "G"))
+	sb.WriteString(fmt.Sprintf(" Mem (Heap) : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth-len(memHeap))+"s", memHeap, "G"))
 	sb.WriteString(fmt.Sprintf(" GC Major   : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n", strconv.FormatUint(metrics.GcMajor, 10)))
 
 	return fmt.Sprint(sb.String())
@@ -285,7 +285,7 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 		return respBodyBytes, http.StatusInternalServerError, err
 	}
 	// Set a 3 second timeout
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(time.Second*3))
+	ctx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cfg.Prometheus.Timeout))
 	defer cancel()
 	req.WithContext(ctx)
 	// Get metrics from the node
