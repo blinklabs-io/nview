@@ -15,8 +15,9 @@ type AppConfig struct {
 }
 
 type PrometheusConfig struct {
-	Host string `envconfig:"PROM_HOST"`
-	Port uint   `envconfig:"PROM_PORT"`
+	Host    string `envconfig:"PROM_HOST"`
+	Port    uint   `envconfig:"PROM_PORT"`
+	Timeout uint   `envconfig:"PROM_TIMEOUT"`
 }
 
 // Singleton config instance with default values
@@ -25,8 +26,9 @@ var globalConfig = &Config{
 		NodeName: "Cardano Node",
 	},
 	Prometheus: PrometheusConfig{
-		Host: "127.0.0.1",
-		Port: 12798,
+		Host:    "127.0.0.1",
+		Port:    12798,
+		Timeout: 3,
 	},
 }
 
