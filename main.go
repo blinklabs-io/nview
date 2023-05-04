@@ -16,22 +16,30 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/rivo/tview"
+	"github.com/shirou/gopsutil/v3/process"
 )
 
+// Global tview application and pages
 var app = tview.NewApplication()
 var pages = tview.NewPages()
 
+// Main viewport - flexible box
 var flex = tview.NewFlex()
-var text = tview.NewTextView().
-	SetDynamicColors(true).
-	SetChangedFunc(func() {
-		app.Draw()
-	})
-var headerText = tview.NewTextView()
+
+// Our text views: footer, header, and main section
 var footerText = tview.NewTextView().
 	SetDynamicColors(true).
 	SetTextColor(tcell.ColorGreen).
 	SetText(" [yellow](esc/q) Quit[white] | [yellow](r) Refresh Prometheus")
+var headerText = tview.NewTextView().
+	SetDynamicColors(true).
+	SetTextAlign(tview.AlignCenter)
+var text = tview.NewTextView().
+	SetDynamicColors(true).
+	SetChangedFunc(func() {
+		// Redraw the screen on a change
+		app.Draw()
+	})
 
 func main() {
 	// Create a background context
@@ -52,9 +60,14 @@ func main() {
 	// Fetch data from Prometheus
 	text.SetText(getPromText(ctx)).SetBorder(true)
 	// Set our header
-	headerText.SetText(fmt.Sprintf("> [green]%s[white] <", cfg.App.NodeName)).
-		SetDynamicColors(true).
-		SetTextAlign(tview.AlignCenter)
+	headerText.SetText(fmt.Sprintf("> [green]%s[white] - [yellow](%s - %s)[white] : [blue]%s[white] <",
+		cfg.App.NodeName,
+		"Role: N/A",
+		"Network: N/A",
+		"Version: N/A",
+	))
+
+	// Add content to our flex box
 	flex.SetDirection(tview.FlexRow).
 		// Row 1 is our application header
 		AddItem(headerText,
@@ -89,7 +102,7 @@ func main() {
 		for {
 			text.Clear()
 			text.SetText(getPromText(ctx))
-			time.Sleep(time.Second * 5)
+			time.Sleep(time.Second * 2)
 		}
 	}()
 
@@ -98,40 +111,21 @@ func main() {
 	}
 }
 
-func getPromMetrics(ctx context.Context) *Metrics {
-	var respBodyBytes []byte
-	respBodyBytes, statusCode, err := getNodeMetrics(ctx)
-	if err != nil {
-		fmt.Printf("Failed getNodeMetrics: %s\n", err)
-		os.Exit(1)
-	}
-	if statusCode != http.StatusOK {
-		fmt.Printf("Failed HTTP: %d\n", statusCode)
-		os.Exit(1)
-	}
-
-	b, err := prom2json(respBodyBytes)
-	if err != nil {
-		fmt.Printf("Failed prom2json: %s\n", err)
-		os.Exit(1)
-	}
-
-	var metrics *Metrics
-	if err := json.Unmarshal(b, &metrics); err != nil {
-		fmt.Printf("Failed JSON unmarshal: %s\n", err)
-		os.Exit(1)
-	}
-	return metrics
-}
-
 func getPromText(ctx context.Context) string {
-	metrics := getPromMetrics(ctx)
-	// TODO: fetch uptime from node
-	var uptimes uint64 = 0
+	// Load our config
+	cfg := GetConfig()
+	// Refresh metrics from Prometheus and host
+	promMetrics := getPromMetrics(ctx)
+	processMetrics := getProcessMetrics(ctx)
 
-	//var nc = tview.TranslateANSI("\e[0m")
-	//var standout = tview.TranslateANSI("\e[7m")
-	//var bold = tview.TranslateANSI("\e[1m")
+	// Calculate uptime for our process
+	var uptimes uint64
+	createTime, err := processMetrics.CreateTimeWithContext(ctx)
+	if err != nil {
+		return fmt.Sprintf("failed get %s process creation time", cfg.Node.Binary)
+	}
+	// createTime is milliseconds since UNIX epoch, convert to seconds
+	uptimes = uint64(time.Now().Unix() - (createTime / 1000))
 
 	// Style / UI
 	var width = 71
@@ -149,86 +143,231 @@ func getPromText(ctx context.Context) string {
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("- ", 10)))
 
 	// Epoch
-	sb.WriteString(fmt.Sprintf(" Epoch [blue]%d[white]\n\n", metrics.EpochNum))
+	sb.WriteString(fmt.Sprintf(" Epoch [blue]%d[white]\n\n", promMetrics.EpochNum))
 
 	// Blocks / Slots / Tx
 
-	// Row 1
-	sb.WriteString(fmt.Sprintf(" Block      : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]", strconv.FormatUint(metrics.BlockNum, 10)))
-	sb.WriteString(fmt.Sprintf(" Tip (ref)  : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]", "N/A"))
-	sb.WriteString(fmt.Sprintf(" Forks      : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n", strconv.FormatUint(metrics.Forks, 10)))
-	// Row 2
-	sb.WriteString(fmt.Sprintf(" Slot       : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]", strconv.FormatUint(metrics.SlotNum, 10)))
-	sb.WriteString(fmt.Sprintf(" Tip (diff) : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]", "N/A"))
-	sb.WriteString(fmt.Sprintf(" Total Tx   : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n", strconv.FormatUint(metrics.TxProcessed, 10)))
-	// Row 3
-	sb.WriteString(fmt.Sprintf(" Slot epoch : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]", strconv.FormatUint(metrics.SlotInEpoch, 10)))
-	sb.WriteString(fmt.Sprintf(" Density    : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]", fmt.Sprintf("%3.5f", metrics.Density*100/1)))
-	mempoolTxKBytes := metrics.MempoolBytes / 1024
-	kWidth := strconv.Itoa(threeCol1ValueWidth -
-		len(strconv.FormatUint(metrics.MempoolTx, 10)) -
+	mempoolTxKBytes := promMetrics.MempoolBytes / 1024
+	kWidth := strconv.Itoa(threeCol3ValueWidth -
+		len(strconv.FormatUint(promMetrics.MempoolTx, 10)) -
 		len(strconv.FormatUint(mempoolTxKBytes, 10)))
-	sb.WriteString(fmt.Sprintf(" Pending Tx : [blue]%d[white]/[blue]%d[white]%-"+kWidth+"s\n",
-		metrics.MempoolTx,
+
+	// Row 1
+	sb.WriteString(fmt.Sprintf(
+		" Block      : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]",
+		strconv.FormatUint(promMetrics.BlockNum, 10),
+	))
+	sb.WriteString(fmt.Sprintf(
+		" Tip (ref)  : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
+		"N/A",
+	))
+	sb.WriteString(fmt.Sprintf(
+		" Forks      : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n",
+		strconv.FormatUint(promMetrics.Forks, 10),
+	))
+	// Row 2
+	sb.WriteString(fmt.Sprintf(
+		" Slot       : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]",
+		strconv.FormatUint(promMetrics.SlotNum, 10),
+	))
+	sb.WriteString(fmt.Sprintf(
+		" Tip (diff) : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
+		"N/A",
+	))
+	sb.WriteString(fmt.Sprintf(
+		" Total Tx   : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n",
+		strconv.FormatUint(promMetrics.TxProcessed, 10),
+	))
+	// Row 3
+	sb.WriteString(fmt.Sprintf(
+		" Slot epoch : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]",
+		strconv.FormatUint(promMetrics.SlotInEpoch, 10),
+	))
+	sb.WriteString(fmt.Sprintf(
+		" Density    : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
+		fmt.Sprintf("%3.5f", promMetrics.Density*100/1),
+	))
+	sb.WriteString(fmt.Sprintf(
+		" Pending Tx : [blue]%d[white]/[blue]%d[white]%-"+kWidth+"s\n",
+		promMetrics.MempoolTx,
 		mempoolTxKBytes,
 		"K",
 	))
 
 	// CONNECTIONS Divider
-	sb.WriteString(fmt.Sprintf("- [yellow]CONNECTIONS[white] %s\n", strings.Repeat("- ", width-13)))
+	sb.WriteString(fmt.Sprintf("- [yellow]CONNECTIONS[white] %s\n",
+		strings.Repeat("- ", width-13),
+	))
 
 	// TODO: actually check for p2p
 	p2p := true
 	if p2p {
 		// Row 1
-		sb.WriteString(fmt.Sprintf(" P2P        : [green]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]", "enabled"))
-		sb.WriteString(fmt.Sprintf(" Cold Peers : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]", strconv.FormatUint(metrics.PeersCold, 10)))
-		sb.WriteString(fmt.Sprintf(" Uni-Dir    : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n", strconv.FormatUint(metrics.ConnUniDir, 10)))
+		sb.WriteString(fmt.Sprintf(
+			" P2P        : [green]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]",
+			"enabled",
+		))
+		sb.WriteString(fmt.Sprintf(
+			" Cold Peers : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
+			strconv.FormatUint(promMetrics.PeersCold, 10),
+		))
+		sb.WriteString(fmt.Sprintf(
+			" Uni-Dir    : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n",
+			strconv.FormatUint(promMetrics.ConnUniDir, 10),
+		))
 		// Row 2
-		sb.WriteString(fmt.Sprintf(" Incoming   : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]", strconv.FormatUint(metrics.ConnIncoming, 10)))
-		sb.WriteString(fmt.Sprintf(" Warm Peers : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]", strconv.FormatUint(metrics.PeersWarm, 10)))
-		sb.WriteString(fmt.Sprintf(" Bi-Dir     : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n", strconv.FormatUint(metrics.ConnBiDir, 10)))
+		sb.WriteString(fmt.Sprintf(
+			" Incoming   : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]",
+			strconv.FormatUint(promMetrics.ConnIncoming, 10),
+		))
+		sb.WriteString(fmt.Sprintf(
+			" Warm Peers : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
+			strconv.FormatUint(promMetrics.PeersWarm, 10),
+		))
+		sb.WriteString(fmt.Sprintf(
+			" Bi-Dir     : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n",
+			strconv.FormatUint(promMetrics.ConnBiDir, 10),
+		))
 		// Row 3
-		sb.WriteString(fmt.Sprintf(" Outgoing   : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]", strconv.FormatUint(metrics.ConnOutgoing, 10)))
-		sb.WriteString(fmt.Sprintf(" Hot Peers  : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]", strconv.FormatUint(metrics.PeersHot, 10)))
-		sb.WriteString(fmt.Sprintf(" Duplex     : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n", strconv.FormatUint(metrics.ConnDuplex, 10)))
+		sb.WriteString(fmt.Sprintf(
+			" Outgoing   : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]",
+			strconv.FormatUint(promMetrics.ConnOutgoing, 10),
+		))
+		sb.WriteString(fmt.Sprintf(
+			" Hot Peers  : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
+			strconv.FormatUint(promMetrics.PeersHot, 10),
+		))
+		sb.WriteString(fmt.Sprintf(
+			" Duplex     : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n",
+			strconv.FormatUint(promMetrics.ConnDuplex, 10),
+		))
 	} else {
-		sb.WriteString(fmt.Sprintf(" P2P        : [yellow]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]\n", "disabled"))
+		sb.WriteString(fmt.Sprintf(
+			" P2P        : [yellow]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]\n",
+			"disabled",
+		))
 	}
 
 	// BLOCK PROPAGATION Divider
-	sb.WriteString(fmt.Sprintf("- [yellow]BLOCK PROPAGATION[white] %s\n", strings.Repeat("- ", width-16)))
+	sb.WriteString(fmt.Sprintf("- [yellow]BLOCK PROPAGATION[white] %s\n",
+		strings.Repeat("- ", width-16),
+	))
+
+	blk1s := fmt.Sprintf("%.2f", promMetrics.BlocksW1s*100)
+	blk3s := fmt.Sprintf("%.2f", promMetrics.BlocksW3s*100)
+	blk5s := fmt.Sprintf("%.2f", promMetrics.BlocksW5s*100)
+	delay := fmt.Sprintf("%.2f", promMetrics.BlockDelay)
 
 	// Row 1
-	sb.WriteString(fmt.Sprintf(" Last Delay : [blue]%s[white]%-18s", fmt.Sprintf("%.2f", metrics.BlockDelay), "s"))
-	sb.WriteString(fmt.Sprintf(" Served     : [blue]%-22s[white]", strconv.FormatUint(metrics.BlocksServed, 10)))
-	sb.WriteString(fmt.Sprintf(" Late (>5s) : [blue]%-22s[white]\n", strconv.FormatUint(metrics.BlocksLate, 10)))
+	sb.WriteString(fmt.Sprintf(
+		" Last Delay : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth-len(delay))+"s",
+		delay,
+		"s",
+	))
+	sb.WriteString(fmt.Sprintf(
+		" Served     : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
+		strconv.FormatUint(promMetrics.BlocksServed, 10),
+	))
+	sb.WriteString(fmt.Sprintf(
+		" Late (>5s) : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n",
+		strconv.FormatUint(promMetrics.BlocksLate, 10),
+	))
 	// Row 2
-	blk1s := fmt.Sprintf("%.2f", metrics.BlocksW1s*100)
-	sb.WriteString(fmt.Sprintf(" Within 1s  : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth-len(blk1s))+"s", blk1s, "%"))
-	blk3s := fmt.Sprintf("%.2f", metrics.BlocksW3s*100)
-	sb.WriteString(fmt.Sprintf(" Within 3s  : [blue]%s[white]%-"+strconv.Itoa(threeCol2ValueWidth-len(blk3s))+"s", blk3s, "%"))
-	blk5s := fmt.Sprintf("%.2f", metrics.BlocksW5s*100)
-	sb.WriteString(fmt.Sprintf(" Within 5s  : [blue]%s[white]%-"+strconv.Itoa(threeCol3ValueWidth-len(blk5s))+"s\n", blk5s, "%"))
+	sb.WriteString(fmt.Sprintf(
+		" Within 1s  : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth-len(blk1s))+"s",
+		blk1s,
+		"%",
+	))
+	sb.WriteString(fmt.Sprintf(
+		" Within 3s  : [blue]%s[white]%-"+strconv.Itoa(threeCol2ValueWidth-len(blk3s))+"s",
+		blk3s,
+		"%",
+	))
+	sb.WriteString(fmt.Sprintf(
+		" Within 5s  : [blue]%s[white]%-"+strconv.Itoa(threeCol3ValueWidth-len(blk5s))+"s\n",
+		blk5s,
+		"%",
+	))
 
 	// NODE RESOURCE USAGE Divider
-	sb.WriteString(fmt.Sprintf("- [yellow]NODE RESOURCE USAGE[white] %s\n", strings.Repeat("- ", width-17)))
+	sb.WriteString(fmt.Sprintf("- [yellow]NODE RESOURCE USAGE[white] %s\n",
+		strings.Repeat("- ", width-17),
+	))
+
+	cpuPercent, err := processMetrics.CPUPercentWithContext(ctx)
+	if err != nil {
+		return fmt.Sprintf("cannot parse CPU usage: %s", err)
+	}
+	cWidth := strconv.Itoa(threeCol1ValueWidth - len(fmt.Sprintf("%.2f", cpuPercent)))
+
+	processMemory, err := processMetrics.MemoryInfoWithContext(ctx)
+	if err != nil {
+		return fmt.Sprintf("cannot parse memory usage: %s", err)
+	}
+	memRss := fmt.Sprintf("%.1f", float64(processMemory.RSS)/float64(1073741824))
+	memLive := fmt.Sprintf("%.1f", float64(promMetrics.MemLive)/float64(1073741824))
+	memHeap := fmt.Sprintf("%.1f", float64(promMetrics.MemHeap)/float64(1073741824))
 
 	// Row 1
-	sb.WriteString(fmt.Sprintf(" CPU (sys)  : [blue]%s[white]%-18s", fmt.Sprintf("%.1f", 99.0), "%"))
-	memLive := fmt.Sprintf("%.1f", float64(metrics.MemLive)/float64(1073741824))
-	sb.WriteString(fmt.Sprintf(" Mem (Live) : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth-len(memLive))+"s", memLive, "G"))
-	sb.WriteString(fmt.Sprintf(" GC Minor   : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n", strconv.FormatUint(metrics.GcMinor, 10)))
+	sb.WriteString(fmt.Sprintf(
+		" CPU (sys)  : [blue]%s[white]%-"+cWidth+"s",
+		fmt.Sprintf("%.2f", cpuPercent),
+		"%",
+	))
+	sb.WriteString(fmt.Sprintf(
+		" Mem (Live) : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth-len(memLive))+"s",
+		memLive,
+		"G",
+	))
+	sb.WriteString(fmt.Sprintf(
+		" GC Minor   : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n",
+		strconv.FormatUint(promMetrics.GcMinor, 10),
+	))
 	// Row 2
-	sb.WriteString(fmt.Sprintf(" Mem (RSS)  : [blue]%s[white]%-19s", fmt.Sprintf("%.1f", 1.2), "G"))
-	memHeap := fmt.Sprintf("%.1f", float64(metrics.MemHeap)/float64(1073741824))
-	sb.WriteString(fmt.Sprintf(" Mem (Heap) : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth-len(memHeap))+"s", memHeap, "G"))
-	sb.WriteString(fmt.Sprintf(" GC Major   : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n", strconv.FormatUint(metrics.GcMajor, 10)))
+	sb.WriteString(fmt.Sprintf(
+		" Mem (RSS)  : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth-len(memRss))+"s",
+		memRss,
+		"G",
+	))
+	sb.WriteString(fmt.Sprintf(
+		" Mem (Heap) : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth-len(memHeap))+"s",
+		memHeap,
+		"G",
+	))
+	sb.WriteString(fmt.Sprintf(
+		" GC Major   : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n",
+		strconv.FormatUint(promMetrics.GcMajor, 10),
+	))
 
 	return fmt.Sprint(sb.String())
 }
 
-type Metrics struct {
+func getProcessMetrics(ctx context.Context) *process.Process {
+	cfg := GetConfig()
+	var r *process.Process
+	processes, err := process.ProcessesWithContext(ctx)
+	if err != nil {
+		fmt.Printf("failed to get processes: %s", err)
+		os.Exit(1)
+	}
+	for _, p := range processes {
+		n, err := p.NameWithContext(ctx)
+		if err != nil {
+			fmt.Printf("failed to get process name: %s", err)
+			os.Exit(1)
+		}
+		c, err := p.CmdlineWithContext(ctx)
+		if err != nil {
+			fmt.Printf("failed to get process cmdline: %s", err)
+		}
+		if strings.Contains(n, cfg.Node.Binary) && strings.Contains(c, strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
+			r = p
+		}
+	}
+	return r
+}
+
+type PromMetrics struct {
 	BlockNum            uint64  `json:"cardano_node_metrics_blockNum_int"`
 	EpochNum            uint64  `json:"cardano_node_metrics_epoch_int"`
 	SlotInEpoch         uint64  `json:"cardano_node_metrics_slotInEpoch_int"`
@@ -263,6 +402,32 @@ type Metrics struct {
 	ConnUniDir          uint64  `json:"cardano_node_metrics_connectionManager_unidirectionalConns"`
 	ConnBiDir           uint64  `json:"cardano_node_metrics_connectionManager_duplexConns"`
 	ConnDuplex          uint64  `json:"cardano_node_metrics_connectionManager_prunableConns"`
+}
+
+func getPromMetrics(ctx context.Context) *PromMetrics {
+	var respBodyBytes []byte
+	respBodyBytes, statusCode, err := getNodeMetrics(ctx)
+	if err != nil {
+		fmt.Printf("Failed getNodeMetrics: %s\n", err)
+		os.Exit(1)
+	}
+	if statusCode != http.StatusOK {
+		fmt.Printf("Failed HTTP: %d\n", statusCode)
+		os.Exit(1)
+	}
+
+	b, err := prom2json(respBodyBytes)
+	if err != nil {
+		fmt.Printf("Failed prom2json: %s\n", err)
+		os.Exit(1)
+	}
+
+	var metrics *PromMetrics
+	if err := json.Unmarshal(b, &metrics); err != nil {
+		fmt.Printf("Failed JSON unmarshal: %s\n", err)
+		os.Exit(1)
+	}
+	return metrics
 }
 
 func getNodeMetrics(ctx context.Context) ([]byte, int, error) {

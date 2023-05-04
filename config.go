@@ -7,11 +7,17 @@ import (
 
 type Config struct {
 	App        AppConfig
+	Node       NodeConfig
 	Prometheus PrometheusConfig
 }
 
 type AppConfig struct {
 	NodeName string `envconfig:"NODE_NAME"`
+}
+
+type NodeConfig struct {
+	Binary string // TODO: make this configurable
+	Port   uint   `envconfig:"CARDANO_PORT"`
 }
 
 type PrometheusConfig struct {
@@ -24,6 +30,10 @@ type PrometheusConfig struct {
 var globalConfig = &Config{
 	App: AppConfig{
 		NodeName: "Cardano Node",
+	},
+	Node: NodeConfig{
+		Binary: "cardano-node",
+		Port:   3001,
 	},
 	Prometheus: PrometheusConfig{
 		Host:    "127.0.0.1",
