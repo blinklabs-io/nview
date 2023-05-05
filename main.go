@@ -29,8 +29,7 @@ var flex = tview.NewFlex()
 // Our text views: footer, header, and main section
 var footerText = tview.NewTextView().
 	SetDynamicColors(true).
-	SetTextColor(tcell.ColorGreen).
-	SetText(" [yellow](esc/q) Quit[white] | [yellow](r) Refresh Prometheus")
+	SetTextColor(tcell.ColorGreen)
 var headerText = tview.NewTextView().
 	SetDynamicColors(true).
 	SetTextAlign(tview.AlignCenter)
@@ -40,6 +39,9 @@ var text = tview.NewTextView().
 		// Redraw the screen on a change
 		app.Draw()
 	})
+
+// Track which page is active
+var active string = "main"
 
 func main() {
 	// Create a background context
@@ -62,10 +64,12 @@ func main() {
 	// Set our header
 	headerText.SetText(fmt.Sprintf("> [green]%s[white] - [yellow](%s - %s)[white] : [blue]%s[white] <",
 		cfg.App.NodeName,
-		"Role: N/A",
-		"Network: N/A",
-		"Version: N/A",
+		"Relay", // TODO: get the real Role
+		cfg.App.Network,
+		"1.35.7", // TODO: get the real Version
 	))
+	// Set our footer
+	footerText.SetText(" [yellow](esc/q) Quit[white] | [yellow](r) Refresh Prometheus")
 
 	// Add content to our flex box
 	flex.SetDirection(tview.FlexRow).
@@ -84,12 +88,22 @@ func main() {
 
 	// capture inputs
 	flex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Rune() == 104 || event.Rune() == 114 { // h or r
+			active = "main"
+			text.Clear()
+			footerText.Clear()
+			footerText.SetText(" [yellow](esc/q) Quit[white] | [yellow](r) Refresh Prometheus")
+			text.SetText(getPromText(ctx))
+		}
+		if event.Rune() == 105 { // i
+			active = "info"
+			text.Clear()
+			footerText.Clear()
+			footerText.SetText(" [yellow](esc/q) Quit[white] | [yellow](h) Return home")
+			text.SetText(getInfoText(ctx))
+		}
 		if event.Rune() == 113 || event.Key() == tcell.KeyEscape { // q
 			app.Stop()
-		}
-		if event.Rune() == 114 { // r
-			text.Clear()
-			text.SetText(getPromText(ctx))
 		}
 		return event
 	})
@@ -100,8 +114,14 @@ func main() {
 	// Start our background refresh timer
 	go func() {
 		for {
-			text.Clear()
-			text.SetText(getPromText(ctx))
+			if active == "main" {
+				text.Clear()
+				text.SetText(getPromText(ctx))
+			}
+			if active == "info" {
+				text.Clear()
+				text.SetText(getInfoText(ctx))
+			}
 			time.Sleep(time.Second * 2)
 		}
 	}()
@@ -111,21 +131,50 @@ func main() {
 	}
 }
 
+var uptimes uint64
+
+func getInfoText(ctx context.Context) string {
+	// Refresh metrics from host
+	processMetrics := getProcessMetrics(ctx)
+
+	// Calculate uptime for our process
+	createTime, err := processMetrics.CreateTimeWithContext(ctx)
+	if err == nil {
+		// createTime is milliseconds since UNIX epoch, convert to seconds
+		uptimes = uint64(time.Now().Unix() - (createTime / 1000))
+	}
+
+	var sb strings.Builder
+
+	// Main section
+	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", timeLeft(uptimes)))
+	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("- ", 10)))
+
+	sb.WriteString("[white:black:r] INFO [white:-:-] Displays live metrics gathered from node Prometheus endpoint\n\n")
+
+	sb.WriteString(" [green]Main Section[white]\n")
+	sb.WriteString(" Epoch number is live from the node.\n\n")
+	sb.WriteString(" Tip reference and diff are not yet available.\n\n")
+	sb.WriteString(" Forks is how many times the blockchain branched off in a different\n")
+	sb.WriteString(" direction since node start (and discarded blocks by doing so).\n\n")
+	sb.WriteString(" P2P Connections shows how many peers the node pushes to/pulls from.\n\n")
+	sb.WriteString(" Block propagation metrics are discussed in the documentation.\n\n")
+	sb.WriteString(" RSS/Live/Heap shows the memory utilization of RSS/live/heap data.\n")
+
+	return fmt.Sprint(sb.String())
+}
+
 func getPromText(ctx context.Context) string {
-	// Load our config
-	cfg := GetConfig()
 	// Refresh metrics from Prometheus and host
 	promMetrics := getPromMetrics(ctx)
 	processMetrics := getProcessMetrics(ctx)
 
 	// Calculate uptime for our process
-	var uptimes uint64
 	createTime, err := processMetrics.CreateTimeWithContext(ctx)
-	if err != nil {
-		return fmt.Sprintf("failed get %s process creation time", cfg.Node.Binary)
+	if err == nil {
+		// createTime is milliseconds since UNIX epoch, convert to seconds
+		uptimes = uint64(time.Now().Unix() - (createTime / 1000))
 	}
-	// createTime is milliseconds since UNIX epoch, convert to seconds
-	uptimes = uint64(time.Now().Unix() - (createTime / 1000))
 
 	// Style / UI
 	var width = 71
@@ -243,8 +292,16 @@ func getPromText(ctx context.Context) string {
 		))
 	} else {
 		sb.WriteString(fmt.Sprintf(
-			" P2P        : [yellow]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]\n",
+			" P2P        : [yellow]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]",
 			"disabled",
+		))
+		sb.WriteString(fmt.Sprintf(
+			" Incoming   : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]",
+			"N/A",
+		))
+		sb.WriteString(fmt.Sprintf(
+			" Outgoing   : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]\n",
+			"N/A",
 		))
 	}
 
