@@ -13,6 +13,7 @@ type Config struct {
 
 type AppConfig struct {
 	NodeName string `envconfig:"NODE_NAME"`
+	Network  string `envconfig:"NETWORK"`
 }
 
 type NodeConfig struct {
@@ -30,6 +31,7 @@ type PrometheusConfig struct {
 var globalConfig = &Config{
 	App: AppConfig{
 		NodeName: "Cardano Node",
+		Network:  "Mainnet",
 	},
 	Node: NodeConfig{
 		Binary: "cardano-node",
