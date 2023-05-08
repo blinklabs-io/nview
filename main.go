@@ -135,13 +135,16 @@ var uptimes uint64
 
 func getInfoText(ctx context.Context) string {
 	// Refresh metrics from host
-	processMetrics := getProcessMetrics(ctx)
-
-	// Calculate uptime for our process
-	createTime, err := processMetrics.CreateTimeWithContext(ctx)
-	if err == nil {
-		// createTime is milliseconds since UNIX epoch, convert to seconds
-		uptimes = uint64(time.Now().Unix() - (createTime / 1000))
+	processMetrics, err := getProcessMetrics(ctx)
+	if err != nil {
+		uptimes = 0
+	} else {
+		// Calculate uptime for our process
+		createTime, err := processMetrics.CreateTimeWithContext(ctx)
+		if err == nil {
+			// createTime is milliseconds since UNIX epoch, convert to seconds
+			uptimes = uint64(time.Now().Unix() - (createTime / 1000))
+		}
 	}
 
 	var sb strings.Builder
@@ -166,14 +169,21 @@ func getInfoText(ctx context.Context) string {
 
 func getPromText(ctx context.Context) string {
 	// Refresh metrics from Prometheus and host
-	promMetrics := getPromMetrics(ctx)
-	processMetrics := getProcessMetrics(ctx)
-
-	// Calculate uptime for our process
-	createTime, err := processMetrics.CreateTimeWithContext(ctx)
-	if err == nil {
-		// createTime is milliseconds since UNIX epoch, convert to seconds
-		uptimes = uint64(time.Now().Unix() - (createTime / 1000))
+	promMetrics, err := getPromMetrics(ctx)
+	if err != nil {
+		return fmt.Sprintf("%s", err)
+	}
+	processMetrics, err := getProcessMetrics(ctx)
+	if err != nil {
+		processMetrics, _ = process.NewProcessWithContext(ctx, 0)
+		uptimes = 0
+	} else {
+		// Calculate uptime for our process
+		createTime, err := processMetrics.CreateTimeWithContext(ctx)
+		if err == nil {
+			// createTime is milliseconds since UNIX epoch, convert to seconds
+			uptimes = uint64(time.Now().Unix() - (createTime / 1000))
+		}
 	}
 
 	// Style / UI
@@ -351,17 +361,23 @@ func getPromText(ctx context.Context) string {
 		strings.Repeat("- ", width-17),
 	))
 
-	cpuPercent, err := processMetrics.CPUPercentWithContext(ctx)
-	if err != nil {
-		return fmt.Sprintf("cannot parse CPU usage: %s", err)
+	var cpuPercent float64 = 0.0
+	var rss uint64 = 0
+	var processMemory *process.MemoryInfoStat
+	if processMetrics.Pid != 0 {
+		cpuPercent, err = processMetrics.CPUPercentWithContext(ctx)
+		if err != nil {
+			return fmt.Sprintf("cannot parse CPU usage: %s", err)
+		}
+		processMemory, err = processMetrics.MemoryInfoWithContext(ctx)
+		if err != nil {
+			return fmt.Sprintf("cannot parse memory usage: %s", err)
+		}
+		rss = processMemory.RSS
 	}
 	cWidth := strconv.Itoa(threeCol1ValueWidth - len(fmt.Sprintf("%.2f", cpuPercent)))
 
-	processMemory, err := processMetrics.MemoryInfoWithContext(ctx)
-	if err != nil {
-		return fmt.Sprintf("cannot parse memory usage: %s", err)
-	}
-	memRss := fmt.Sprintf("%.1f", float64(processMemory.RSS)/float64(1073741824))
+	memRss := fmt.Sprintf("%.1f", float64(rss)/float64(1073741824))
 	memLive := fmt.Sprintf("%.1f", float64(promMetrics.MemLive)/float64(1073741824))
 	memHeap := fmt.Sprintf("%.1f", float64(promMetrics.MemHeap)/float64(1073741824))
 
@@ -399,29 +415,27 @@ func getPromText(ctx context.Context) string {
 	return fmt.Sprint(sb.String())
 }
 
-func getProcessMetrics(ctx context.Context) *process.Process {
+func getProcessMetrics(ctx context.Context) (*process.Process, error) {
 	cfg := GetConfig()
 	var r *process.Process
 	processes, err := process.ProcessesWithContext(ctx)
 	if err != nil {
-		fmt.Printf("failed to get processes: %s", err)
-		os.Exit(1)
+		return r, fmt.Errorf("failed to get processes: %s", err)
 	}
 	for _, p := range processes {
 		n, err := p.NameWithContext(ctx)
 		if err != nil {
-			fmt.Printf("failed to get process name: %s", err)
-			os.Exit(1)
+			return r, fmt.Errorf("failed to get process name: %s", err)
 		}
 		c, err := p.CmdlineWithContext(ctx)
 		if err != nil {
-			fmt.Printf("failed to get process cmdline: %s", err)
+			return r, fmt.Errorf("failed to get process cmdline: %s", err)
 		}
 		if strings.Contains(n, cfg.Node.Binary) && strings.Contains(c, strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
 			r = p
 		}
 	}
-	return r
+	return r, nil
 }
 
 type PromMetrics struct {
@@ -461,30 +475,26 @@ type PromMetrics struct {
 	ConnDuplex          uint64  `json:"cardano_node_metrics_connectionManager_prunableConns"`
 }
 
-func getPromMetrics(ctx context.Context) *PromMetrics {
+func getPromMetrics(ctx context.Context) (*PromMetrics, error) {
+	var metrics *PromMetrics
 	var respBodyBytes []byte
 	respBodyBytes, statusCode, err := getNodeMetrics(ctx)
 	if err != nil {
-		fmt.Printf("Failed getNodeMetrics: %s\n", err)
-		os.Exit(1)
+		return metrics, fmt.Errorf("Failed getNodeMetrics: %s\n", err)
 	}
 	if statusCode != http.StatusOK {
-		fmt.Printf("Failed HTTP: %d\n", statusCode)
-		os.Exit(1)
+		return metrics, fmt.Errorf("Failed HTTP: %d\n", statusCode)
 	}
 
 	b, err := prom2json(respBodyBytes)
 	if err != nil {
-		fmt.Printf("Failed prom2json: %s\n", err)
-		os.Exit(1)
+		return metrics, fmt.Errorf("Failed prom2json: %s\n", err)
 	}
 
-	var metrics *PromMetrics
 	if err := json.Unmarshal(b, &metrics); err != nil {
-		fmt.Printf("Failed JSON unmarshal: %s\n", err)
-		os.Exit(1)
+		return metrics, fmt.Errorf("Failed JSON unmarshal: %s\n", err)
 	}
-	return metrics
+	return metrics, nil
 }
 
 func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
@@ -553,6 +563,7 @@ func prom2json(prom []byte) ([]byte, error) {
 	return b, nil
 }
 
+// Time is in seconds
 func timeLeft(t uint64) string {
 	d := t / 60 / 60 / 24
 	h := math.Mod(float64(t/60/60), 24)
