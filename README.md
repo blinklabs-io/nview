@@ -63,7 +63,7 @@ To use a configuration file, run `nview` with a command line flag to set the
 file to load as a configuration.
 
 ```bash
-./nview /path/to/config.yml
+./nview -config /path/to/config.yml
 ```
 
 config.yaml:
