@@ -1,0 +1,54 @@
+---
+# Example config file for nview
+# The values shown below correspond to the in-code defaults
+
+app:
+  # Display name for the node
+  #
+  # This can also be set via the NODE_NAME environment variable
+  nodeName: Cardano Node
+
+  # Named Cardano network for cardano-node
+  #
+  # This is a short-cut to select the NetworkMagic and can be used to
+  # select mainnet, preprod, or preview networks.
+  #
+  # This can also be set via the NETWORK environment variable and overrides
+  # the node specific setting below
+  network:
+
+node:
+  # Named Cardano network for cardano-node
+  #
+  # This is a short-cut to select the NetworkMagic and can be used to
+  # select mainnet, preprod, or preview networks.
+  #
+  # This can also be set via the CARDANO_NETWORK environment variable
+  network: mainnet
+
+  # NetworkMagic for network for cardano-node
+  #
+  # This selects the correct network for operation and can be configured to
+  # any network, not just the named networks.
+  #
+  # This can also be set via the CARDANO_NODE_NETWORK_MAGIC environment variable
+  networkMagic:
+
+  # Port for cardano-node
+  #
+  # Listening port for cardano-node for NtN communication.
+  #
+  # This can also be set via the CARDANO_PORT environment variable
+  port: 3001
+
+prometheus:
+  # host/port for cardano-node Prometheus metrics
+  #
+  # These can also be set via the PROM_HOST and PROM_PORT environment variables
+  host: 127.0.0.1
+  port: 12798
+
+  # Timeout for connections to cardano-node
+  #
+  # This can also be set via the PROM_TIMEOUT environment variable
+  timeout: 3

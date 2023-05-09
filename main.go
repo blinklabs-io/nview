@@ -1,8 +1,23 @@
+// Copyright 2023 Blink Labs, LLC.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"math"
@@ -18,6 +33,11 @@ import (
 	"github.com/rivo/tview"
 	"github.com/shirou/gopsutil/v3/process"
 )
+
+// Global command line flags
+var cmdlineFlags struct {
+	configFile string
+}
 
 // Global tview application and pages
 var app = tview.NewApplication()
@@ -44,14 +64,19 @@ var text = tview.NewTextView().
 var active string = "main"
 
 func main() {
-	// Create a background context
-	ctx := context.Background()
-	// Load our config
-	cfg := GetConfig()
-	if err := cfg.LoadConfig(); err != nil {
+	// Check if any command line flags are given
+	flag.StringVar(&cmdlineFlags.configFile, "config", "", "path to config file to load")
+	flag.Parse()
+
+	// Load config
+	cfg, err := LoadConfig(cmdlineFlags.configFile)
+	if err != nil {
 		fmt.Printf("Failed to load config: %s", err)
 		os.Exit(1)
 	}
+
+	// Create a background context
+	ctx := context.Background()
 
 	// Exit if NODE_NAME is > 19 characters
 	if len([]rune(cfg.App.NodeName)) > 19 {
@@ -62,14 +87,22 @@ func main() {
 	// Fetch data from Prometheus
 	text.SetText(getPromText(ctx)).SetBorder(true)
 	// Set our header
+	role := "Relay" // TODO: get the real Role
+	var network string
+	if cfg.App.Network != "" {
+		network = strings.ToUpper(cfg.App.Network[:1]) + cfg.App.Network[1:]
+	} else {
+		network = strings.ToUpper(cfg.Node.Network[:1]) + cfg.Node.Network[1:]
+	}
 	headerText.SetText(fmt.Sprintf("> [green]%s[white] - [yellow](%s - %s)[white] : [blue]%s[white] <",
 		cfg.App.NodeName,
-		"Relay", // TODO: get the real Role
-		cfg.App.Network,
+		role,
+		network,
 		"1.35.7", // TODO: get the real Version
 	))
 	// Set our footer
-	footerText.SetText(" [yellow](esc/q) Quit[white] | [yellow](r) Refresh Prometheus")
+	defaultFooterText := " [yellow](esc/q) Quit[white] | [yellow](i) Info[white] | [yellow](r) Refresh Prometheus"
+	footerText.SetText(defaultFooterText)
 
 	// Add content to our flex box
 	flex.SetDirection(tview.FlexRow).
@@ -92,7 +125,7 @@ func main() {
 			active = "main"
 			text.Clear()
 			footerText.Clear()
-			footerText.SetText(" [yellow](esc/q) Quit[white] | [yellow](r) Refresh Prometheus")
+			footerText.SetText(defaultFooterText)
 			text.SetText(getPromText(ctx))
 		}
 		if event.Rune() == 105 { // i
