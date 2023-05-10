@@ -32,7 +32,7 @@ import (
 	"github.com/prometheus/common/expfmt"
 	"github.com/rivo/tview"
 	"github.com/shirou/gopsutil/v3/process"
-	"golang.org/x/crypto/ssh/terminal"
+	terminal "golang.org/x/term"
 )
 
 // Global command line flags
