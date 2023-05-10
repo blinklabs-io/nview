@@ -31,19 +31,21 @@ type Config struct {
 type AppConfig struct {
 	NodeName string `yaml:"nodeName" envconfig:"NODE_NAME"`
 	Network  string `yaml:"network" envconfig:"NETWORK"`
+	Retries  uint32 `yaml:"retries" envconfig:"RETRIES"`
 }
 
 type NodeConfig struct {
-	Binary       string // TODO: make this configurable
-	Network      string `yaml:"network" envconfig:"CARDANO_NETWORK"`
-	NetworkMagic uint32 `yaml:"networkMagic" envconfig:"CARDANO_NODE_NETWORK_MAGIC"`
-	Port         uint   `yaml:"port" envconfig:"CARDANO_PORT"`
+	Binary            string // TODO: make this configurable
+	Network           string `yaml:"network" envconfig:"CARDANO_NETWORK"`
+	NetworkMagic      uint32 `yaml:"networkMagic" envconfig:"CARDANO_NODE_NETWORK_MAGIC"`
+	Port              uint32 `yaml:"port" envconfig:"CARDANO_PORT"`
+	ShelleyTransEpoch int32  `yaml:"shellyTransEpoch" envconfig:"SHELLEY_TRANS_EPOCH"`
 }
 
 type PrometheusConfig struct {
 	Host    string `yaml:"host" envconfig:"PROM_HOST"`
-	Port    uint   `yaml:"port" envconfig:"PROM_PORT"`
-	Timeout uint   `yaml:"timeout" envconfig:"PROM_TIMEOUT"`
+	Port    uint32 `yaml:"port" envconfig:"PROM_PORT"`
+	Timeout uint32 `yaml:"timeout" envconfig:"PROM_TIMEOUT"`
 }
 
 // Singleton config instance with default values
@@ -51,6 +53,7 @@ var globalConfig = &Config{
 	App: AppConfig{
 		NodeName: "Cardano Node",
 		Network:  "",
+		Retries:  3,
 	},
 	Node: NodeConfig{
 		Binary:  "cardano-node",
@@ -87,6 +90,10 @@ func LoadConfig(configFile string) (*Config, error) {
 	if err := globalConfig.populateNetworkMagic(); err != nil {
 		return nil, err
 	}
+	// Populate ShelleyTransEpoch from named networks
+	if err := globalConfig.populateShelleyTransEpoch(); err != nil {
+		return nil, err
+	}
 	return globalConfig, nil
 }
 
@@ -95,6 +102,7 @@ func GetConfig() *Config {
 	return globalConfig
 }
 
+// Populates NetworkMagic from named networks
 func (c *Config) populateNetworkMagic() error {
 	if c.Node.NetworkMagic != uint32(0) {
 		return nil
@@ -125,6 +133,38 @@ func (c *Config) populateNetworkMagic() error {
 			c.Node.NetworkMagic = libada.Mainnet.ProtocolMagic()
 		default:
 			return fmt.Errorf("unknown network: %s", c.Node.Network)
+		}
+	}
+	return nil
+}
+
+// Populates ShelleyTransEpoch from named networks
+func (c *Config) populateShelleyTransEpoch() error {
+	if c.Node.ShelleyTransEpoch != int32(-1) {
+		return nil
+	}
+	if c.App.Network != "" {
+		switch c.App.Network {
+		case "preview":
+			c.Node.ShelleyTransEpoch = 0
+		case "preprod":
+			c.Node.ShelleyTransEpoch = 4
+		case "mainnet":
+			c.Node.ShelleyTransEpoch = 208
+		default:
+			c.Node.ShelleyTransEpoch = 0
+		}
+	}
+	if c.Node.Network != "" {
+		switch c.Node.Network {
+		case "preview":
+			c.Node.ShelleyTransEpoch = 0
+		case "preprod":
+			c.Node.ShelleyTransEpoch = 4
+		case "mainnet":
+			c.Node.ShelleyTransEpoch = 208
+		default:
+			c.Node.ShelleyTransEpoch = 0
 		}
 	}
 	return nil
