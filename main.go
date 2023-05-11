@@ -32,6 +32,7 @@ import (
 	"github.com/prometheus/common/expfmt"
 	"github.com/rivo/tview"
 	"github.com/shirou/gopsutil/v3/process"
+	terminal "golang.org/x/term"
 )
 
 // Global command line flags
@@ -62,6 +63,9 @@ var text = tview.NewTextView().
 
 // Track which page is active
 var active string = "main"
+
+// Track our failures
+var failCount uint32 = 0
 
 func main() {
 	// Check if any command line flags are given
@@ -115,7 +119,7 @@ func main() {
 		AddItem(text,
 			0,
 			5,
-			false).
+			true).
 		// Row 3 is our footer
 		AddItem(footerText, 0, 1, false)
 
@@ -138,6 +142,13 @@ func main() {
 		if event.Rune() == 113 || event.Key() == tcell.KeyEscape { // q
 			app.Stop()
 		}
+		if event.Rune() == 116 { // t
+			active = "test"
+			text.Clear()
+			footerText.Clear()
+			footerText.SetText(" [yellow](esc/q) Quit[white] | [yellow](h) Return home")
+			text.SetText(getTestText(ctx))
+		}
 		return event
 	})
 
@@ -147,7 +158,12 @@ func main() {
 	// Start our background refresh timer
 	go func() {
 		for {
+			if failCount >= cfg.App.Retries {
+				panic(fmt.Errorf("COULD NOT CONNECT TO A RUNNING INSTANCE, %d FAILED ATTEMPTS IN A ROW!", failCount))
+			}
 			if active == "main" {
+				footerText.Clear()
+				footerText.SetText(defaultFooterText)
 				text.Clear()
 				text.SetText(getPromText(ctx))
 			}
@@ -166,6 +182,56 @@ func main() {
 
 var uptimes uint64
 
+func getTestText(ctx context.Context) string {
+	cfg := GetConfig()
+	// Refresh metrics from host
+	processMetrics, err := getProcessMetrics(ctx)
+	if err != nil {
+		uptimes = 0
+	} else {
+		// Calculate uptime for our process
+		createTime, err := processMetrics.CreateTimeWithContext(ctx)
+		if err == nil {
+			// createTime is milliseconds since UNIX epoch, convert to seconds
+			uptimes = uint64(time.Now().Unix() - (createTime / 1000))
+		}
+	}
+
+	var sb strings.Builder
+
+	// Main section
+	uptime := timeLeft(uptimes)
+	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
+	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
+
+	connections, err := processMetrics.ConnectionsWithContext(ctx)
+	if err != nil {
+		sb.WriteString(fmt.Sprintf("Failed to get processes: %v", err))
+	}
+
+	var peersIn []string
+	var peersOut []string
+
+	sb.WriteString(fmt.Sprintf(" Process: %v\n\n", processMetrics.String()))
+
+	for _, c := range connections {
+		if c.Status == "ESTABLISHED" {
+			if c.Laddr.Port == cfg.Node.Port {
+				peersIn = append(peersIn, fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port))
+			}
+			if c.Laddr.Port != cfg.Node.Port && c.Laddr.Port != uint32(12788) && c.Laddr.Port != cfg.Prometheus.Port {
+				peersOut = append(peersOut, fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port))
+			}
+		}
+	}
+
+	sb.WriteString(fmt.Sprintf(" Peers In  (%d): %v\n", len(peersIn), peersIn))
+	sb.WriteString(fmt.Sprintf(" Peers Out (%d): %v\n", len(peersOut), peersOut))
+
+	failCount = 0
+	return fmt.Sprint(sb.String())
+}
+
 func getInfoText(ctx context.Context) string {
 	// Refresh metrics from host
 	processMetrics, err := getProcessMetrics(ctx)
@@ -183,8 +249,9 @@ func getInfoText(ctx context.Context) string {
 	var sb strings.Builder
 
 	// Main section
-	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", timeLeft(uptimes)))
-	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("- ", 10)))
+	uptime := timeLeft(uptimes)
+	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
+	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
 
 	sb.WriteString("[white:black:r] INFO [white:-:-] Displays live metrics gathered from node Prometheus endpoint\n\n")
 
@@ -197,18 +264,20 @@ func getInfoText(ctx context.Context) string {
 	sb.WriteString(" Block propagation metrics are discussed in the documentation.\n\n")
 	sb.WriteString(" RSS/Live/Heap shows the memory utilization of RSS/live/heap data.\n")
 
+	failCount = 0
 	return fmt.Sprint(sb.String())
 }
 
 func getPromText(ctx context.Context) string {
+	// cfg := GetConfig()
 	// Refresh metrics from Prometheus and host
 	promMetrics, err := getPromMetrics(ctx)
 	if err != nil {
-		return fmt.Sprintf("%s", err)
+		failCount++
+		return fmt.Sprintf("ERROR: %v", err)
 	}
 	processMetrics, err := getProcessMetrics(ctx)
 	if err != nil {
-		processMetrics, _ = process.NewProcessWithContext(ctx, 0)
 		uptimes = 0
 	} else {
 		// Calculate uptime for our process
@@ -228,11 +297,38 @@ func getPromText(ctx context.Context) string {
 	var threeCol2ValueWidth = threeColWidth - 12
 	var threeCol3ValueWidth = threeColWidth - 12
 
+	// Get our terminal size
+	tcols, tlines, err := terminal.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		failCount++
+		return fmt.Sprintf("ERROR: %v", err)
+	}
+	// Validate size
+	if width >= tcols {
+		footerText.Clear()
+		footerText.SetText(" [yellow](esc/q) Quit\n")
+		return fmt.Sprintf(
+			"\n [red]Terminal width too small![white]\n Please increase by [yellow]%d[white] columns\n",
+			width-tcols+1,
+		)
+	}
+	// TODO: populate lines
+	line := 10
+	if line >= (tlines - 1) {
+		footerText.Clear()
+		footerText.SetText(" [yellow](esc/q) Quit\n")
+		return fmt.Sprintf(
+			"\n [red]Terminal height too small![white]\n Please increase by [yellow]%d[white] lines\n",
+			line-tlines+2,
+		)
+	}
+
 	var sb strings.Builder
 
 	// Main section
-	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", timeLeft(uptimes)))
-	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("- ", 10)))
+	uptime := timeLeft(uptimes)
+	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
+	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
 
 	// Epoch
 	sb.WriteString(fmt.Sprintf(" Epoch [blue]%d[white]\n\n", promMetrics.EpochNum))
@@ -400,10 +496,12 @@ func getPromText(ctx context.Context) string {
 	if processMetrics.Pid != 0 {
 		cpuPercent, err = processMetrics.CPUPercentWithContext(ctx)
 		if err != nil {
+			failCount++
 			return fmt.Sprintf("cannot parse CPU usage: %s", err)
 		}
 		processMemory, err = processMetrics.MemoryInfoWithContext(ctx)
 		if err != nil {
+			failCount++
 			return fmt.Sprintf("cannot parse memory usage: %s", err)
 		}
 		rss = processMemory.RSS
@@ -445,12 +543,13 @@ func getPromText(ctx context.Context) string {
 		strconv.FormatUint(promMetrics.GcMajor, 10),
 	))
 
+	failCount = 0
 	return fmt.Sprint(sb.String())
 }
 
 func getProcessMetrics(ctx context.Context) (*process.Process, error) {
 	cfg := GetConfig()
-	var r *process.Process
+	r, _ := process.NewProcessWithContext(ctx, 0)
 	processes, err := process.ProcessesWithContext(ctx)
 	if err != nil {
 		return r, fmt.Errorf("failed to get processes: %s", err)
@@ -566,6 +665,7 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 	return respBodyBytes, resp.StatusCode, nil
 }
 
+// Converts a prometheus http response byte array into a JSON byte array
 func prom2json(prom []byte) ([]byte, error) {
 	// {"name": 0}
 	out := make(map[string]interface{})
