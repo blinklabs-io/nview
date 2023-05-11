@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -67,6 +68,9 @@ var active string = "main"
 // Track our failures
 var failCount uint32 = 0
 
+// Track our role
+var role string = "Relay"
+
 func main() {
 	// Check if any command line flags are given
 	flag.StringVar(&cmdlineFlags.configFile, "config", "", "path to config file to load")
@@ -91,7 +95,6 @@ func main() {
 	// Fetch data from Prometheus
 	text.SetText(getPromText(ctx)).SetBorder(true)
 	// Set our header
-	role := "Relay" // TODO: get the real Role
 	var network string
 	if cfg.App.Network != "" {
 		network = strings.ToUpper(cfg.App.Network[:1]) + cfg.App.Network[1:]
@@ -204,6 +207,7 @@ func getTestText(ctx context.Context) string {
 	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
 
+	// Get process in/out connections
 	connections, err := processMetrics.ConnectionsWithContext(ctx)
 	if err != nil {
 		sb.WriteString(fmt.Sprintf("Failed to get processes: %v", err))
@@ -212,21 +216,61 @@ func getTestText(ctx context.Context) string {
 	var peersIn []string
 	var peersOut []string
 
-	sb.WriteString(fmt.Sprintf(" Process: %v\n\n", processMetrics.String()))
-
+	// Loops each connection, looking for ESTABLISHED
 	for _, c := range connections {
 		if c.Status == "ESTABLISHED" {
+			// If local port == node port, it's incoming
 			if c.Laddr.Port == cfg.Node.Port {
 				peersIn = append(peersIn, fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port))
 			}
+			// If local port != node port, ekg port, or prometheus port, it's outgoing
 			if c.Laddr.Port != cfg.Node.Port && c.Laddr.Port != uint32(12788) && c.Laddr.Port != cfg.Prometheus.Port {
 				peersOut = append(peersOut, fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port))
 			}
 		}
 	}
 
-	sb.WriteString(fmt.Sprintf(" Peers In  (%d): %v\n", len(peersIn), peersIn))
-	sb.WriteString(fmt.Sprintf(" Peers Out (%d): %v\n", len(peersOut), peersOut))
+	// Start "checkPeers"
+	var peersFiltered []string
+
+	// First, check for external address using custom resolver so we can
+	// use a given DNS server to resolve our public address
+	r := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			d := net.Dialer{
+				Timeout: time.Second * time.Duration(3),
+			}
+			return d.DialContext(ctx, network, "resolver1.opendns.com:53")
+		},
+	}
+	// Lookup special address to get our public IP
+	ips, _ := r.LookupIP(ctx, "ip4", "myip.opendns.com")
+	var ip net.IP
+	if ips != nil {
+		ip = ips[0]
+		sb.WriteString(fmt.Sprintf(" Public IP info: %s\n", ip))
+	}
+
+	// Process peersIn
+	for _, peer := range peersIn {
+		p := strings.Split(peer, ":")
+		peerIP := p[0]
+		peerPORT := p[1]
+		if strings.HasPrefix(peerIP, "[") { // IPv6
+			peerIP = strings.TrimPrefix(strings.TrimSuffix(peerIP, "]"), "[")
+		}
+
+		if peerIP == "127.0.0.1" || (peerIP == ip.String() && peerPORT == strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
+			// Do nothing
+		} else {
+			// TODO: filter duplicates
+			peersFiltered = append(peersFiltered, fmt.Sprintf("%s;%s;i", peerIP, peerPORT))
+		}
+	}
+
+	// Display progress
+	sb.WriteString(fmt.Sprintf(" Incoming peers: %v", peersFiltered))
 
 	failCount = 0
 	return fmt.Sprint(sb.String())
@@ -269,7 +313,7 @@ func getInfoText(ctx context.Context) string {
 }
 
 func getPromText(ctx context.Context) string {
-	// cfg := GetConfig()
+	cfg := GetConfig()
 	// Refresh metrics from Prometheus and host
 	promMetrics, err := getPromMetrics(ctx)
 	if err != nil {
@@ -430,17 +474,40 @@ func getPromText(ctx context.Context) string {
 			strconv.FormatUint(promMetrics.ConnDuplex, 10),
 		))
 	} else {
+		// Get process in/out connections
+		connections, err := processMetrics.ConnectionsWithContext(ctx)
+		if err != nil {
+			sb.WriteString(fmt.Sprintf("Failed to get processes: %v", err))
+		}
+
+		var peersIn []string
+		var peersOut []string
+
+		// Loops each connection, looking for ESTABLISHED
+		for _, c := range connections {
+			if c.Status == "ESTABLISHED" {
+				// If local port == node port, it's incoming
+				if c.Laddr.Port == cfg.Node.Port {
+					peersIn = append(peersIn, fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port))
+				}
+				// If local port != node port, ekg port, or prometheus port, it's outgoing
+				if c.Laddr.Port != cfg.Node.Port && c.Laddr.Port != uint32(12788) && c.Laddr.Port != cfg.Prometheus.Port {
+					peersOut = append(peersOut, fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port))
+				}
+			}
+		}
+
 		sb.WriteString(fmt.Sprintf(
 			" P2P        : [yellow]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]",
 			"disabled",
 		))
 		sb.WriteString(fmt.Sprintf(
-			" Incoming   : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]",
-			"N/A",
+			" Incoming   : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
+			strconv.Itoa(len(peersIn)),
 		))
 		sb.WriteString(fmt.Sprintf(
-			" Outgoing   : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]\n",
-			"N/A",
+			" Outgoing   : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n",
+			strconv.Itoa(len(peersOut)),
 		))
 	}
 
