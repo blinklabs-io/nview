@@ -351,7 +351,7 @@ func getPromText(ctx context.Context) string {
 	}
 
 	// Set role
-	if promMetrics.AboutToLead >= 0 {
+	if promMetrics.AboutToLead > 0 {
 		if role != "Core" {
 			role = "Core"
 		}
