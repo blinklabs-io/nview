@@ -271,6 +271,7 @@ func getTestText(ctx context.Context) string {
 
 	// Display progress
 	sb.WriteString(fmt.Sprintf(" Incoming peers: %v", peersFiltered))
+	sb.WriteString(fmt.Sprintf(" Outgoing peers: %v", peersOut))
 
 	failCount = 0
 	return fmt.Sprint(sb.String())
