@@ -269,6 +269,23 @@ func getTestText(ctx context.Context) string {
 		}
 	}
 
+	// Process peersOut
+	for _, peer := range peersOut {
+		p := strings.Split(peer, ":")
+		peerIP := p[0]
+		peerPORT := p[1]
+		if strings.HasPrefix(peerIP, "[") { // IPv6
+			peerIP = strings.TrimPrefix(strings.TrimSuffix(peerIP, "]"), "[")
+		}
+
+		if peerIP == "127.0.0.1" || (peerIP == ip.String() && peerPORT == strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
+			// Do nothing
+		} else {
+			// TODO: filter duplicates
+			peersFiltered = append(peersFiltered, fmt.Sprintf("%s;%s;o", peerIP, peerPORT))
+		}
+	}
+
 	// Display progress
 	sb.WriteString(fmt.Sprintf(" Incoming peers: %v", peersFiltered))
 	sb.WriteString(fmt.Sprintf(" Outgoing peers: %v", peersOut))
@@ -331,6 +348,15 @@ func getPromText(ctx context.Context) string {
 			// createTime is milliseconds since UNIX epoch, convert to seconds
 			uptimes = uint64(time.Now().Unix() - (createTime / 1000))
 		}
+	}
+
+	// Set role
+	if promMetrics.AboutToLead > 0 {
+		if role != "Core" {
+			role = "Core"
+		}
+	} else if role != "Relay" {
+		role = "Relay"
 	}
 
 	// Style / UI
