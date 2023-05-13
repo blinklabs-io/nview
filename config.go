@@ -16,10 +16,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/Bitrue-exchange/libada-go"
+	"os"
+
+	"github.com/blinklabs-io/gouroboros"
 	"github.com/kelseyhightower/envconfig"
 	"gopkg.in/yaml.v2"
-	"os"
 )
 
 type Config struct {
@@ -40,6 +41,7 @@ type NodeConfig struct {
 	NetworkMagic      uint32 `yaml:"networkMagic" envconfig:"CARDANO_NODE_NETWORK_MAGIC"`
 	Port              uint32 `yaml:"port" envconfig:"CARDANO_PORT"`
 	ShelleyTransEpoch int32  `yaml:"shellyTransEpoch" envconfig:"SHELLEY_TRANS_EPOCH"`
+	SocketPath        string `yaml:"socketPath" envconfig:"CARDANO_NODE_SOCKET_PATH"`
 }
 
 type PrometheusConfig struct {
@@ -56,9 +58,10 @@ var globalConfig = &Config{
 		Retries:  3,
 	},
 	Node: NodeConfig{
-		Binary:  "cardano-node",
-		Network: "mainnet",
-		Port:    3001,
+		Binary:     "cardano-node",
+		Network:    "mainnet",
+		Port:       3001,
+		SocketPath: "/opt/cardano/ipc/socket",
 	},
 	Prometheus: PrometheusConfig{
 		Host:    "127.0.0.1",
@@ -104,35 +107,26 @@ func GetConfig() *Config {
 
 // Populates NetworkMagic from named networks
 func (c *Config) populateNetworkMagic() error {
-	if c.Node.NetworkMagic != uint32(0) {
-		return nil
-	}
-	if c.App.Network != "" {
-		switch c.App.Network {
-		case "preview":
-			c.Node.NetworkMagic = libada.Preview.ProtocolMagic()
-		case "preprod":
-			c.Node.NetworkMagic = libada.Preprod.ProtocolMagic()
-		case "testnet":
-			c.Node.NetworkMagic = libada.Testnet.ProtocolMagic()
-		case "mainnet":
-			c.Node.NetworkMagic = libada.Mainnet.ProtocolMagic()
-		default:
-			return fmt.Errorf("unknown network: %s", c.App.Network)
+	if c.Node.NetworkMagic == 0 {
+		if c.App.Network != "" {
+			network := ouroboros.NetworkByName(c.App.Network)
+			if network == ouroboros.NetworkInvalid {
+				return fmt.Errorf("unknown network: %s", c.App.Network)
+			}
+			// Set Node's network, networkMagic, port, and socketPath
+			c.Node.Network = c.App.Network
+			c.Node.NetworkMagic = uint32(network.NetworkMagic)
+			c.Node.Port = uint32(3001)
+			c.Node.SocketPath = "/ipc/node.socket"
+			return nil
 		}
-	}
-	if c.Node.Network != "" {
-		switch c.Node.Network {
-		case "preview":
-			c.Node.NetworkMagic = libada.Preview.ProtocolMagic()
-		case "preprod":
-			c.Node.NetworkMagic = libada.Preprod.ProtocolMagic()
-		case "testnet":
-			c.Node.NetworkMagic = libada.Testnet.ProtocolMagic()
-		case "mainnet":
-			c.Node.NetworkMagic = libada.Mainnet.ProtocolMagic()
-		default:
-			return fmt.Errorf("unknown network: %s", c.Node.Network)
+		if c.Node.Network != "" {
+			network := ouroboros.NetworkByName(c.Node.Network)
+			if network == ouroboros.NetworkInvalid {
+				return fmt.Errorf("unknown network: %s", c.Node.Network)
+			}
+			c.Node.NetworkMagic = uint32(network.NetworkMagic)
+			return nil
 		}
 	}
 	return nil
@@ -143,28 +137,21 @@ func (c *Config) populateShelleyTransEpoch() error {
 	if c.Node.ShelleyTransEpoch != int32(-1) {
 		return nil
 	}
+	c.Node.ShelleyTransEpoch = 0
 	if c.App.Network != "" {
 		switch c.App.Network {
-		case "preview":
-			c.Node.ShelleyTransEpoch = 0
 		case "preprod":
 			c.Node.ShelleyTransEpoch = 4
 		case "mainnet":
 			c.Node.ShelleyTransEpoch = 208
-		default:
-			c.Node.ShelleyTransEpoch = 0
 		}
 	}
 	if c.Node.Network != "" {
 		switch c.Node.Network {
-		case "preview":
-			c.Node.ShelleyTransEpoch = 0
 		case "preprod":
 			c.Node.ShelleyTransEpoch = 4
 		case "mainnet":
 			c.Node.ShelleyTransEpoch = 208
-		default:
-			c.Node.ShelleyTransEpoch = 0
 		}
 	}
 	return nil

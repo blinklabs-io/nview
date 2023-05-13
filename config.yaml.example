@@ -31,7 +31,8 @@ node:
   # This selects the correct network for operation and can be configured to
   # any network, not just the named networks.
   #
-  # This can also be set via the CARDANO_NODE_NETWORK_MAGIC environment variable
+  # This can also be set via the CARDANO_NODE_NETWORK_MAGIC environment
+  # variable
   networkMagic:
 
   # Port for cardano-node
@@ -40,6 +41,14 @@ node:
   #
   # This can also be set via the CARDANO_PORT environment variable
   port: 3001
+
+  # Socket path for cardano-node
+  #
+  # Listening UNIX socket path and file name for cardano-node NtC
+  # communication.
+  #
+  # This can also be set via the CARDANO_NODE_SOCKET_PATH environment variable
+  socketPath:
 
 prometheus:
   # host/port for cardano-node Prometheus metrics
