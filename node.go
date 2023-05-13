@@ -41,7 +41,6 @@ func createClientConnection(cfg *Config) net.Conn {
 
 	conn, err = net.Dial(dialProto, dialAddress)
 	if err != nil {
-		return conn
 		fmt.Printf("ERROR: %s\n", err)
 		os.Exit(1)
 	}
