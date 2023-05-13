@@ -78,7 +78,6 @@ func getProtocolParams(cfg *Config) string {
 	protoParams, err := o.LocalStateQuery().Client.GetCurrentProtocolParams()
 	if err != nil {
 		return fmt.Sprintf("ERROR: failure querying protocol params: %s\n", err)
-		os.Exit(1)
 	}
 	return fmt.Sprintf("%v", *protoParams)
 }
