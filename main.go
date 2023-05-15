@@ -19,8 +19,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
-	"math"
 	"net"
 	"net/http"
 	"os"
@@ -287,8 +285,15 @@ func getTestText(ctx context.Context) string {
 	}
 
 	// Display progress
-	sb.WriteString(fmt.Sprintf(" Incoming peers: %v", peersFiltered))
-	sb.WriteString(fmt.Sprintf(" Outgoing peers: %v", peersOut))
+	sb.WriteString(fmt.Sprintf(" Incoming peers: %v\n", peersFiltered))
+	sb.WriteString(fmt.Sprintf(" Outgoing peers: %v\n", peersOut))
+
+	// Some Debugging
+	sb.WriteString(fmt.Sprintf(" Application config: %v\n", cfg))
+
+	// Get protocol parameters
+	params := getProtocolParams(cfg)
+	sb.WriteString(fmt.Sprintf(" Protocol params: %v\n", params))
 
 	failCount = 0
 	return fmt.Sprint(sb.String())
@@ -723,42 +728,6 @@ func getPromMetrics(ctx context.Context) (*PromMetrics, error) {
 	return metrics, nil
 }
 
-func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
-	// Load our config and get host/port
-	cfg := GetConfig()
-	url := fmt.Sprintf(
-		"http://%s:%d/metrics",
-		cfg.Prometheus.Host,
-		cfg.Prometheus.Port,
-	)
-	var respBodyBytes []byte
-	// Setup request
-	req, err := http.NewRequest(
-		http.MethodGet,
-		url,
-		nil,
-	)
-	if err != nil {
-		return respBodyBytes, http.StatusInternalServerError, err
-	}
-	// Set a 3 second timeout
-	ctx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cfg.Prometheus.Timeout))
-	defer cancel()
-	req = req.WithContext(ctx)
-	// Get metrics from the node
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return respBodyBytes, http.StatusInternalServerError, err
-	}
-	// Read the entire response body and close it to prevent a memory leak
-	respBodyBytes, err = io.ReadAll(resp.Body)
-	if err != nil {
-		return respBodyBytes, http.StatusInternalServerError, err
-	}
-	defer resp.Body.Close()
-	return respBodyBytes, resp.StatusCode, nil
-}
-
 // Converts a prometheus http response byte array into a JSON byte array
 func prom2json(prom []byte) ([]byte, error) {
 	// {"name": 0}
@@ -788,17 +757,4 @@ func prom2json(prom []byte) ([]byte, error) {
 		return b, err
 	}
 	return b, nil
-}
-
-// Time is in seconds
-func timeLeft(t uint64) string {
-	d := t / 60 / 60 / 24
-	h := math.Mod(float64(t/60/60), 24)
-	m := math.Mod(float64(t/60), 60)
-	s := math.Mod(float64(t), 60)
-	var result string
-	if d > 0 {
-		result = fmt.Sprintf("%dd ", d)
-	}
-	return fmt.Sprintf("%s%02d:%02d:%02d", result, int(h), int(m), int(s))
 }
