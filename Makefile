@@ -30,4 +30,4 @@ test: tidy
 # Build our program binaries
 # Depends on GO_FILES to determine when rebuild is needed
 $(BINARIES): mod-tidy $(GO_FILES)
-	go build -o $(@) .
+	go build -ldflags="-s -w" -o $(@) .

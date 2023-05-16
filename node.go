@@ -47,12 +47,12 @@ func createClientConnection(cfg *Config) net.Conn {
 	return conn
 }
 
-// Get Protocol Parameters from a running node using Ouroboros
-func getProtocolParams(cfg *Config) string {
+func getGenesisConfig(cfg *Config) *localstatequery.GenesisConfigResult {
+	var result *localstatequery.GenesisConfigResult
 	// Get a connection and setup our error channels
 	conn := createClientConnection(cfg)
 	if conn == nil {
-		return fmt.Sprintf("ERROR: cannot connect to node: %v", conn)
+		return result
 	}
 	errorChan := make(chan error)
 	go func() {
@@ -71,13 +71,49 @@ func getProtocolParams(cfg *Config) string {
 		ouroboros.WithLocalStateQueryConfig(buildLocalStateQueryConfig()),
 	)
 	if err != nil {
-		return fmt.Sprintf("ERROR: %s\n", err)
+		return result
 	}
 	// Start our client
 	o.LocalStateQuery().Client.Start()
-	protoParams, err := o.LocalStateQuery().Client.GetCurrentProtocolParams()
+	result, err = o.LocalStateQuery().Client.GetGenesisConfig()
 	if err != nil {
-		return fmt.Sprintf("ERROR: failure querying protocol params: %s\n", err)
+		return result
 	}
-	return fmt.Sprintf("%v", *protoParams)
+	return result
+}
+
+// Get Protocol Parameters from a running node using Ouroboros
+func getProtocolParams(cfg *Config) *localstatequery.CurrentProtocolParamsResult {
+	var result *localstatequery.CurrentProtocolParamsResult
+	// Get a connection and setup our error channels
+	conn := createClientConnection(cfg)
+	if conn == nil {
+		return result
+	}
+	errorChan := make(chan error)
+	go func() {
+		for {
+			err := <-errorChan
+			fmt.Printf("ERROR: %s\n", err)
+			os.Exit(1)
+		}
+	}()
+	o, err := ouroboros.New(
+		ouroboros.WithConnection(conn),
+		ouroboros.WithNetworkMagic(uint32(cfg.Node.NetworkMagic)),
+		ouroboros.WithErrorChan(errorChan),
+		ouroboros.WithNodeToNode(false),
+		ouroboros.WithKeepAlive(false),
+		ouroboros.WithLocalStateQueryConfig(buildLocalStateQueryConfig()),
+	)
+	if err != nil {
+		return result
+	}
+	// Start our client
+	o.LocalStateQuery().Client.Start()
+	result, err = o.LocalStateQuery().Client.GetCurrentProtocolParams()
+	if err != nil {
+		return result
+	}
+	return result
 }

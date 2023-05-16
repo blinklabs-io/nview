@@ -69,6 +69,9 @@ var failCount uint32 = 0
 // Track our role
 var role string = "Relay"
 
+// Track current epoch
+var currentEpoch uint32 = 0
+
 func main() {
 	// Check if any command line flags are given
 	flag.StringVar(&cmdlineFlags.configFile, "config", "", "path to config file to load")
@@ -91,7 +94,21 @@ func main() {
 	}
 
 	// Fetch data from Prometheus
-	text.SetText(getPromText(ctx)).SetBorder(true)
+	metrics, err := getPromMetrics(ctx)
+	if err != nil {
+		text.SetText(fmt.Sprintf(" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s", err))
+	}
+	// Set current epoch from Prometheus metrics
+	currentEpoch = uint32(metrics.EpochNum)
+	// TODO: temp hack to use currentEpoch
+	if currentEpoch > 0 {
+		// Do something non-useful
+		text.SetText(fmt.Sprintf("%d", currentEpoch))
+	}
+
+	// Populate initial text from metrics
+	text.SetText(getPromText(ctx, metrics)).SetBorder(true)
+
 	// Set our header
 	var network string
 	if cfg.App.Network != "" {
@@ -99,12 +116,15 @@ func main() {
 	} else {
 		network = strings.ToUpper(cfg.Node.Network[:1]) + cfg.Node.Network[1:]
 	}
-	headerText.SetText(fmt.Sprintf("> [green]%s[white] - [yellow](%s - %s)[white] : [blue]%s[white] <",
+	defaultHeaderText := fmt.Sprintf("> [green]%s[white] - [yellow](%s - %s)[white] : [blue]%s[white] [[blue]%s[white]] <",
 		cfg.App.NodeName,
 		role,
 		network,
-		"1.35.7", // TODO: get the real Version
-	))
+		"1.35.7",   // TODO: get the real Version
+		"abcd1234", // TODO: get the real Revision
+	)
+	headerText.SetText(defaultHeaderText)
+
 	// Set our footer
 	defaultFooterText := " [yellow](esc/q) Quit[white] | [yellow](i) Info[white] | [yellow](r) Refresh Prometheus"
 	footerText.SetText(defaultFooterText)
@@ -131,7 +151,11 @@ func main() {
 			text.Clear()
 			footerText.Clear()
 			footerText.SetText(defaultFooterText)
-			text.SetText(getPromText(ctx))
+			metrics, err = getPromMetrics(ctx)
+			if err != nil {
+				text.SetText(fmt.Sprintf(" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s", err))
+			}
+			text.SetText(getPromText(ctx, metrics))
 		}
 		if event.Rune() == 105 { // i
 			active = "info"
@@ -148,7 +172,11 @@ func main() {
 			text.Clear()
 			footerText.Clear()
 			footerText.SetText(" [yellow](esc/q) Quit[white] | [yellow](h) Return home")
-			text.SetText(getTestText(ctx))
+			metrics, err = getPromMetrics(ctx)
+			if err != nil {
+				text.SetText(fmt.Sprintf(" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s", err))
+			}
+			text.SetText(getTestText(ctx, metrics))
 		}
 		return event
 	})
@@ -166,11 +194,11 @@ func main() {
 				footerText.Clear()
 				footerText.SetText(defaultFooterText)
 				text.Clear()
-				text.SetText(getPromText(ctx))
-			}
-			if active == "info" {
-				text.Clear()
-				text.SetText(getInfoText(ctx))
+				metrics, err = getPromMetrics(ctx)
+				if err != nil {
+					text.SetText(fmt.Sprintf(" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s", err))
+				}
+				text.SetText(getPromText(ctx, metrics))
 			}
 			time.Sleep(time.Second * 2)
 		}
@@ -183,9 +211,12 @@ func main() {
 
 var uptimes uint64
 
-func getTestText(ctx context.Context) string {
+// TODO: Track size of epoch items
+// var epochItemsLast uint32 = 0
+
+func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	cfg := GetConfig()
-	// Refresh metrics from host
+	// Refresh process metrics from host
 	processMetrics, err := getProcessMetrics(ctx)
 	if err != nil {
 		uptimes = 0
@@ -205,6 +236,10 @@ func getTestText(ctx context.Context) string {
 	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
 
+	// Genesis Config
+	genesisConfig := getGenesisConfig(cfg)
+	sb.WriteString(fmt.Sprintf(" Genesis Config: %#v\n\n", genesisConfig))
+
 	// Get process in/out connections
 	connections, err := processMetrics.ConnectionsWithContext(ctx)
 	if err != nil {
@@ -217,7 +252,7 @@ func getTestText(ctx context.Context) string {
 	// Loops each connection, looking for ESTABLISHED
 	for _, c := range connections {
 		if c.Status == "ESTABLISHED" {
-			// If local port == node port, it's incoming
+			// If local port == node port, it's incoming (except P2P)
 			if c.Laddr.Port == cfg.Node.Port {
 				peersIn = append(peersIn, fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port))
 			}
@@ -261,6 +296,7 @@ func getTestText(ctx context.Context) string {
 
 		if peerIP == "127.0.0.1" || (peerIP == ip.String() && peerPORT == strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
 			// Do nothing
+			continue
 		} else {
 			// TODO: filter duplicates
 			peersFiltered = append(peersFiltered, fmt.Sprintf("%s;%s;i", peerIP, peerPORT))
@@ -278,6 +314,7 @@ func getTestText(ctx context.Context) string {
 
 		if peerIP == "127.0.0.1" || (peerIP == ip.String() && peerPORT == strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
 			// Do nothing
+			continue
 		} else {
 			// TODO: filter duplicates
 			peersFiltered = append(peersFiltered, fmt.Sprintf("%s;%s;o", peerIP, peerPORT))
@@ -285,15 +322,16 @@ func getTestText(ctx context.Context) string {
 	}
 
 	// Display progress
-	sb.WriteString(fmt.Sprintf(" Incoming peers: %v\n", peersFiltered))
+	sb.WriteString(fmt.Sprintf(" Incoming peers: %v\n", peersIn))
 	sb.WriteString(fmt.Sprintf(" Outgoing peers: %v\n", peersOut))
+	sb.WriteString(fmt.Sprintf(" Filtered peers: %v\n", peersFiltered))
 
 	// Some Debugging
-	sb.WriteString(fmt.Sprintf(" Application config: %v\n", cfg))
+	sb.WriteString(fmt.Sprintf(" Application config: %#v\n", cfg))
 
 	// Get protocol parameters
-	params := getProtocolParams(cfg)
-	sb.WriteString(fmt.Sprintf(" Protocol params: %v\n", params))
+	protoParams := getProtocolParams(cfg)
+	sb.WriteString(fmt.Sprintf(" Protocol params: %#v\n", protoParams))
 
 	failCount = 0
 	return fmt.Sprint(sb.String())
@@ -335,14 +373,8 @@ func getInfoText(ctx context.Context) string {
 	return fmt.Sprint(sb.String())
 }
 
-func getPromText(ctx context.Context) string {
+func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 	cfg := GetConfig()
-	// Refresh metrics from Prometheus and host
-	promMetrics, err := getPromMetrics(ctx)
-	if err != nil {
-		failCount++
-		return fmt.Sprintf("ERROR: %v", err)
-	}
 	processMetrics, err := getProcessMetrics(ctx)
 	if err != nil {
 		uptimes = 0
@@ -406,8 +438,17 @@ func getPromText(ctx context.Context) string {
 	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
 
+	// Epoch progress
+	var epochProgress float32
+	genesisConfig := getGenesisConfig(cfg)
+	if promMetrics.EpochNum >= uint64(cfg.Node.ShelleyTransEpoch) {
+		epochProgress = float32((float32(promMetrics.SlotInEpoch) / float32(genesisConfig.EpochLength)) * 100)
+	} // TODO: support Byron epochs
+	epochProgress1dec := fmt.Sprintf("%.1f", epochProgress)
+	// epochTimeLeft := timeLeft(timeUntilNextEpoch())
+
 	// Epoch
-	sb.WriteString(fmt.Sprintf(" Epoch [blue]%d[white]\n\n", promMetrics.EpochNum))
+	sb.WriteString(fmt.Sprintf(" Epoch [blue]%d[white] [[blue]%s%%[white]]\n\n", promMetrics.EpochNum, epochProgress1dec))
 
 	// Blocks / Slots / Tx
 
@@ -711,20 +752,25 @@ func getPromMetrics(ctx context.Context) (*PromMetrics, error) {
 	var respBodyBytes []byte
 	respBodyBytes, statusCode, err := getNodeMetrics(ctx)
 	if err != nil {
+		failCount++
 		return metrics, fmt.Errorf("Failed getNodeMetrics: %s\n", err)
 	}
 	if statusCode != http.StatusOK {
+		failCount++
 		return metrics, fmt.Errorf("Failed HTTP: %d\n", statusCode)
 	}
 
 	b, err := prom2json(respBodyBytes)
 	if err != nil {
+		failCount++
 		return metrics, fmt.Errorf("Failed prom2json: %s\n", err)
 	}
 
 	if err := json.Unmarshal(b, &metrics); err != nil {
+		failCount++
 		return metrics, fmt.Errorf("Failed JSON unmarshal: %s\n", err)
 	}
+	failCount = 0
 	return metrics, nil
 }
 
