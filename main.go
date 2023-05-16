@@ -101,7 +101,7 @@ func main() {
 	// Set current epoch from Prometheus metrics
 	currentEpoch = uint32(metrics.EpochNum)
 	// TODO: temp hack to use currentEpoch
-	if currentEpoch >= 0 {
+	if currentEpoch > 0 {
 		// Do nothing
 	}
 
