@@ -100,6 +100,13 @@ func main() {
 	}
 	// Set current epoch from Prometheus metrics
 	currentEpoch = uint32(metrics.EpochNum)
+	// TODO: temp hack to use currentEpoch
+	if currentEpoch >= 0 {
+		continue
+	}
+
+
+
 	// Populate initial text from metrics
 	text.SetText(getPromText(ctx, metrics)).SetBorder(true)
 
@@ -205,8 +212,8 @@ func main() {
 
 var uptimes uint64
 
-// Track size of epoch items
-var epochItemsLast uint32 = 0
+// TODO: Track size of epoch items
+// var epochItemsLast uint32 = 0
 
 func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	cfg := GetConfig()
