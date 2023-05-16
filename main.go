@@ -102,10 +102,8 @@ func main() {
 	currentEpoch = uint32(metrics.EpochNum)
 	// TODO: temp hack to use currentEpoch
 	if currentEpoch >= 0 {
-		continue
+		// Do nothing
 	}
-
-
 
 	// Populate initial text from metrics
 	text.SetText(getPromText(ctx, metrics)).SetBorder(true)
