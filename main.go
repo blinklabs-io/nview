@@ -257,7 +257,7 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	sb.WriteString(fmt.Sprintf(" Epoch [blue]%d[white] [[blue]%s%%[white]], [blue]%s[white] %-12s\n\n", promMetrics.EpochNum, epochProgress1dec, epochTimeLeft, "remaining"))
 
 	// Epoch Debug
-	sb.WriteString(fmt.Sprint(" Epoch Debug\n"))
+	sb.WriteString(fmt.Sprintf(" Epoch Debug%s\n", ""))
 	currentTimeSec := uint64(time.Now().Unix() - 1)
 	sb.WriteString(fmt.Sprintf("currentTimeSec    = %d\n", currentTimeSec))
 	sb.WriteString(fmt.Sprintf("startTime         = %d\n", cfg.Node.ByronGenesis.StartTime))
@@ -272,8 +272,7 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	sb.WriteString(fmt.Sprintf(" Epoch getEpoch: %d\n", getEpoch()))
 	sb.WriteString(fmt.Sprintf(" Epoch timeUntilNextEpoch: %d\n",
 		((uint64(cfg.Node.ShelleyTransEpoch)*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)/1000)+((promMetrics.EpochNum+1-uint64(cfg.Node.ShelleyTransEpoch))*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)-currentTimeSec+cfg.Node.ByronGenesis.StartTime))
-	sb.WriteString(fmt.Sprintf("   timeLeft now: %s\n", timeLeft(((uint64(cfg.Node.ShelleyTransEpoch)*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)/1000)+((promMetrics.EpochNum+1-uint64(cfg.Node.ShelleyTransEpoch))*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)-currentTimeSec+cfg.Node.ByronGenesis.StartTime)))
-	sb.WriteString(fmt.Sprint("\n\n"))
+	sb.WriteString(fmt.Sprintf("   timeLeft now: %s\n\n\n", timeLeft(((uint64(cfg.Node.ShelleyTransEpoch)*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)/1000)+((promMetrics.EpochNum+1-uint64(cfg.Node.ShelleyTransEpoch))*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)-currentTimeSec+cfg.Node.ByronGenesis.StartTime)))
 
 	// Genesis Config
 	sb.WriteString(fmt.Sprintf(" Genesis Config: %#v\n\n", genesisConfig))
