@@ -21,6 +21,8 @@ import (
 	"math"
 	"net/http"
 	"time"
+
+	"github.com/blinklabs-io/gouroboros/protocol/localstatequery"
 )
 
 // Fetches the node metrics and return a byte array
@@ -60,6 +62,33 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 	return respBodyBytes, resp.StatusCode, nil
 }
 
+// Calculate epoch from current second
+func getEpoch() uint64 {
+	cfg := GetConfig()
+	currentTimeSec := uint64(time.Now().Unix() - 1)
+	byronEndTime := cfg.Node.ByronGenesis.StartTime + ((uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000)
+	result := uint64(cfg.Node.ShelleyTransEpoch) + ((currentTimeSec - byronEndTime) / cfg.Node.ByronGenesis.EpochLength / cfg.Node.ByronGenesis.SlotLength)
+	return result
+}
+
+// Calculate slot number
+func getSlotTipRef(g *localstatequery.GenesisConfigResult) uint64 {
+	cfg := GetConfig()
+	currentTimeSec := uint64(time.Now().Unix() - 1)
+	byronSlots := uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength
+	byronEndTime := cfg.Node.ByronGenesis.StartTime + ((uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000)
+	if currentTimeSec < byronEndTime {
+		return ((currentTimeSec - cfg.Node.ByronGenesis.StartTime) * 1000) / cfg.Node.ByronGenesis.SlotLength
+	}
+	return byronSlots + ((currentTimeSec - byronEndTime) / uint64(g.SlotLength/1000000))
+}
+
+// Calculate expected interval between blocks
+func slotInterval(g *localstatequery.GenesisConfigResult) uint64 {
+	// return (uint64(g.SlotLength/1000000) / g.ActiveSlotsCoeff / 0.5) + 0.5
+	return uint64(0)
+}
+
 // Time is in seconds
 func timeLeft(t uint64) string {
 	d := t / 60 / 60 / 24
@@ -71,4 +100,11 @@ func timeLeft(t uint64) string {
 		result = fmt.Sprintf("%dd ", d)
 	}
 	return fmt.Sprintf("%s%02d:%02d:%02d", result, int(h), int(m), int(s))
+}
+
+func timeUntilNextEpoch() uint64 {
+	cfg := GetConfig()
+	currentTimeSec := uint64(time.Now().Unix() - 1)
+	result := ((uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000) + ((getEpoch() + uint64(1) - uint64(cfg.Node.ShelleyTransEpoch)) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) - currentTimeSec + cfg.Node.ByronGenesis.StartTime
+	return result
 }

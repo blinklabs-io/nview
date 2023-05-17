@@ -36,18 +36,26 @@ type AppConfig struct {
 }
 
 type NodeConfig struct {
-	Binary            string // TODO: make this configurable
-	Network           string `yaml:"network" envconfig:"CARDANO_NETWORK"`
-	NetworkMagic      uint32 `yaml:"networkMagic" envconfig:"CARDANO_NODE_NETWORK_MAGIC"`
-	Port              uint32 `yaml:"port" envconfig:"CARDANO_PORT"`
-	ShelleyTransEpoch int32  `yaml:"shellyTransEpoch" envconfig:"SHELLEY_TRANS_EPOCH"`
-	SocketPath        string `yaml:"socketPath" envconfig:"CARDANO_NODE_SOCKET_PATH"`
+	Binary            string             // TODO: make this configurable
+	ByronGenesis      ByronGenesisConfig `yaml:"byron"`
+	Network           string             `yaml:"network" envconfig:"CARDANO_NETWORK"`
+	NetworkMagic      uint32             `yaml:"networkMagic" envconfig:"CARDANO_NODE_NETWORK_MAGIC"`
+	Port              uint32             `yaml:"port" envconfig:"CARDANO_PORT"`
+	ShelleyTransEpoch int32              `yaml:"shellyTransEpoch" envconfig:"SHELLEY_TRANS_EPOCH"`
+	SocketPath        string             `yaml:"socketPath" envconfig:"CARDANO_NODE_SOCKET_PATH"`
 }
 
 type PrometheusConfig struct {
 	Host    string `yaml:"host" envconfig:"PROM_HOST"`
 	Port    uint32 `yaml:"port" envconfig:"PROM_PORT"`
 	Timeout uint32 `yaml:"timeout" envconfig:"PROM_TIMEOUT"`
+}
+
+type ByronGenesisConfig struct {
+	StartTime   uint64 `yaml:"startTime" envconfig:"BYRON_GENESIS_START_SEC"`
+	EpochLength uint64 `yaml:"epochLength" envconfig:"BYRON_EPOCH_LENGTH"`
+	K           uint64 `yaml:"k" envconfig:"BYRON_K"`
+	SlotLength  uint64 `yaml:"slotLength" envconfig:"BYRON_SLOT_LENGTH"`
 }
 
 // Singleton config instance with default values
@@ -93,6 +101,10 @@ func LoadConfig(configFile string) (*Config, error) {
 	if err := globalConfig.populateNetworkMagic(); err != nil {
 		return nil, err
 	}
+	// Populate ByronGenesis from named networks
+	if err := globalConfig.populateByronGenesis(); err != nil {
+		return nil, err
+	}
 	// Populate ShelleyTransEpoch from named networks
 	if err := globalConfig.populateShelleyTransEpoch(); err != nil {
 		return nil, err
@@ -119,14 +131,15 @@ func (c *Config) populateNetworkMagic() error {
 			c.Node.Port = uint32(3001)
 			c.Node.SocketPath = "/ipc/node.socket"
 			return nil
-		}
-		if c.Node.Network != "" {
+		} else if c.Node.Network != "" {
 			network := ouroboros.NetworkByName(c.Node.Network)
 			if network == ouroboros.NetworkInvalid {
 				return fmt.Errorf("unknown network: %s", c.Node.Network)
 			}
 			c.Node.NetworkMagic = uint32(network.NetworkMagic)
 			return nil
+		} else {
+			return fmt.Errorf("unable to set network magic")
 		}
 	}
 	return nil
@@ -145,14 +158,51 @@ func (c *Config) populateShelleyTransEpoch() error {
 		case "mainnet":
 			c.Node.ShelleyTransEpoch = 208
 		}
-	}
-	if c.Node.Network != "" {
+	} else if c.Node.Network != "" {
 		switch c.Node.Network {
 		case "preprod":
 			c.Node.ShelleyTransEpoch = 4
 		case "mainnet":
 			c.Node.ShelleyTransEpoch = 208
 		}
+	} else {
+		return fmt.Errorf("unable to populate shelley transition epoch")
 	}
+	return nil
+}
+
+// Populates ByronGenesisConfig from named networks
+func (c *Config) populateByronGenesis() error {
+	if c.Node.ByronGenesis.StartTime != 0 {
+		return nil
+	}
+	// Our slot length is always 20000 in supported networks
+	c.Node.ByronGenesis.SlotLength = 20000
+	// Our K is 2160, except preview, which we'll override below
+	c.Node.ByronGenesis.K = 2160
+	if c.App.Network != "" {
+		switch c.App.Network {
+		case "preview":
+			c.Node.ByronGenesis.K = 432
+			c.Node.ByronGenesis.StartTime = 1666656000
+		case "preprod":
+			c.Node.ByronGenesis.StartTime = 1654041600
+		case "mainnet":
+			c.Node.ByronGenesis.StartTime = 1506203091
+		}
+	} else if c.Node.Network != "" {
+		switch c.Node.Network {
+		case "preview":
+			c.Node.ByronGenesis.K = 432
+			c.Node.ByronGenesis.StartTime = 1666656000
+		case "preprod":
+			c.Node.ByronGenesis.StartTime = 1654041600
+		case "mainnet":
+			c.Node.ByronGenesis.StartTime = 1506203091
+		}
+	} else {
+		return fmt.Errorf("unable to populate byron genesis config")
+	}
+	c.Node.ByronGenesis.EpochLength = (10 * c.Node.ByronGenesis.K)
 	return nil
 }
