@@ -191,14 +191,20 @@ func main() {
 				panic(fmt.Errorf("COULD NOT CONNECT TO A RUNNING INSTANCE, %d FAILED ATTEMPTS IN A ROW!", failCount))
 			}
 			if active == "main" {
-				footerText.Clear()
-				footerText.SetText(defaultFooterText)
 				text.Clear()
 				metrics, err = getPromMetrics(ctx)
 				if err != nil {
 					text.SetText(fmt.Sprintf(" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s", err))
 				}
 				text.SetText(getPromText(ctx, metrics))
+			}
+			if active == "test" {
+				text.Clear()
+				metrics, err = getPromMetrics(ctx)
+				if err != nil {
+					text.SetText(fmt.Sprintf(" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s", err))
+				}
+				text.SetText(getTestText(ctx, metrics))
 			}
 			time.Sleep(time.Second * 2)
 		}
@@ -236,8 +242,39 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
 
-	// Genesis Config
+	// Epoch progress
+	var epochProgress float32
 	genesisConfig := getGenesisConfig(cfg)
+	if promMetrics.EpochNum >= uint64(cfg.Node.ShelleyTransEpoch) {
+		epochProgress = float32((float32(promMetrics.SlotInEpoch) / float32(genesisConfig.EpochLength)) * 100)
+	} else {
+		epochProgress = float32((float32(promMetrics.SlotInEpoch) / float32(cfg.Node.ByronGenesis.EpochLength)) * 100)
+	}
+	epochProgress1dec := fmt.Sprintf("%.1f", epochProgress)
+	epochTimeLeft := timeLeft(timeUntilNextEpoch())
+
+	// Epoch
+	sb.WriteString(fmt.Sprintf(" Epoch [blue]%d[white] [[blue]%s%%[white]], [blue]%s[white] %-12s\n\n", promMetrics.EpochNum, epochProgress1dec, epochTimeLeft, "remaining"))
+
+	// Epoch Debug
+	sb.WriteString(fmt.Sprintf(" Epoch Debug%s\n", ""))
+	currentTimeSec := uint64(time.Now().Unix() - 1)
+	sb.WriteString(fmt.Sprintf("currentTimeSec    = %d\n", currentTimeSec))
+	sb.WriteString(fmt.Sprintf("startTime         = %d\n", cfg.Node.ByronGenesis.StartTime))
+	sb.WriteString(fmt.Sprintf("rhs               = %d\n", (uint64(cfg.Node.ShelleyTransEpoch)*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)/1000))
+	byronEndTime := uint64(cfg.Node.ByronGenesis.StartTime + ((uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000))
+	sb.WriteString(fmt.Sprintf("byronEndTime      = %d\n", byronEndTime))
+	sb.WriteString(fmt.Sprintf("math, currentTimeSec - byronEndTime = %d\n", (currentTimeSec - byronEndTime)))
+
+	result := uint64(cfg.Node.ShelleyTransEpoch) + ((currentTimeSec - byronEndTime) / cfg.Node.ByronGenesis.EpochLength / cfg.Node.ByronGenesis.SlotLength)
+	sb.WriteString(fmt.Sprintf("result=%d\n", result))
+
+	sb.WriteString(fmt.Sprintf(" Epoch getEpoch: %d\n", getEpoch()))
+	sb.WriteString(fmt.Sprintf(" Epoch timeUntilNextEpoch: %d\n",
+		((uint64(cfg.Node.ShelleyTransEpoch)*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)/1000)+((promMetrics.EpochNum+1-uint64(cfg.Node.ShelleyTransEpoch))*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)-currentTimeSec+cfg.Node.ByronGenesis.StartTime))
+	sb.WriteString(fmt.Sprintf("   timeLeft now: %s\n\n\n", timeLeft(((uint64(cfg.Node.ShelleyTransEpoch)*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)/1000)+((promMetrics.EpochNum+1-uint64(cfg.Node.ShelleyTransEpoch))*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)-currentTimeSec+cfg.Node.ByronGenesis.StartTime)))
+
+	// Genesis Config
 	sb.WriteString(fmt.Sprintf(" Genesis Config: %#v\n\n", genesisConfig))
 
 	// Get process in/out connections
@@ -324,14 +361,14 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	// Display progress
 	sb.WriteString(fmt.Sprintf(" Incoming peers: %v\n", peersIn))
 	sb.WriteString(fmt.Sprintf(" Outgoing peers: %v\n", peersOut))
-	sb.WriteString(fmt.Sprintf(" Filtered peers: %v\n", peersFiltered))
+	sb.WriteString(fmt.Sprintf(" Filtered peers: %v\n\n", peersFiltered))
 
 	// Some Debugging
-	sb.WriteString(fmt.Sprintf(" Application config: %#v\n", cfg))
+	sb.WriteString(fmt.Sprintf(" Application config: %#v\n\n", cfg))
 
 	// Get protocol parameters
 	protoParams := getProtocolParams(cfg)
-	sb.WriteString(fmt.Sprintf(" Protocol params: %#v\n", protoParams))
+	sb.WriteString(fmt.Sprintf(" Protocol params: %#v\n\n", protoParams))
 
 	failCount = 0
 	return fmt.Sprint(sb.String())
@@ -443,12 +480,12 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 	genesisConfig := getGenesisConfig(cfg)
 	if promMetrics.EpochNum >= uint64(cfg.Node.ShelleyTransEpoch) {
 		epochProgress = float32((float32(promMetrics.SlotInEpoch) / float32(genesisConfig.EpochLength)) * 100)
-	} // TODO: support Byron epochs
+	} // TODO: support Byron epochs: else { epochProgress = float32((float32(promMetrics.SlotInEpoch) / float32(BYRON_EPOCH_LENGTH)) * 100)
 	epochProgress1dec := fmt.Sprintf("%.1f", epochProgress)
 	// epochTimeLeft := timeLeft(timeUntilNextEpoch())
 
 	// Epoch
-	sb.WriteString(fmt.Sprintf(" Epoch [blue]%d[white] [[blue]%s%%[white]]\n\n", promMetrics.EpochNum, epochProgress1dec))
+	sb.WriteString(fmt.Sprintf(" Epoch [blue]%d[white] [[blue]%s%%[white]], [blue]%s[white] %-12s\n\n", promMetrics.EpochNum, epochProgress1dec, "N/A", "remaining"))
 
 	// Blocks / Slots / Tx
 
@@ -457,6 +494,9 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 		len(strconv.FormatUint(promMetrics.MempoolTx, 10)) -
 		len(strconv.FormatUint(mempoolTxKBytes, 10)))
 
+	tipRef := getSlotTipRef(genesisConfig)
+	tipDiff := tipRef - promMetrics.SlotNum
+
 	// Row 1
 	sb.WriteString(fmt.Sprintf(
 		" Block      : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]",
@@ -464,7 +504,7 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 	))
 	sb.WriteString(fmt.Sprintf(
 		" Tip (ref)  : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
-		"N/A",
+		strconv.FormatUint(tipRef, 10),
 	))
 	sb.WriteString(fmt.Sprintf(
 		" Forks      : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n",
@@ -475,10 +515,28 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 		" Slot       : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]",
 		strconv.FormatUint(promMetrics.SlotNum, 10),
 	))
-	sb.WriteString(fmt.Sprintf(
-		" Tip (diff) : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
-		"N/A",
-	))
+	if promMetrics.SlotNum == 0 {
+		sb.WriteString(fmt.Sprintf(
+			" Status     : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
+			"starting",
+		))
+	} else if tipDiff >= slotInterval(genesisConfig) {
+		sb.WriteString(fmt.Sprintf(
+			" Tip (diff) : [green]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
+			fmt.Sprintf("%s :)", strconv.FormatUint(tipDiff, 10)),
+		))
+	} else if tipDiff <= 600 {
+		sb.WriteString(fmt.Sprintf(
+			" Tip (diff) : [yellow]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
+			fmt.Sprintf("%s :|", strconv.FormatUint(tipDiff, 10)),
+		))
+	} else {
+		syncProgress := float32(promMetrics.SlotNum / tipRef * 1000)
+		sb.WriteString(fmt.Sprintf(
+			" Syncing    : [yellow]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
+			fmt.Sprintf("%2.1f", syncProgress),
+		))
+	}
 	sb.WriteString(fmt.Sprintf(
 		" Total Tx   : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n",
 		strconv.FormatUint(promMetrics.TxProcessed, 10),
