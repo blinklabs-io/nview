@@ -832,7 +832,7 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 		sb.WriteString(fmt.Sprintf("- [yellow]CORE[white] %s\n",
 			strings.Repeat("-", width-6),
 		))
-		sb.WriteString(fmt.Sprint(" [green]Coming soon![white]\n"))
+		sb.WriteString(fmt.Sprintf(" [green]%s[white]\n", "Comping soon!"))
 	}
 
 	failCount = 0
