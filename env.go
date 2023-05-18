@@ -67,8 +67,10 @@ func getEpoch() uint64 {
 	cfg := GetConfig()
 	currentTimeSec := uint64(time.Now().Unix() - 1)
 	byronEndTime := cfg.Node.ByronGenesis.StartTime + ((uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000)
-	result := uint64(cfg.Node.ShelleyTransEpoch) + ((currentTimeSec - byronEndTime) / cfg.Node.ByronGenesis.EpochLength / cfg.Node.ByronGenesis.SlotLength)
-	return result
+	result := uint64(
+		cfg.Node.ShelleyTransEpoch,
+	) + ((currentTimeSec - byronEndTime) / cfg.Node.ByronGenesis.EpochLength / cfg.Node.ByronGenesis.SlotLength)
+	return uint64(result)
 }
 
 // Calculate slot number
@@ -85,8 +87,11 @@ func getSlotTipRef(g *localstatequery.GenesisConfigResult) uint64 {
 
 // Calculate expected interval between blocks
 func slotInterval(g *localstatequery.GenesisConfigResult) uint64 {
-	// return (uint64(g.SlotLength/1000000) / g.ActiveSlotsCoeff / 0.5) + 0.5
-	return uint64(0)
+	// g.SlotLength is nanoseconds
+	// 0.05 is g.ActiveSlotsCoeff resolved
+	// 0.5 is decentralisation (removed in babbage... so use default)
+	result := (float64(g.SlotLength/1000000) / 0.05 / 0.5) + 0.5
+	return uint64(result)
 }
 
 // Time is in seconds
@@ -106,5 +111,5 @@ func timeUntilNextEpoch() uint64 {
 	cfg := GetConfig()
 	currentTimeSec := uint64(time.Now().Unix() - 1)
 	result := ((uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000) + ((getEpoch() + uint64(1) - uint64(cfg.Node.ShelleyTransEpoch)) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) - currentTimeSec + cfg.Node.ByronGenesis.StartTime
-	return result
+	return uint64(result)
 }
