@@ -110,6 +110,10 @@ func timeLeft(t uint64) string {
 func timeUntilNextEpoch() uint64 {
 	cfg := GetConfig()
 	currentTimeSec := uint64(time.Now().Unix() - 1)
-	result := ((uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000) + ((getEpoch() + uint64(1) - uint64(cfg.Node.ShelleyTransEpoch)) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) - currentTimeSec + cfg.Node.ByronGenesis.StartTime
+	ste := uint64(cfg.Node.ShelleyTransEpoch)
+	bgel := cfg.Node.ByronGenesis.EpochLength
+	bgsl := cfg.Node.ByronGenesis.SlotLength
+	byronLength := (ste * bgel * bgsl) / 1000
+	result := byronLength + ((getEpoch() + 1 - ste) * bgel * bgsl) - currentTimeSec + cfg.Node.ByronGenesis.StartTime
 	return uint64(result)
 }
