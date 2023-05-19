@@ -96,7 +96,9 @@ func main() {
 	// Fetch data from Prometheus
 	metrics, err := getPromMetrics(ctx)
 	if err != nil {
-		text.SetText(fmt.Sprintf(" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s", err))
+		text.SetText(
+			fmt.Sprintf(" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s", err),
+		)
 	}
 	// Set current epoch from Prometheus metrics
 	currentEpoch = uint32(metrics.EpochNum)
@@ -116,12 +118,13 @@ func main() {
 	} else {
 		network = strings.ToUpper(cfg.Node.Network[:1]) + cfg.Node.Network[1:]
 	}
-	defaultHeaderText := fmt.Sprintf("> [green]%s[white] - [yellow](%s - %s)[white] : [blue]%s[white] [[blue]%s[white]] <",
+	defaultHeaderText := fmt.Sprintf(
+		"> [green]%s[white] - [yellow](%s - %s)[white] : [blue]%s[white] [[blue]%s[white]] <",
 		cfg.App.NodeName,
 		role,
 		network,
-		"1.35.7",   // TODO: get the real Version
-		"abcd1234", // TODO: get the real Revision
+		"8.0.0",    // TODO: get the real Version
+		"69a117b7", // TODO: get the real Revision
 	)
 	headerText.SetText(defaultHeaderText)
 
@@ -153,7 +156,12 @@ func main() {
 			footerText.SetText(defaultFooterText)
 			metrics, err = getPromMetrics(ctx)
 			if err != nil {
-				text.SetText(fmt.Sprintf(" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s", err))
+				text.SetText(
+					fmt.Sprintf(
+						" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s",
+						err,
+					),
+				)
 			}
 			text.SetText(getPromText(ctx, metrics))
 		}
@@ -174,7 +182,12 @@ func main() {
 			footerText.SetText(" [yellow](esc/q) Quit[white] | [yellow](h) Return home")
 			metrics, err = getPromMetrics(ctx)
 			if err != nil {
-				text.SetText(fmt.Sprintf(" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s", err))
+				text.SetText(
+					fmt.Sprintf(
+						" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s",
+						err,
+					),
+				)
 			}
 			text.SetText(getTestText(ctx, metrics))
 		}
@@ -188,13 +201,23 @@ func main() {
 	go func() {
 		for {
 			if failCount >= cfg.App.Retries {
-				panic(fmt.Errorf("COULD NOT CONNECT TO A RUNNING INSTANCE, %d FAILED ATTEMPTS IN A ROW!", failCount))
+				panic(
+					fmt.Errorf(
+						"COULD NOT CONNECT TO A RUNNING INSTANCE, %d FAILED ATTEMPTS IN A ROW!",
+						failCount,
+					),
+				)
 			}
 			if active == "main" {
 				text.Clear()
 				metrics, err = getPromMetrics(ctx)
 				if err != nil {
-					text.SetText(fmt.Sprintf(" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s", err))
+					text.SetText(
+						fmt.Sprintf(
+							" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s",
+							err,
+						),
+					)
 				}
 				text.SetText(getPromText(ctx, metrics))
 			}
@@ -202,7 +225,12 @@ func main() {
 				text.Clear()
 				metrics, err = getPromMetrics(ctx)
 				if err != nil {
-					text.SetText(fmt.Sprintf(" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s", err))
+					text.SetText(
+						fmt.Sprintf(
+							" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s",
+							err,
+						),
+					)
 				}
 				text.SetText(getTestText(ctx, metrics))
 			}
@@ -246,7 +274,9 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	var epochProgress float32
 	genesisConfig := getGenesisConfig(cfg)
 	if promMetrics.EpochNum >= uint64(cfg.Node.ShelleyTransEpoch) {
-		epochProgress = float32((float32(promMetrics.SlotInEpoch) / float32(genesisConfig.EpochLength)) * 100)
+		epochProgress = float32(
+			(float32(promMetrics.SlotInEpoch) / float32(genesisConfig.EpochLength)) * 100,
+		)
 	} else {
 		epochProgress = float32((float32(promMetrics.SlotInEpoch) / float32(cfg.Node.ByronGenesis.EpochLength)) * 100)
 	}
@@ -254,25 +284,63 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	epochTimeLeft := timeLeft(timeUntilNextEpoch())
 
 	// Epoch
-	sb.WriteString(fmt.Sprintf(" Epoch [blue]%d[white] [[blue]%s%%[white]], [blue]%s[white] %-12s\n\n", promMetrics.EpochNum, epochProgress1dec, epochTimeLeft, "remaining"))
+	sb.WriteString(
+		fmt.Sprintf(
+			" Epoch [blue]%d[white] [[blue]%s%%[white]], [blue]%s[white] %-12s\n\n",
+			promMetrics.EpochNum,
+			epochProgress1dec,
+			epochTimeLeft,
+			"remaining",
+		),
+	)
 
 	// Epoch Debug
 	sb.WriteString(fmt.Sprintf(" Epoch Debug%s\n", ""))
 	currentTimeSec := uint64(time.Now().Unix() - 1)
 	sb.WriteString(fmt.Sprintf("currentTimeSec    = %d\n", currentTimeSec))
 	sb.WriteString(fmt.Sprintf("startTime         = %d\n", cfg.Node.ByronGenesis.StartTime))
-	sb.WriteString(fmt.Sprintf("rhs               = %d\n", (uint64(cfg.Node.ShelleyTransEpoch)*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)/1000))
-	byronEndTime := uint64(cfg.Node.ByronGenesis.StartTime + ((uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000))
+	sb.WriteString(
+		fmt.Sprintf(
+			"rhs               = %d\n",
+			(uint64(cfg.Node.ShelleyTransEpoch)*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)/1000,
+		),
+	)
+	byronEndTime := uint64(
+		cfg.Node.ByronGenesis.StartTime + ((uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000),
+	)
 	sb.WriteString(fmt.Sprintf("byronEndTime      = %d\n", byronEndTime))
-	sb.WriteString(fmt.Sprintf("math, currentTimeSec - byronEndTime = %d\n", (currentTimeSec - byronEndTime)))
+	sb.WriteString(fmt.Sprintf("byron EpochLength = %d\n", cfg.Node.ByronGenesis.EpochLength))
+	sb.WriteString(fmt.Sprintf("byron SlotLength  = %d\n", cfg.Node.ByronGenesis.SlotLength))
+	sb.WriteString(
+		fmt.Sprintf("currentTimeSec-byronEndTime = %d\n", (currentTimeSec - byronEndTime)),
+	)
+	sb.WriteString(
+		fmt.Sprintf(
+			"byron EpochLength*SlotLength = %d\n",
+			(cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength),
+		),
+	)
+	sb.WriteString(fmt.Sprintf("slotInterval      = %d\n", slotInterval(genesisConfig)))
+	sb.WriteString(fmt.Sprintf("ActiveSlotsCoeff  = %#v\n", genesisConfig.ActiveSlotsCoeff))
 
-	result := uint64(cfg.Node.ShelleyTransEpoch) + ((currentTimeSec - byronEndTime) / cfg.Node.ByronGenesis.EpochLength / cfg.Node.ByronGenesis.SlotLength)
+	result := uint64(
+		cfg.Node.ShelleyTransEpoch,
+	) + ((currentTimeSec - byronEndTime) / cfg.Node.ByronGenesis.EpochLength / cfg.Node.ByronGenesis.SlotLength)
 	sb.WriteString(fmt.Sprintf("result=%d\n", result))
 
 	sb.WriteString(fmt.Sprintf(" Epoch getEpoch: %d\n", getEpoch()))
-	sb.WriteString(fmt.Sprintf(" Epoch timeUntilNextEpoch: %d\n",
-		((uint64(cfg.Node.ShelleyTransEpoch)*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)/1000)+((promMetrics.EpochNum+1-uint64(cfg.Node.ShelleyTransEpoch))*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)-currentTimeSec+cfg.Node.ByronGenesis.StartTime))
-	sb.WriteString(fmt.Sprintf("   timeLeft now: %s\n\n\n", timeLeft(((uint64(cfg.Node.ShelleyTransEpoch)*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)/1000)+((promMetrics.EpochNum+1-uint64(cfg.Node.ShelleyTransEpoch))*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)-currentTimeSec+cfg.Node.ByronGenesis.StartTime)))
+	sb.WriteString(fmt.Sprintf(
+		" Epoch timeUntilNextEpoch: %d\n",
+		((uint64(cfg.Node.ShelleyTransEpoch)*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)/1000)+((promMetrics.EpochNum+1-uint64(cfg.Node.ShelleyTransEpoch))*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)-currentTimeSec+cfg.Node.ByronGenesis.StartTime,
+	))
+	sb.WriteString(
+		fmt.Sprintf(
+			"   timeLeft now: %s\n\n\n",
+			timeLeft(
+				((uint64(cfg.Node.ShelleyTransEpoch)*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)/1000)+((promMetrics.EpochNum+1-uint64(cfg.Node.ShelleyTransEpoch))*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)-currentTimeSec+cfg.Node.ByronGenesis.StartTime,
+			),
+		),
+	)
 
 	// Genesis Config
 	sb.WriteString(fmt.Sprintf(" Genesis Config: %#v\n\n", genesisConfig))
@@ -294,7 +362,8 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 				peersIn = append(peersIn, fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port))
 			}
 			// If local port != node port, ekg port, or prometheus port, it's outgoing
-			if c.Laddr.Port != cfg.Node.Port && c.Laddr.Port != uint32(12788) && c.Laddr.Port != cfg.Prometheus.Port {
+			if c.Laddr.Port != cfg.Node.Port && c.Laddr.Port != uint32(12788) &&
+				c.Laddr.Port != cfg.Prometheus.Port {
 				peersOut = append(peersOut, fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port))
 			}
 		}
@@ -331,7 +400,8 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 			peerIP = strings.TrimPrefix(strings.TrimSuffix(peerIP, "]"), "[")
 		}
 
-		if peerIP == "127.0.0.1" || (peerIP == ip.String() && peerPORT == strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
+		if peerIP == "127.0.0.1" ||
+			(peerIP == ip.String() && peerPORT == strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
 			// Do nothing
 			continue
 		} else {
@@ -349,7 +419,8 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 			peerIP = strings.TrimPrefix(strings.TrimSuffix(peerIP, "]"), "[")
 		}
 
-		if peerIP == "127.0.0.1" || (peerIP == ip.String() && peerPORT == strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
+		if peerIP == "127.0.0.1" ||
+			(peerIP == ip.String() && peerPORT == strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
 			// Do nothing
 			continue
 		} else {
@@ -395,7 +466,9 @@ func getInfoText(ctx context.Context) string {
 	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
 
-	sb.WriteString("[white:black:r] INFO [white:-:-] Displays live metrics gathered from node Prometheus endpoint\n\n")
+	sb.WriteString(
+		"[white:black:r] INFO [white:-:-] Displays live metrics gathered from node Prometheus endpoint\n\n",
+	)
 
 	sb.WriteString(" [green]Main Section[white]\n")
 	sb.WriteString(" Epoch number is live from the node.\n\n")
@@ -435,7 +508,8 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 
 	// Style / UI
 	var width = 71
-	var threeColWidth = (width - 3) / 2
+
+	var threeColWidth = (width - 5) / 3
 	//var threeCol2Start = threeColWidth+3
 	//var threeCol3Start = threeColWidth*2+4
 	var threeCol1ValueWidth = threeColWidth - 12
@@ -479,13 +553,23 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 	var epochProgress float32
 	genesisConfig := getGenesisConfig(cfg)
 	if promMetrics.EpochNum >= uint64(cfg.Node.ShelleyTransEpoch) {
-		epochProgress = float32((float32(promMetrics.SlotInEpoch) / float32(genesisConfig.EpochLength)) * 100)
+		epochProgress = float32(
+			(float32(promMetrics.SlotInEpoch) / float32(genesisConfig.EpochLength)) * 100,
+		)
 	} // TODO: support Byron epochs: else { epochProgress = float32((float32(promMetrics.SlotInEpoch) / float32(BYRON_EPOCH_LENGTH)) * 100)
 	epochProgress1dec := fmt.Sprintf("%.1f", epochProgress)
 	// epochTimeLeft := timeLeft(timeUntilNextEpoch())
 
 	// Epoch
-	sb.WriteString(fmt.Sprintf(" Epoch [blue]%d[white] [[blue]%s%%[white]], [blue]%s[white] %-12s\n\n", promMetrics.EpochNum, epochProgress1dec, "N/A", "remaining"))
+	sb.WriteString(
+		fmt.Sprintf(
+			" Epoch [blue]%d[white] [[blue]%s%%[white]], [blue]%s[white] %-12s\n\n",
+			promMetrics.EpochNum,
+			epochProgress1dec,
+			"N/A",
+			"remaining",
+		),
+	)
 
 	// Blocks / Slots / Tx
 
@@ -495,7 +579,7 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 		len(strconv.FormatUint(mempoolTxKBytes, 10)))
 
 	tipRef := getSlotTipRef(genesisConfig)
-	tipDiff := tipRef - promMetrics.SlotNum
+	tipDiff := (tipRef - promMetrics.SlotNum)
 
 	// Row 1
 	sb.WriteString(fmt.Sprintf(
@@ -520,7 +604,7 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 			" Status     : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
 			"starting",
 		))
-	} else if tipDiff >= slotInterval(genesisConfig) {
+	} else if tipDiff <= slotInterval(genesisConfig) {
 		sb.WriteString(fmt.Sprintf(
 			" Tip (diff) : [green]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
 			fmt.Sprintf("%s :)", strconv.FormatUint(tipDiff, 10)),
@@ -531,7 +615,7 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 			fmt.Sprintf("%s :|", strconv.FormatUint(tipDiff, 10)),
 		))
 	} else {
-		syncProgress := float32(promMetrics.SlotNum / tipRef * 1000)
+		syncProgress := float32((float32(promMetrics.SlotNum) / float32(tipRef)) * 100)
 		sb.WriteString(fmt.Sprintf(
 			" Syncing    : [yellow]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
 			fmt.Sprintf("%2.1f", syncProgress),
@@ -559,7 +643,7 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 
 	// CONNECTIONS Divider
 	sb.WriteString(fmt.Sprintf("- [yellow]CONNECTIONS[white] %s\n",
-		strings.Repeat("- ", width-13),
+		strings.Repeat("-", width-13),
 	))
 
 	// TODO: actually check for p2p
@@ -644,7 +728,7 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 
 	// BLOCK PROPAGATION Divider
 	sb.WriteString(fmt.Sprintf("- [yellow]BLOCK PROPAGATION[white] %s\n",
-		strings.Repeat("- ", width-16),
+		strings.Repeat("-", width-19),
 	))
 
 	blk1s := fmt.Sprintf("%.2f", promMetrics.BlocksW1s*100)
@@ -685,7 +769,7 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 
 	// NODE RESOURCE USAGE Divider
 	sb.WriteString(fmt.Sprintf("- [yellow]NODE RESOURCE USAGE[white] %s\n",
-		strings.Repeat("- ", width-17),
+		strings.Repeat("-", width-21),
 	))
 
 	var cpuPercent float64 = 0.0
@@ -741,6 +825,16 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 		strconv.FormatUint(promMetrics.GcMajor, 10),
 	))
 
+	// Core section
+	// if role == "Core" {
+	if true {
+		// Core Divider
+		sb.WriteString(fmt.Sprintf("- [yellow]CORE[white] %s\n",
+			strings.Repeat("-", width-6),
+		))
+		sb.WriteString(fmt.Sprintf(" [green]%s[white]\n", "Comping soon!"))
+	}
+
 	failCount = 0
 	return fmt.Sprint(sb.String())
 }
@@ -761,7 +855,8 @@ func getProcessMetrics(ctx context.Context) (*process.Process, error) {
 		if err != nil {
 			return r, fmt.Errorf("failed to get process cmdline: %s", err)
 		}
-		if strings.Contains(n, cfg.Node.Binary) && strings.Contains(c, strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
+		if strings.Contains(n, cfg.Node.Binary) &&
+			strings.Contains(c, strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
 			r = p
 		}
 	}

@@ -31,31 +31,31 @@ type Config struct {
 
 type AppConfig struct {
 	NodeName string `yaml:"nodeName" envconfig:"NODE_NAME"`
-	Network  string `yaml:"network" envconfig:"NETWORK"`
-	Retries  uint32 `yaml:"retries" envconfig:"RETRIES"`
+	Network  string `yaml:"network"  envconfig:"NETWORK"`
+	Retries  uint32 `yaml:"retries"  envconfig:"RETRIES"`
 }
 
 type NodeConfig struct {
 	Binary            string             // TODO: make this configurable
 	ByronGenesis      ByronGenesisConfig `yaml:"byron"`
-	Network           string             `yaml:"network" envconfig:"CARDANO_NETWORK"`
-	NetworkMagic      uint32             `yaml:"networkMagic" envconfig:"CARDANO_NODE_NETWORK_MAGIC"`
-	Port              uint32             `yaml:"port" envconfig:"CARDANO_PORT"`
+	Network           string             `yaml:"network"          envconfig:"CARDANO_NETWORK"`
+	NetworkMagic      uint32             `yaml:"networkMagic"     envconfig:"CARDANO_NODE_NETWORK_MAGIC"`
+	Port              uint32             `yaml:"port"             envconfig:"CARDANO_PORT"`
 	ShelleyTransEpoch int32              `yaml:"shellyTransEpoch" envconfig:"SHELLEY_TRANS_EPOCH"`
-	SocketPath        string             `yaml:"socketPath" envconfig:"CARDANO_NODE_SOCKET_PATH"`
+	SocketPath        string             `yaml:"socketPath"       envconfig:"CARDANO_NODE_SOCKET_PATH"`
 }
 
 type PrometheusConfig struct {
-	Host    string `yaml:"host" envconfig:"PROM_HOST"`
-	Port    uint32 `yaml:"port" envconfig:"PROM_PORT"`
+	Host    string `yaml:"host"    envconfig:"PROM_HOST"`
+	Port    uint32 `yaml:"port"    envconfig:"PROM_PORT"`
 	Timeout uint32 `yaml:"timeout" envconfig:"PROM_TIMEOUT"`
 }
 
 type ByronGenesisConfig struct {
-	StartTime   uint64 `yaml:"startTime" envconfig:"BYRON_GENESIS_START_SEC"`
+	StartTime   uint64 `yaml:"startTime"   envconfig:"BYRON_GENESIS_START_SEC"`
 	EpochLength uint64 `yaml:"epochLength" envconfig:"BYRON_EPOCH_LENGTH"`
-	K           uint64 `yaml:"k" envconfig:"BYRON_K"`
-	SlotLength  uint64 `yaml:"slotLength" envconfig:"BYRON_SLOT_LENGTH"`
+	K           uint64 `yaml:"k"           envconfig:"BYRON_K"`
+	SlotLength  uint64 `yaml:"slotLength"  envconfig:"BYRON_SLOT_LENGTH"`
 }
 
 // Singleton config instance with default values
