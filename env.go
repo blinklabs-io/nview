@@ -62,6 +62,11 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 	return respBodyBytes, resp.StatusCode, nil
 }
 
+// Calculate current KES period from tip ref
+func getCurrentKESPeriod(g *localstatequery.GenesisConfigResult) uint64 {
+	return getSlotTipRef(g) / uint64(g.SlotsPerKESPeriod)
+}
+
 // Calculate epoch from current second
 func getEpoch() uint64 {
 	cfg := GetConfig()

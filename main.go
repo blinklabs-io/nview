@@ -51,8 +51,7 @@ var footerText = tview.NewTextView().
 	SetDynamicColors(true).
 	SetTextColor(tcell.ColorGreen)
 var headerText = tview.NewTextView().
-	SetDynamicColors(true).
-	SetTextAlign(tview.AlignCenter)
+	SetDynamicColors(true)
 var text = tview.NewTextView().
 	SetDynamicColors(true).
 	SetChangedFunc(func() {
@@ -109,27 +108,39 @@ func main() {
 	}
 
 	// Populate initial text from metrics
-	text.SetText(getPromText(ctx, metrics)).SetBorder(true)
+	text.SetText(getHomeText(ctx, metrics)).SetBorder(true)
 
 	// Set our header
+	var width int = 71
 	var network string
 	if cfg.App.Network != "" {
 		network = strings.ToUpper(cfg.App.Network[:1]) + cfg.App.Network[1:]
 	} else {
 		network = strings.ToUpper(cfg.Node.Network[:1]) + cfg.Node.Network[1:]
 	}
+	var nodeVersion string = "8.0.0"     // TODO: get the real version
+	var nodeRevision string = "69a117b7" // TODO: get the real revision
+	var headerLength int
+	var headerPadding int
+	headerLength = len([]rune(cfg.App.NodeName)) + len(role) + len(nodeVersion) + len(nodeRevision) + len(network) + 19
+	if headerLength >= width {
+		headerPadding = 0
+	} else {
+		headerPadding = (width - headerLength) / 2
+	}
 	defaultHeaderText := fmt.Sprintf(
-		"> [green]%s[white] - [yellow](%s - %s)[white] : [blue]%s[white] [[blue]%s[white]] <",
+		"%"+strconv.Itoa(headerPadding)+"s > [green]%s[white] - [yellow](%s - %s)[white] : [blue]%s[white] [[blue]%s[white]] <",
+		"",
 		cfg.App.NodeName,
 		role,
 		network,
-		"8.0.0",    // TODO: get the real Version
-		"69a117b7", // TODO: get the real Revision
+		nodeVersion,
+		nodeRevision,
 	)
 	headerText.SetText(defaultHeaderText)
 
 	// Set our footer
-	defaultFooterText := " [yellow](esc/q) Quit[white] | [yellow](i) Info[white] | [yellow](r) Refresh Prometheus"
+	defaultFooterText := " [yellow](esc/q) Quit[white] | [yellow](i) Info[white] | [yellow](p) Peer Analysis"
 	footerText.SetText(defaultFooterText)
 
 	// Add content to our flex box
@@ -142,10 +153,10 @@ func main() {
 		// Row 2 is our main text section
 		AddItem(text,
 			0,
-			5,
+			6,
 			true).
 		// Row 3 is our footer
-		AddItem(footerText, 0, 1, false)
+		AddItem(footerText, 2, 0, false)
 
 	// capture inputs
 	flex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -163,7 +174,7 @@ func main() {
 					),
 				)
 			}
-			text.SetText(getPromText(ctx, metrics))
+			text.SetText(getHomeText(ctx, metrics))
 		}
 		if event.Rune() == 105 { // i
 			active = "info"
@@ -171,6 +182,13 @@ func main() {
 			footerText.Clear()
 			footerText.SetText(" [yellow](esc/q) Quit[white] | [yellow](h) Return home")
 			text.SetText(getInfoText(ctx))
+		}
+		if event.Rune() == 112 { // p
+			active = "peer"
+			text.Clear()
+			footerText.Clear()
+			footerText.SetText(" [yellow](esc/q) Quit[white] | [yellow](h) Return home")
+			text.SetText(getPeerText(ctx))
 		}
 		if event.Rune() == 113 || event.Key() == tcell.KeyEscape { // q
 			app.Stop()
@@ -219,7 +237,7 @@ func main() {
 						),
 					)
 				}
-				text.SetText(getPromText(ctx, metrics))
+				text.SetText(getHomeText(ctx, metrics))
 			}
 			if active == "test" {
 				text.Clear()
@@ -286,35 +304,13 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	// Epoch
 	sb.WriteString(
 		fmt.Sprintf(
-			" Epoch [blue]%d[white] [[blue]%s%%[white]], [blue]%s[white] %-12s\n",
+			" Epoch [blue]%d[white] [[blue]%s%%[white]], [blue]%s[white] %-12s\n\n",
 			promMetrics.EpochNum,
 			epochProgress1dec,
 			epochTimeLeft,
 			"remaining",
 		),
 	)
-	// Progress
-	width := 71
-	charMarked := string('▌')
-	charUnmarked := string('▖')
-	granularity := width - 3
-	// granularitySmall := granularity / 2
-	// barColSmall := width - granularitySmall
-
-	var epochBar string
-	epochItems := int(epochProgress) * granularity / 100
-	if epochBar == "" || epochItems != epochItemsLast {
-		epochBar = ""
-		epochItemsLast = epochItems
-		for i := 0; i <= granularity-1; i++ {
-			if i < epochItems {
-				epochBar += fmt.Sprintf("[blue]%s", charMarked)
-			} else {
-				epochBar += fmt.Sprintf("[white]%s", charUnmarked)
-			}
-		}
-	}
-	sb.WriteString(fmt.Sprintf(" [blue]%s[white]\n\n", epochBar))
 
 	// Epoch Debug
 	sb.WriteString(fmt.Sprintf(" Epoch Debug%s\n", ""))
@@ -355,10 +351,7 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	sb.WriteString(fmt.Sprintf("result=%d\n", result))
 
 	sb.WriteString(fmt.Sprintf(" Epoch getEpoch: %d\n", getEpoch()))
-	sb.WriteString(fmt.Sprintf(
-		" Epoch timeUntilNextEpoch: %d\n",
-		((uint64(cfg.Node.ShelleyTransEpoch)*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)/1000)+((promMetrics.EpochNum+1-uint64(cfg.Node.ShelleyTransEpoch))*cfg.Node.ByronGenesis.EpochLength*cfg.Node.ByronGenesis.SlotLength)-currentTimeSec+cfg.Node.ByronGenesis.StartTime,
-	))
+	sb.WriteString(fmt.Sprintf(" Epoch timeUntilNextEpoch: %d\n", timeUntilNextEpoch()))
 	sb.WriteString(
 		fmt.Sprintf(
 			"   timeLeft now: %s\n\n\n",
@@ -371,95 +364,6 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	// Genesis Config
 	sb.WriteString(fmt.Sprintf(" Genesis Config: %#v\n\n", genesisConfig))
 
-	// Get process in/out connections
-	connections, err := processMetrics.ConnectionsWithContext(ctx)
-	if err != nil {
-		sb.WriteString(fmt.Sprintf("Failed to get processes: %v", err))
-	}
-
-	var peersIn []string
-	var peersOut []string
-
-	// Loops each connection, looking for ESTABLISHED
-	for _, c := range connections {
-		if c.Status == "ESTABLISHED" {
-			// If local port == node port, it's incoming (except P2P)
-			if c.Laddr.Port == cfg.Node.Port {
-				peersIn = append(peersIn, fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port))
-			}
-			// If local port != node port, ekg port, or prometheus port, it's outgoing
-			if c.Laddr.Port != cfg.Node.Port && c.Laddr.Port != uint32(12788) &&
-				c.Laddr.Port != cfg.Prometheus.Port {
-				peersOut = append(peersOut, fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port))
-			}
-		}
-	}
-
-	// Start "checkPeers"
-	var peersFiltered []string
-
-	// First, check for external address using custom resolver so we can
-	// use a given DNS server to resolve our public address
-	r := &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			d := net.Dialer{
-				Timeout: time.Second * time.Duration(3),
-			}
-			return d.DialContext(ctx, network, "resolver1.opendns.com:53")
-		},
-	}
-	// Lookup special address to get our public IP
-	ips, _ := r.LookupIP(ctx, "ip4", "myip.opendns.com")
-	var ip net.IP
-	if ips != nil {
-		ip = ips[0]
-		sb.WriteString(fmt.Sprintf(" Public IP info: %s\n", ip))
-	}
-
-	// Process peersIn
-	for _, peer := range peersIn {
-		p := strings.Split(peer, ":")
-		peerIP := p[0]
-		peerPORT := p[1]
-		if strings.HasPrefix(peerIP, "[") { // IPv6
-			peerIP = strings.TrimPrefix(strings.TrimSuffix(peerIP, "]"), "[")
-		}
-
-		if peerIP == "127.0.0.1" ||
-			(peerIP == ip.String() && peerPORT == strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
-			// Do nothing
-			continue
-		} else {
-			// TODO: filter duplicates
-			peersFiltered = append(peersFiltered, fmt.Sprintf("%s;%s;i", peerIP, peerPORT))
-		}
-	}
-
-	// Process peersOut
-	for _, peer := range peersOut {
-		p := strings.Split(peer, ":")
-		peerIP := p[0]
-		peerPORT := p[1]
-		if strings.HasPrefix(peerIP, "[") { // IPv6
-			peerIP = strings.TrimPrefix(strings.TrimSuffix(peerIP, "]"), "[")
-		}
-
-		if peerIP == "127.0.0.1" ||
-			(peerIP == ip.String() && peerPORT == strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
-			// Do nothing
-			continue
-		} else {
-			// TODO: filter duplicates
-			peersFiltered = append(peersFiltered, fmt.Sprintf("%s;%s;o", peerIP, peerPORT))
-		}
-	}
-
-	// Display progress
-	sb.WriteString(fmt.Sprintf(" Incoming peers: %v\n", peersIn))
-	sb.WriteString(fmt.Sprintf(" Outgoing peers: %v\n", peersOut))
-	sb.WriteString(fmt.Sprintf(" Filtered peers: %v\n\n", peersFiltered))
-
 	// Some Debugging
 	sb.WriteString(fmt.Sprintf(" Application config: %#v\n\n", cfg))
 
@@ -467,49 +371,34 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	protoParams := getProtocolParams(cfg)
 	sb.WriteString(fmt.Sprintf(" Protocol params: %#v\n\n", protoParams))
 
-	failCount = 0
-	return fmt.Sprint(sb.String())
-}
-
-func getInfoText(ctx context.Context) string {
-	// Refresh metrics from host
-	processMetrics, err := getProcessMetrics(ctx)
-	if err != nil {
-		uptimes = 0
-	} else {
-		// Calculate uptime for our process
-		createTime, err := processMetrics.CreateTimeWithContext(ctx)
-		if err == nil {
-			// createTime is milliseconds since UNIX epoch, convert to seconds
-			uptimes = uint64(time.Now().Unix() - (createTime / 1000))
+	// Core section
+	// if role == "Core" {
+	var width = 71
+	var twoColWidth int = (width - 3) / 2
+	var twoColSecond int = twoColWidth + 2
+	if true {
+		// Core Divider
+		sb.WriteString(fmt.Sprintf("- [yellow]CORE[white] %s\n",
+			strings.Repeat("-", width-6),
+		))
+		sb.WriteString(fmt.Sprintf(" KES current/remaining %"+strconv.Itoa(twoColSecond-1)+"s: ",
+			" ",
+		))
+		sb.WriteString(fmt.Sprintf(" [blue]%d[white] / ", promMetrics.KesPeriod))
+		if promMetrics.RemainingKesPeriods <= 0 {
+			sb.WriteString(fmt.Sprintf("[magenta]%d[white]\n", promMetrics.RemainingKesPeriods))
+		} else if promMetrics.RemainingKesPeriods <= 8 {
+			sb.WriteString(fmt.Sprintf("[red]%d[white]\n", promMetrics.RemainingKesPeriods))
+		} else {
+			sb.WriteString(fmt.Sprintf("[blue]%d[white]\n", promMetrics.RemainingKesPeriods))
 		}
 	}
 
-	var sb strings.Builder
-
-	// Main section
-	uptime := timeLeft(uptimes)
-	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
-	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
-
-	sb.WriteString(
-		"[white:black:r] INFO [white:-:-] Displays live metrics gathered from node Prometheus endpoint\n\n",
-	)
-
-	sb.WriteString(" [green]Main Section[white]\n")
-	sb.WriteString(" Epoch number is live from the node.\n\n")
-	sb.WriteString(" Tip reference and diff are not yet available.\n\n")
-	sb.WriteString(" Forks is how many times the blockchain branched off in a different\n")
-	sb.WriteString(" direction since node start (and discarded blocks by doing so).\n\n")
-	sb.WriteString(" P2P Connections shows how many peers the node pushes to/pulls from.\n\n")
-	sb.WriteString(" Block propagation metrics are discussed in the documentation.\n\n")
-	sb.WriteString(" RSS/Live/Heap shows the memory utilization of RSS/live/heap data.\n")
-
 	failCount = 0
 	return fmt.Sprint(sb.String())
 }
 
-func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
+func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 	cfg := GetConfig()
 	processMetrics, err := getProcessMetrics(ctx)
 	if err != nil {
@@ -892,6 +781,187 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 		))
 		sb.WriteString(fmt.Sprintf(" [green]%s[white]\n", "Coming soon!"))
 	}
+
+	failCount = 0
+	return fmt.Sprint(sb.String())
+}
+
+func getInfoText(ctx context.Context) string {
+	// Refresh metrics from host
+	processMetrics, err := getProcessMetrics(ctx)
+	if err != nil {
+		uptimes = 0
+	} else {
+		// Calculate uptime for our process
+		createTime, err := processMetrics.CreateTimeWithContext(ctx)
+		if err == nil {
+			// createTime is milliseconds since UNIX epoch, convert to seconds
+			uptimes = uint64(time.Now().Unix() - (createTime / 1000))
+		}
+	}
+
+	var sb strings.Builder
+
+	// Main section
+	uptime := timeLeft(uptimes)
+	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
+	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
+
+	sb.WriteString(
+		"[white:black:r] INFO [white:-:-] Displays live metrics gathered from node Prometheus endpoint\n\n",
+	)
+
+	sb.WriteString(" [green]Main Section[white]\n")
+	sb.WriteString(" Epoch number is live from the node.\n\n")
+	sb.WriteString(" Tip reference and diff are not yet available.\n\n")
+	sb.WriteString(" Forks is how many times the blockchain branched off in a different\n")
+	sb.WriteString(" direction since node start (and discarded blocks by doing so).\n\n")
+	sb.WriteString(" P2P Connections shows how many peers the node pushes to/pulls from.\n\n")
+	sb.WriteString(" Block propagation metrics are discussed in the documentation.\n\n")
+	sb.WriteString(" RSS/Live/Heap shows the memory utilization of RSS/live/heap data.\n")
+
+	failCount = 0
+	return fmt.Sprint(sb.String())
+}
+
+var checkPeers bool = false
+
+func getPeerText(ctx context.Context) string {
+	cfg := GetConfig()
+	// Refresh metrics from host
+	processMetrics, err := getProcessMetrics(ctx)
+	if err != nil {
+		uptimes = 0
+	} else {
+		// Calculate uptime for our process
+		createTime, err := processMetrics.CreateTimeWithContext(ctx)
+		if err == nil {
+			// createTime is milliseconds since UNIX epoch, convert to seconds
+			uptimes = uint64(time.Now().Unix() - (createTime / 1000))
+		}
+	}
+
+	var sb strings.Builder
+
+	// Main section
+	uptime := timeLeft(uptimes)
+	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
+	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
+
+	// Get process in/out connections
+	connections, err := processMetrics.ConnectionsWithContext(ctx)
+	if err != nil {
+		sb.WriteString(fmt.Sprintf("Failed to get processes: %v", err))
+	}
+
+	var peersIn []string
+	var peersOut []string
+
+	// Loops each connection, looking for ESTABLISHED
+	for _, c := range connections {
+		if c.Status == "ESTABLISHED" {
+			// If local port == node port, it's incoming (except P2P)
+			if c.Laddr.Port == cfg.Node.Port {
+				peersIn = append(peersIn, fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port))
+			}
+			// If local port != node port, ekg port, or prometheus port, it's outgoing
+			if c.Laddr.Port != cfg.Node.Port && c.Laddr.Port != uint32(12788) &&
+				c.Laddr.Port != cfg.Prometheus.Port {
+				peersOut = append(peersOut, fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port))
+			}
+		}
+	}
+
+	// Start "checkPeers"
+	var peersFiltered []string
+
+	// First, check for external address using custom resolver so we can
+	// use a given DNS server to resolve our public address
+	r := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			d := net.Dialer{
+				Timeout: time.Second * time.Duration(3),
+			}
+			return d.DialContext(ctx, network, "resolver1.opendns.com:53")
+		},
+	}
+	// Lookup special address to get our public IP
+	ips, _ := r.LookupIP(ctx, "ip4", "myip.opendns.com")
+	var ip net.IP
+	if ips != nil {
+		ip = ips[0]
+		sb.WriteString(fmt.Sprintf(" Public IP info: %s\n", ip))
+	}
+
+	// Skip everything if we have no peers
+	if len(peersIn) == 0 && len(peersOut) == 0 {
+		sb.WriteString(fmt.Sprintf("%s\n",
+			"No peers found",
+		))
+		failCount = 0
+		return fmt.Sprint(sb.String())
+	}
+
+	// Process peersIn
+	for _, peer := range peersIn {
+		p := strings.Split(peer, ":")
+		peerIP := p[0]
+		peerPORT := p[1]
+		if strings.HasPrefix(peerIP, "[") { // IPv6
+			peerIP = strings.TrimPrefix(strings.TrimSuffix(peerIP, "]"), "[")
+		}
+
+		if peerIP == "127.0.0.1" ||
+			(peerIP == ip.String() && peerPORT == strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
+			// Do nothing
+			continue
+		} else {
+			// TODO: filter duplicates
+			peersFiltered = append(peersFiltered, fmt.Sprintf("%s;%s;i", peerIP, peerPORT))
+		}
+	}
+
+	// Process peersOut
+	for _, peer := range peersOut {
+		p := strings.Split(peer, ":")
+		peerIP := p[0]
+		peerPORT := p[1]
+		if strings.HasPrefix(peerIP, "[") { // IPv6
+			peerIP = strings.TrimPrefix(strings.TrimSuffix(peerIP, "]"), "[")
+		}
+
+		if peerIP == "127.0.0.1" ||
+			(peerIP == ip.String() && peerPORT == strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
+			// Do nothing
+			continue
+		} else {
+			// TODO: filter duplicates
+			peersFiltered = append(peersFiltered, fmt.Sprintf("%s;%s;o", peerIP, peerPORT))
+		}
+	}
+
+	// Actuall do "checkPeers" within this block
+	//if checkPeers {
+	if true {
+		width := 71
+		sb.WriteString(fmt.Sprintf(" [yellow]%-"+strconv.Itoa(width-3)+"s[white]\n",
+			"Peer analysis started... please wait!",
+		))
+
+		peerCount := len(peersFiltered)
+		printStart := width - (peerCount * 2) - 2
+		sb.WriteString(fmt.Sprintf("%"+strconv.Itoa(printStart-1)+"s [blue]%"+strconv.Itoa(peerCount)+"s[white]/[green]%d[white]",
+			" ", "0", peerCount,
+		))
+		// TODO: start checkPeers loop here
+	}
+	sb.WriteString("\n")
+
+	// Display progress
+	sb.WriteString(fmt.Sprintf(" Incoming peers: %v\n", peersIn))
+	sb.WriteString(fmt.Sprintf(" Outgoing peers: %v\n", peersOut))
+	sb.WriteString(fmt.Sprintf(" Filtered peers: %v\n\n", peersFiltered))
 
 	failCount = 0
 	return fmt.Sprint(sb.String())
