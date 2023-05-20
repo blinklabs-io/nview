@@ -246,7 +246,7 @@ func main() {
 var uptimes uint64
 
 // TODO: Track size of epoch items
-// var epochItemsLast uint32 = 0
+var epochItemsLast = 0
 
 func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	cfg := GetConfig()
@@ -286,19 +286,45 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	// Epoch
 	sb.WriteString(
 		fmt.Sprintf(
-			" Epoch [blue]%d[white] [[blue]%s%%[white]], [blue]%s[white] %-12s\n\n",
+			" Epoch [blue]%d[white] [[blue]%s%%[white]], [blue]%s[white] %-12s\n",
 			promMetrics.EpochNum,
 			epochProgress1dec,
 			epochTimeLeft,
 			"remaining",
 		),
 	)
+	// Progress
+	width := 71
+	charMarked := string('▌')
+	charUnmarked := string('▖')
+	granularity := width - 3
+	// granularitySmall := granularity / 2
+	// barColSmall := width - granularitySmall
+
+	var epochBar string
+	epochItems := int(epochProgress) * granularity / 100
+	if epochBar == "" || epochItems != epochItemsLast {
+		epochBar = ""
+		epochItemsLast = epochItems
+		for i := 0; i <= granularity-1; i++ {
+			if i < epochItems {
+				epochBar += fmt.Sprintf("[blue]%s", charMarked)
+			} else {
+				epochBar += fmt.Sprintf("[white]%s", charUnmarked)
+			}
+		}
+	}
+	sb.WriteString(fmt.Sprintf(" [blue]%s[white]\n\n", epochBar))
 
 	// Epoch Debug
 	sb.WriteString(fmt.Sprintf(" Epoch Debug%s\n", ""))
 	currentTimeSec := uint64(time.Now().Unix() - 1)
 	sb.WriteString(fmt.Sprintf("currentTimeSec    = %d\n", currentTimeSec))
 	sb.WriteString(fmt.Sprintf("startTime         = %d\n", cfg.Node.ByronGenesis.StartTime))
+	sb.WriteString(fmt.Sprintf("shellyTransEpoch  = %d\n", cfg.Node.ShelleyTransEpoch))
+	sb.WriteString(fmt.Sprintf("byron length      = %d\n", ((uint64(
+		cfg.Node.ShelleyTransEpoch,
+	) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000)))
 	sb.WriteString(
 		fmt.Sprintf(
 			"rhs               = %d\n",
@@ -516,6 +542,18 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 	var threeCol2ValueWidth = threeColWidth - 12
 	var threeCol3ValueWidth = threeColWidth - 12
 
+	var charMarked string
+	var charUnmarked string
+	// TODO: legacy mode vs new
+	if false {
+		charMarked = string('#')
+		charUnmarked = string('.')
+	} else {
+		charMarked = string('▌')
+		charUnmarked = string('▖')
+	}
+	granularity := width - 3
+
 	// Get our terminal size
 	tcols, tlines, err := terminal.GetSize(int(os.Stdout.Fd()))
 	if err != nil {
@@ -556,20 +594,40 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 		epochProgress = float32(
 			(float32(promMetrics.SlotInEpoch) / float32(genesisConfig.EpochLength)) * 100,
 		)
-	} // TODO: support Byron epochs: else { epochProgress = float32((float32(promMetrics.SlotInEpoch) / float32(BYRON_EPOCH_LENGTH)) * 100)
+	} else {
+		epochProgress = float32(
+			(float32(promMetrics.SlotInEpoch) / float32(cfg.Node.ByronGenesis.EpochLength)) * 100,
+		)
+	}
 	epochProgress1dec := fmt.Sprintf("%.1f", epochProgress)
 	// epochTimeLeft := timeLeft(timeUntilNextEpoch())
 
 	// Epoch
 	sb.WriteString(
 		fmt.Sprintf(
-			" Epoch [blue]%d[white] [[blue]%s%%[white]], [blue]%s[white] %-12s\n\n",
+			" Epoch [blue]%d[white] [[blue]%s%%[white]], [blue]%s[white] %-12s\n",
 			promMetrics.EpochNum,
 			epochProgress1dec,
 			"N/A",
 			"remaining",
 		),
 	)
+
+	// Epoch progress bar
+	var epochBar string
+	epochItems := int(epochProgress) * granularity / 100
+	if epochBar == "" || epochItems != epochItemsLast {
+		epochBar = ""
+		epochItemsLast = epochItems
+		for i := 0; i <= granularity-1; i++ {
+			if i < epochItems {
+				epochBar += fmt.Sprintf("[blue]%s", charMarked)
+			} else {
+				epochBar += fmt.Sprintf("[white]%s", charUnmarked)
+			}
+		}
+	}
+	sb.WriteString(fmt.Sprintf(" [blue]%s[white]\n\n", epochBar))
 
 	// Blocks / Slots / Tx
 
@@ -832,7 +890,7 @@ func getPromText(ctx context.Context, promMetrics *PromMetrics) string {
 		sb.WriteString(fmt.Sprintf("- [yellow]CORE[white] %s\n",
 			strings.Repeat("-", width-6),
 		))
-		sb.WriteString(fmt.Sprintf(" [green]%s[white]\n", "Comping soon!"))
+		sb.WriteString(fmt.Sprintf(" [green]%s[white]\n", "Coming soon!"))
 	}
 
 	failCount = 0

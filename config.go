@@ -66,10 +66,11 @@ var globalConfig = &Config{
 		Retries:  3,
 	},
 	Node: NodeConfig{
-		Binary:     "cardano-node",
-		Network:    "mainnet",
-		Port:       3001,
-		SocketPath: "/opt/cardano/ipc/socket",
+		Binary:            "cardano-node",
+		Network:           "mainnet",
+		Port:              3001,
+		ShelleyTransEpoch: -1,
+		SocketPath:        "/opt/cardano/ipc/socket",
 	},
 	Prometheus: PrometheusConfig{
 		Host:    "127.0.0.1",
