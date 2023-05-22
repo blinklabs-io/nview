@@ -27,8 +27,6 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell/v2"
-	dto "github.com/prometheus/client_model/go"
-	"github.com/prometheus/common/expfmt"
 	"github.com/rivo/tview"
 	"github.com/shirou/gopsutil/v3/process"
 	terminal "golang.org/x/term"
@@ -824,9 +822,10 @@ func getInfoText(ctx context.Context) string {
 	return fmt.Sprint(sb.String())
 }
 
-//nolint:unused
-var checkPeers bool = false
+var checkPeers bool = true
+var peerAnalysisDate uint64
 
+//nolint:unused
 func getPeerText(ctx context.Context) string {
 	cfg := GetConfig()
 	// Refresh metrics from host
@@ -843,11 +842,6 @@ func getPeerText(ctx context.Context) string {
 	}
 
 	var sb strings.Builder
-
-	// Main section
-	uptime := timeLeft(uptimes)
-	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
-	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
 
 	// Get process in/out connections
 	connections, err := processMetrics.ConnectionsWithContext(ctx)
@@ -892,13 +886,15 @@ func getPeerText(ctx context.Context) string {
 	var ip net.IP
 	if ips != nil {
 		ip = ips[0]
-		sb.WriteString(fmt.Sprintf(" Public IP info: %s\n", ip))
+		if !checkPeers {
+			sb.WriteString(fmt.Sprintf(" Public IP info: %s\n", ip))
+		}
 	}
 
 	// Skip everything if we have no peers
 	if len(peersIn) == 0 && len(peersOut) == 0 {
 		sb.WriteString(fmt.Sprintf("%s\n",
-			"No peers found",
+			" [yellow]No peers found[white]",
 		))
 		failCount = 0
 		return fmt.Sprint(sb.String())
@@ -942,10 +938,10 @@ func getPeerText(ctx context.Context) string {
 		}
 	}
 
-	// Actuall do "checkPeers" within this block
-	//if checkPeers {
-	if true {
+	if checkPeers {
 		width := 71
+		granularity := width - 3
+		granularitySmall := granularity / 2
 		sb.WriteString(fmt.Sprintf(" [yellow]%-"+strconv.Itoa(width-3)+"s[white]\n",
 			"Peer analysis started... please wait!",
 		))
@@ -955,7 +951,60 @@ func getPeerText(ctx context.Context) string {
 		sb.WriteString(fmt.Sprintf("%"+strconv.Itoa(printStart-1)+"s [blue]%"+strconv.Itoa(peerCount)+"s[white]/[green]%d[white]",
 			" ", "0", peerCount,
 		))
-		// TODO: start checkPeers loop here
+		//var index int
+		var lastpeerIP string
+		// counters, etc.
+		var peerRTT int
+		for i, v := range peersFiltered {
+			peerArr := strings.Split(v, ";")
+			peerIP := peerArr[0]
+			peerPORT := peerArr[1]
+			// peerDIR := peerArr[2]
+
+			// TODO: geolocation
+
+			if peerIP == lastpeerIP && peerRTT != 99999 {
+				peerStats.RTTSUM = peerStats.RTTSUM + peerRTT // skip RTT check and reuse old peerRTT
+			} else {
+				// Start RTT loop
+				// for tool in ... return peerRTT
+				sb.WriteString(fmt.Sprintf(" Faking ping to: %s:%s\n", peerIP, peerPORT))
+				peerRTT = 99949 + i // TODO: do a real ping
+				if peerRTT != 99999 {
+					peerStats.RTTSUM = peerStats.RTTSUM + peerRTT
+				}
+
+			}
+			lastpeerIP = peerIP
+			// Update counters
+			if peerRTT < 50 {
+				peerStats.CNT1 = peerStats.CNT1 + 1
+			} else if peerRTT < 100 {
+				peerStats.CNT2 = peerStats.CNT2 + 1
+			} else if peerRTT < 200 {
+				peerStats.CNT3 = peerStats.CNT3 + 1
+			} else if peerRTT < 99999 {
+				peerStats.CNT4 = peerStats.CNT4 + 1
+			} else {
+				peerStats.CNT0 = peerStats.CNT0 + 1
+			}
+			peerStats.RTTresults = append(peerStats.RTTresults, fmt.Sprintf("%d;%s", peerRTT, v))
+		}
+		peerCNTreachable := peerCount - peerStats.CNT0
+		if peerCNTreachable > 0 {
+			peerStats.RTTAVG = peerStats.RTTSUM / peerCNTreachable
+			peerStats.PCT1 = peerStats.CNT1 / peerCNTreachable * 100
+			peerStats.PCT1items = peerStats.PCT1 * granularitySmall / 100
+			peerStats.PCT2 = peerStats.CNT2 / peerCNTreachable * 100
+			peerStats.PCT2items = peerStats.PCT2 * granularitySmall / 100
+			peerStats.PCT3 = peerStats.CNT3 / peerCNTreachable * 100
+			peerStats.PCT3items = peerStats.PCT3 * granularitySmall / 100
+			peerStats.PCT4 = peerStats.CNT4 / peerCNTreachable * 100
+			peerStats.PCT4items = peerStats.PCT4 * granularitySmall / 100
+		}
+		// TODO: lookup geoIP data
+		sb.WriteString(fmt.Sprintf(" [yellow]%-46s[white]\n", "Peer analysis done!"))
+		peerAnalysisDate = uint64(time.Now().Unix() - 1)
 	}
 	sb.WriteString("\n")
 
@@ -963,9 +1012,31 @@ func getPeerText(ctx context.Context) string {
 	sb.WriteString(fmt.Sprintf(" Incoming peers: %v\n", peersIn))
 	sb.WriteString(fmt.Sprintf(" Outgoing peers: %v\n", peersOut))
 	sb.WriteString(fmt.Sprintf(" Filtered peers: %v\n\n", peersFiltered))
+	sb.WriteString(fmt.Sprintf(" PeerStats:      %#v\n\n", peerStats))
 
 	failCount = 0
 	return fmt.Sprint(sb.String())
+}
+
+var peerStats PeerStats
+
+type PeerStats struct {
+	RTTSUM     int
+	RTTAVG     int
+	CNT0       int
+	CNT1       int
+	CNT2       int
+	CNT3       int
+	CNT4       int
+	PCT1       int
+	PCT2       int
+	PCT3       int
+	PCT4       int
+	PCT1items  int
+	PCT2items  int
+	PCT3items  int
+	PCT4items  int
+	RTTresults []string
 }
 
 func getProcessMetrics(ctx context.Context) (*process.Process, error) {
@@ -1054,35 +1125,4 @@ func getPromMetrics(ctx context.Context) (*PromMetrics, error) {
 	}
 	failCount = 0
 	return metrics, nil
-}
-
-// Converts a prometheus http response byte array into a JSON byte array
-func prom2json(prom []byte) ([]byte, error) {
-	// {"name": 0}
-	out := make(map[string]interface{})
-	b := []byte{}
-	parser := &expfmt.TextParser{}
-	families, err := parser.TextToMetricFamilies(strings.NewReader(string(prom)))
-	if err != nil {
-		return b, err
-	}
-	for _, val := range families {
-		for _, m := range val.GetMetric() {
-			switch val.GetType() {
-			case dto.MetricType_COUNTER:
-				out[val.GetName()] = m.GetCounter().GetValue()
-			case dto.MetricType_GAUGE:
-				out[val.GetName()] = m.GetGauge().GetValue()
-			case dto.MetricType_UNTYPED:
-				out[val.GetName()] = m.GetUntyped().GetValue()
-			default:
-				return b, err
-			}
-		}
-	}
-	b, err = json.MarshalIndent(out, "", "    ")
-	if err != nil {
-		return b, err
-	}
-	return b, nil
 }

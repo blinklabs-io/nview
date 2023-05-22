@@ -62,7 +62,7 @@ func getGenesisConfig(cfg *Config) *localstatequery.GenesisConfigResult {
 			os.Exit(1)
 		}
 	}()
-	o, err := ouroboros.New(
+	o, err := ouroboros.NewConnection(
 		ouroboros.WithConnection(conn),
 		ouroboros.WithNetworkMagic(uint32(cfg.Node.NetworkMagic)),
 		ouroboros.WithErrorChan(errorChan),
@@ -98,7 +98,7 @@ func getProtocolParams(cfg *Config) *localstatequery.CurrentProtocolParamsResult
 			os.Exit(1)
 		}
 	}()
-	o, err := ouroboros.New(
+	o, err := ouroboros.NewConnection(
 		ouroboros.WithConnection(conn),
 		ouroboros.WithNetworkMagic(uint32(cfg.Node.NetworkMagic)),
 		ouroboros.WithErrorChan(errorChan),
