@@ -824,6 +824,7 @@ func getInfoText(ctx context.Context) string {
 	return fmt.Sprint(sb.String())
 }
 
+//nolint:unused
 var checkPeers bool = false
 
 func getPeerText(ctx context.Context) string {
