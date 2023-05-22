@@ -823,6 +823,8 @@ func getInfoText(ctx context.Context) string {
 }
 
 var checkPeers bool = true
+
+//nolint:unused
 var peerAnalysisDate uint64
 
 //nolint:unused
