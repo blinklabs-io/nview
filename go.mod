@@ -3,7 +3,7 @@ module github.com/blinklabs-io/tview
 go 1.18
 
 require (
-	github.com/blinklabs-io/gouroboros v0.38.4
+	github.com/blinklabs-io/gouroboros v0.40.1
 	github.com/gdamore/tcell/v2 v2.6.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/prometheus/client_model v0.4.0
@@ -32,7 +32,7 @@ require (
 	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
-	golang.org/x/crypto v0.8.0 // indirect
+	golang.org/x/crypto v0.9.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
