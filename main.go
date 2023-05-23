@@ -854,7 +854,7 @@ func getPeerText(ctx context.Context) string {
 	// Refresh metrics from host
 	processMetrics, err := getProcessMetrics(ctx)
 	if err != nil {
-		return fmt.Sprintf(" [red]Could not get process metrics![white]\n")
+		return fmt.Sprintf(" [red]Could not get process metrics![white]%s\n", "")
 	}
 
 	var sb strings.Builder
