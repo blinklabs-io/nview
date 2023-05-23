@@ -160,6 +160,7 @@ func main() {
 	flex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Rune() == 104 || event.Rune() == 114 { // h or r
 			active = "main"
+			showPeers = false
 			text.Clear()
 			footerText.Clear()
 			footerText.SetText(defaultFooterText)
@@ -183,6 +184,8 @@ func main() {
 		}
 		if event.Rune() == 112 { // p
 			active = "peer"
+			checkPeers = true
+			showPeers = false
 			text.Clear()
 			footerText.Clear()
 			footerText.SetText(" [yellow](esc/q) Quit[white] | [yellow](h) Return home")
@@ -237,6 +240,14 @@ func main() {
 				}
 				text.SetText(getHomeText(ctx, metrics))
 			}
+			if active == "peer" {
+				if checkPeers {
+					checkPeers = false
+					showPeers = true
+					text.Clear()
+					text.SetText(getPeerText(ctx))
+				}
+			}
 			if active == "test" {
 				text.Clear()
 				metrics, err = getPromMetrics(ctx)
@@ -261,7 +272,7 @@ func main() {
 
 var uptimes uint64
 
-// TODO: Track size of epoch items
+// Track size of epoch items
 var epochItemsLast = 0
 
 func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
@@ -370,10 +381,10 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	sb.WriteString(fmt.Sprintf(" Protocol params: %#v\n\n", protoParams))
 
 	// Core section
-	// if role == "Core" {
 	var width = 71
 	var twoColWidth int = (width - 3) / 2
 	var twoColSecond int = twoColWidth + 2
+	// if role == "Core" {
 	if true {
 		// Core Divider
 		sb.WriteString(fmt.Sprintf("- [yellow]CORE[white] %s\n",
@@ -384,7 +395,7 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 		))
 		sb.WriteString(fmt.Sprintf(" [blue]%d[white] / ", promMetrics.KesPeriod))
 		if promMetrics.RemainingKesPeriods <= 0 {
-			sb.WriteString(fmt.Sprintf("[magenta]%d[white]\n", promMetrics.RemainingKesPeriods))
+			sb.WriteString(fmt.Sprintf("[fuchsia]%d[white]\n", promMetrics.RemainingKesPeriods))
 		} else if promMetrics.RemainingKesPeriods <= 8 {
 			sb.WriteString(fmt.Sprintf("[red]%d[white]\n", promMetrics.RemainingKesPeriods))
 		} else {
@@ -771,8 +782,7 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 	))
 
 	// Core section
-	// if role == "Core" {
-	if true {
+	if role == "Core" {
 		// Core Divider
 		sb.WriteString(fmt.Sprintf("- [yellow]CORE[white] %s\n",
 			strings.Repeat("-", width-6),
@@ -805,27 +815,38 @@ func getInfoText(ctx context.Context) string {
 	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
 
-	sb.WriteString(
-		"[white:black:r] INFO [white:-:-] Displays live metrics gathered from node Prometheus endpoint\n\n",
-	)
+	if showPeers {
+		sb.WriteString(fmt.Sprintf(
+			"[white:black:r] INFO [white:-:-] One-shot peer analysis last run at [blue]%s\n\n",
+			time.Unix(int64(peerAnalysisDate), 0),
+		))
 
-	sb.WriteString(" [green]Main Section[white]\n")
-	sb.WriteString(" Epoch number is live from the node.\n\n")
-	sb.WriteString(" Tip reference and diff are not yet available.\n\n")
-	sb.WriteString(" Forks is how many times the blockchain branched off in a different\n")
-	sb.WriteString(" direction since node start (and discarded blocks by doing so).\n\n")
-	sb.WriteString(" P2P Connections shows how many peers the node pushes to/pulls from.\n\n")
-	sb.WriteString(" Block propagation metrics are discussed in the documentation.\n\n")
-	sb.WriteString(" RSS/Live/Heap shows the memory utilization of RSS/live/heap data.\n")
+		sb.WriteString(" Runs a latency test on connections to the node.\n")
+		sb.WriteString(" Once the analysis is finished, RTTs(Round Trip Time) for each peer\n")
+		sb.WriteString(" is display and grouped in ranges of 0-50, 50-100, 100-200, 200<.\n\n")
+	} else {
+		sb.WriteString(
+			"[white:black:r] INFO [white:-:-] Displays live metrics gathered from node Prometheus endpoint\n\n",
+		)
+
+		sb.WriteString(" [green]Main Section[white]\n")
+		sb.WriteString(" Epoch number is live from the node.\n\n")
+		sb.WriteString(" Tip reference and diff are not yet available.\n\n")
+		sb.WriteString(" Forks is how many times the blockchain branched off in a different\n")
+		sb.WriteString(" direction since node start (and discarded blocks by doing so).\n\n")
+		sb.WriteString(" P2P Connections shows how many peers the node pushes to/pulls from.\n\n")
+		sb.WriteString(" Block propagation metrics are discussed in the documentation.\n\n")
+		sb.WriteString(" RSS/Live/Heap shows the memory utilization of RSS/live/heap data.\n")
+	}
 
 	failCount = 0
 	return fmt.Sprint(sb.String())
 }
 
-var checkPeers bool = true
-
-//nolint:unused
 var peerAnalysisDate uint64
+
+var checkPeers bool = false
+var showPeers bool = false
 
 //nolint:unused
 func getPeerText(ctx context.Context) string {
@@ -833,14 +854,7 @@ func getPeerText(ctx context.Context) string {
 	// Refresh metrics from host
 	processMetrics, err := getProcessMetrics(ctx)
 	if err != nil {
-		uptimes = 0
-	} else {
-		// Calculate uptime for our process
-		createTime, err := processMetrics.CreateTimeWithContext(ctx)
-		if err == nil {
-			// createTime is milliseconds since UNIX epoch, convert to seconds
-			uptimes = uint64(time.Now().Unix() - (createTime / 1000))
-		}
+		return fmt.Sprintf(" [red]Could not get process metrics![white]\n")
 	}
 
 	var sb strings.Builder
@@ -848,7 +862,7 @@ func getPeerText(ctx context.Context) string {
 	// Get process in/out connections
 	connections, err := processMetrics.ConnectionsWithContext(ctx)
 	if err != nil {
-		sb.WriteString(fmt.Sprintf("Failed to get processes: %v", err))
+		return fmt.Sprintf("Failed to get processes: %v", err)
 	}
 
 	var peersIn []string
@@ -889,7 +903,7 @@ func getPeerText(ctx context.Context) string {
 	if ips != nil {
 		ip = ips[0]
 		if !checkPeers {
-			sb.WriteString(fmt.Sprintf(" Public IP info: %s\n", ip))
+			sb.WriteString(fmt.Sprintf(" Public IP : %s\n", ip))
 		}
 	}
 
@@ -940,17 +954,28 @@ func getPeerText(ctx context.Context) string {
 		}
 	}
 
+	var charMarked string
+	var charUnmarked string
+	// TODO: legacy mode vs new
+	if false {
+		charMarked = string('#')
+		charUnmarked = string('.')
+	} else {
+		charMarked = string('▌')
+		charUnmarked = string('▖')
+	}
+	width := 71
+	granularity := width - 3
+	granularitySmall := granularity / 2
 	if checkPeers {
-		width := 71
-		granularity := width - 3
-		granularitySmall := granularity / 2
 		sb.WriteString(fmt.Sprintf(" [yellow]%-"+strconv.Itoa(width-3)+"s[white]\n",
 			"Peer analysis started... please wait!",
 		))
 
+		checkPeers = false
 		peerCount := len(peersFiltered)
 		printStart := width - (peerCount * 2) - 2
-		sb.WriteString(fmt.Sprintf("%"+strconv.Itoa(printStart-1)+"s [blue]%"+strconv.Itoa(peerCount)+"s[white]/[green]%d[white]",
+		sb.WriteString(fmt.Sprintf("%"+strconv.Itoa(printStart-1)+"s [blue]%"+strconv.Itoa(peerCount)+"s[white]/[green]%d[white]\n",
 			" ", "0", peerCount,
 		))
 		//var index int
@@ -971,7 +996,7 @@ func getPeerText(ctx context.Context) string {
 				// Start RTT loop
 				// for tool in ... return peerRTT
 				sb.WriteString(fmt.Sprintf(" Faking ping to: %s:%s\n", peerIP, peerPORT))
-				peerRTT = 99949 + i // TODO: do a real ping
+				peerRTT = 10 * i // TODO: do a real ping
 				if peerRTT != 99999 {
 					peerStats.RTTSUM = peerStats.RTTSUM + peerRTT
 				}
@@ -995,20 +1020,91 @@ func getPeerText(ctx context.Context) string {
 		peerCNTreachable := peerCount - peerStats.CNT0
 		if peerCNTreachable > 0 {
 			peerStats.RTTAVG = peerStats.RTTSUM / peerCNTreachable
-			peerStats.PCT1 = peerStats.CNT1 / peerCNTreachable * 100
-			peerStats.PCT1items = peerStats.PCT1 * granularitySmall / 100
-			peerStats.PCT2 = peerStats.CNT2 / peerCNTreachable * 100
-			peerStats.PCT2items = peerStats.PCT2 * granularitySmall / 100
-			peerStats.PCT3 = peerStats.CNT3 / peerCNTreachable * 100
-			peerStats.PCT3items = peerStats.PCT3 * granularitySmall / 100
-			peerStats.PCT4 = peerStats.CNT4 / peerCNTreachable * 100
-			peerStats.PCT4items = peerStats.PCT4 * granularitySmall / 100
+			peerStats.PCT1 = float32(peerStats.CNT1) / float32(peerCNTreachable) * 100
+			peerStats.PCT1items = int(peerStats.PCT1) * granularitySmall / 100
+			peerStats.PCT2 = float32(peerStats.CNT2) / float32(peerCNTreachable) * 100
+			peerStats.PCT2items = int(peerStats.PCT2) * granularitySmall / 100
+			peerStats.PCT3 = float32(peerStats.CNT3) / float32(peerCNTreachable) * 100
+			peerStats.PCT3items = int(peerStats.PCT3) * granularitySmall / 100
+			peerStats.PCT4 = float32(peerStats.CNT4) / float32(peerCNTreachable) * 100
+			peerStats.PCT4items = int(peerStats.PCT4) * granularitySmall / 100
 		}
 		// TODO: lookup geoIP data
 		sb.WriteString(fmt.Sprintf(" [yellow]%-46s[white]\n", "Peer analysis done!"))
 		peerAnalysisDate = uint64(time.Now().Unix() - 1)
+		checkPeers = true
+	} else if showPeers {
+		sb.WriteString("       RTT : Peers / Percent\n")
+		sb.WriteString(fmt.Sprintf(
+			"    0-50ms : [blue]%5s[white]   [blue]%.f[white]%%",
+			strconv.Itoa(peerStats.CNT1),
+			peerStats.PCT1,
+		))
+		sb.WriteString(fmt.Sprintf(
+			"%"+strconv.Itoa(5-len(fmt.Sprintf("%.f", peerStats.PCT1)))+"s",
+			" ",
+		))
+		for i := 0; i <= granularitySmall-1; i++ {
+			if i < int(peerStats.PCT1) {
+				sb.WriteString(fmt.Sprintf("[green]%s", charMarked))
+			} else {
+				sb.WriteString(fmt.Sprintf("[white]%s", charUnmarked))
+			}
+		}
+		sb.WriteString("[white]\n") // closeRow
+		sb.WriteString(fmt.Sprintf(
+			"  50-100ms : [blue]%5s[white]   [blue]%.f[white]%%",
+			strconv.Itoa(peerStats.CNT2),
+			peerStats.PCT2,
+		))
+		sb.WriteString(fmt.Sprintf(
+			"%"+strconv.Itoa(5-len(fmt.Sprintf("%.f", peerStats.PCT2)))+"s",
+			"",
+		))
+		for i := 0; i <= granularitySmall-1; i++ {
+			if i < int(peerStats.PCT2) {
+				sb.WriteString(fmt.Sprintf("[yellow]%s", charMarked))
+			} else {
+				sb.WriteString(fmt.Sprintf("[white]%s", charUnmarked))
+			}
+		}
+		sb.WriteString("[white]\n") // closeRow
+		sb.WriteString(fmt.Sprintf(
+			" 100-200ms : [blue]%5s[white]   [blue]%.f[white]%%",
+			strconv.Itoa(peerStats.CNT3),
+			peerStats.PCT3,
+		))
+		sb.WriteString(fmt.Sprintf(
+			"%"+strconv.Itoa(5-len(fmt.Sprintf("%.f", peerStats.PCT3)))+"s",
+			"",
+		))
+		for i := 0; i <= granularitySmall-1; i++ {
+			if i < int(peerStats.PCT3) {
+				sb.WriteString(fmt.Sprintf("[red]%s", charMarked))
+			} else {
+				sb.WriteString(fmt.Sprintf("[white]%s", charUnmarked))
+			}
+		}
+		sb.WriteString("[white]\n") // closeRow
+		sb.WriteString(fmt.Sprintf(
+			"   200ms < : [blue]%5s[white]   [blue]%.f[white]%%",
+			strconv.Itoa(peerStats.CNT4),
+			peerStats.PCT4,
+		))
+		sb.WriteString(fmt.Sprintf(
+			"%"+strconv.Itoa(5-len(fmt.Sprintf("%.f", peerStats.PCT4)))+"s",
+			"",
+		))
+		for i := 0; i <= granularitySmall-1; i++ {
+			if i < int(peerStats.PCT4) {
+				sb.WriteString(fmt.Sprintf("[fuchsia]%s", charMarked))
+			} else {
+				sb.WriteString(fmt.Sprintf("[white]%s", charUnmarked))
+			}
+		}
+		sb.WriteString("[white]\n") // closeRow
 	}
-	sb.WriteString("\n")
+	sb.WriteString("[white]\n")
 
 	// Display progress
 	sb.WriteString(fmt.Sprintf(" Incoming peers: %v\n", peersIn))
@@ -1030,10 +1126,10 @@ type PeerStats struct {
 	CNT2       int
 	CNT3       int
 	CNT4       int
-	PCT1       int
-	PCT2       int
-	PCT3       int
-	PCT4       int
+	PCT1       float32
+	PCT2       float32
+	PCT3       float32
+	PCT4       float32
 	PCT1items  int
 	PCT2items  int
 	PCT3items  int
