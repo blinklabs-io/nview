@@ -20,13 +20,14 @@ import (
 	"flag"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gdamore/tcell/v2"
+	"github.com/mikioh/tcp"
+	"github.com/mikioh/tcpinfo"
 	"github.com/rivo/tview"
 	"github.com/shirou/gopsutil/v3/process"
 	terminal "golang.org/x/term"
@@ -982,7 +983,7 @@ func getPeerText(ctx context.Context) string {
 		var lastpeerIP string
 		// counters, etc.
 		var peerRTT int
-		for i, v := range peersFiltered {
+		for _, v := range peersFiltered {
 			peerArr := strings.Split(v, ";")
 			peerIP := peerArr[0]
 			peerPORT := peerArr[1]
@@ -995,8 +996,8 @@ func getPeerText(ctx context.Context) string {
 			} else {
 				// Start RTT loop
 				// for tool in ... return peerRTT
-				sb.WriteString(fmt.Sprintf(" Faking ping to: %s:%s\n", peerIP, peerPORT))
-				peerRTT = 10 * i // TODO: do a real ping
+				sb.WriteString(fmt.Sprintf(" Getting RTT for: %s:%s\n", peerIP, peerPORT))
+				peerRTT = tcpinfoRtt(fmt.Sprintf("%s:%s", peerIP, peerPORT))
 				if peerRTT != 99999 {
 					peerStats.RTTSUM = peerStats.RTTSUM + peerRTT
 				}
@@ -1044,7 +1045,7 @@ func getPeerText(ctx context.Context) string {
 			"%"+strconv.Itoa(5-len(fmt.Sprintf("%.f", peerStats.PCT1)))+"s",
 			" ",
 		))
-		for i := 0; i <= granularitySmall-1; i++ {
+		for i := 0; i < granularitySmall; i++ {
 			if i < int(peerStats.PCT1) {
 				sb.WriteString(fmt.Sprintf("[green]%s", charMarked))
 			} else {
@@ -1061,7 +1062,7 @@ func getPeerText(ctx context.Context) string {
 			"%"+strconv.Itoa(5-len(fmt.Sprintf("%.f", peerStats.PCT2)))+"s",
 			"",
 		))
-		for i := 0; i <= granularitySmall-1; i++ {
+		for i := 0; i < granularitySmall; i++ {
 			if i < int(peerStats.PCT2) {
 				sb.WriteString(fmt.Sprintf("[yellow]%s", charMarked))
 			} else {
@@ -1078,7 +1079,7 @@ func getPeerText(ctx context.Context) string {
 			"%"+strconv.Itoa(5-len(fmt.Sprintf("%.f", peerStats.PCT3)))+"s",
 			"",
 		))
-		for i := 0; i <= granularitySmall-1; i++ {
+		for i := 0; i < granularitySmall; i++ {
 			if i < int(peerStats.PCT3) {
 				sb.WriteString(fmt.Sprintf("[red]%s", charMarked))
 			} else {
@@ -1095,7 +1096,7 @@ func getPeerText(ctx context.Context) string {
 			"%"+strconv.Itoa(5-len(fmt.Sprintf("%.f", peerStats.PCT4)))+"s",
 			"",
 		))
-		for i := 0; i <= granularitySmall-1; i++ {
+		for i := 0; i < granularitySmall; i++ {
 			if i < int(peerStats.PCT4) {
 				sb.WriteString(fmt.Sprintf("[fuchsia]%s", charMarked))
 			} else {
@@ -1107,10 +1108,10 @@ func getPeerText(ctx context.Context) string {
 	sb.WriteString("[white]\n")
 
 	// Display progress
-	sb.WriteString(fmt.Sprintf(" Incoming peers: %v\n", peersIn))
-	sb.WriteString(fmt.Sprintf(" Outgoing peers: %v\n", peersOut))
-	sb.WriteString(fmt.Sprintf(" Filtered peers: %v\n\n", peersFiltered))
-	sb.WriteString(fmt.Sprintf(" PeerStats:      %#v\n\n", peerStats))
+	//sb.WriteString(fmt.Sprintf(" Incoming peers: %v\n", peersIn))
+	//sb.WriteString(fmt.Sprintf(" Outgoing peers: %v\n", peersOut))
+	//sb.WriteString(fmt.Sprintf(" Filtered peers: %v\n\n", peersFiltered))
+	//sb.WriteString(fmt.Sprintf(" PeerStats:      %#v\n\n", peerStats))
 
 	failCount = 0
 	return fmt.Sprint(sb.String())
@@ -1161,66 +1162,53 @@ func getProcessMetrics(ctx context.Context) (*process.Process, error) {
 	return r, nil
 }
 
-type PromMetrics struct {
-	BlockNum            uint64  `json:"cardano_node_metrics_blockNum_int"`
-	EpochNum            uint64  `json:"cardano_node_metrics_epoch_int"`
-	SlotInEpoch         uint64  `json:"cardano_node_metrics_slotInEpoch_int"`
-	SlotNum             uint64  `json:"cardano_node_metrics_slotNum_int"`
-	Density             float64 `json:"cardano_node_metrics_density_real"`
-	TxProcessed         uint64  `json:"cardano_node_metrics_txsProcessedNum_int"`
-	MempoolTx           uint64  `json:"cardano_node_metrics_txsInMempool_int"`
-	MempoolBytes        uint64  `json:"cardano_node_metrics_mempoolBytes_int"`
-	KesPeriod           uint64  `json:"cardano_node_metrics_currentKESPeriod_int"`
-	RemainingKesPeriods uint64  `json:"cardano_node_metrics_remainingKESPeriods_int"`
-	IsLeader            uint64  `json:"cardano_node_metrics_Forge_node_is_leader_int"`
-	Adopted             uint64  `json:"cardano_node_metrics_Forge_adopted_int"`
-	DidntAdopt          uint64  `json:"cardano_node_metrics_Forge_didnt_adopt_int"`
-	AboutToLead         uint64  `json:"cardano_node_metrics_Forge_forge_about_to_lead_int"`
-	MissedSlots         uint64  `json:"cardano_node_metrics_slotsMissedNum_int"`
-	MemLive             uint64  `json:"cardano_node_metrics_RTS_gcLiveBytes_int"`
-	MemHeap             uint64  `json:"cardano_node_metrics_RTS_gcHeapBytes_int"`
-	GcMinor             uint64  `json:"cardano_node_metrics_RTS_gcMinorNum_int"`
-	GcMajor             uint64  `json:"cardano_node_metrics_RTS_gcMajorNum_int"`
-	Forks               uint64  `json:"cardano_node_metrics_forks_int"`
-	BlockDelay          float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_s"`
-	BlocksServed        uint64  `json:"cardano_node_metrics_served_block_count_int"`
-	BlocksLate          uint64  `json:"cardano_node_metrics_blockfetchclient_lateblocks"`
-	BlocksW1s           float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_cdfOne"`
-	BlocksW3s           float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_cdfThree"`
-	BlocksW5s           float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_cdfFive"`
-	PeersCold           uint64  `json:"cardano_node_metrics_peerSelection_cold"`
-	PeersWarm           uint64  `json:"cardano_node_metrics_peerSelection_warm"`
-	PeersHot            uint64  `json:"cardano_node_metrics_peerSelection_hot"`
-	ConnIncoming        uint64  `json:"cardano_node_metrics_connectionManager_incomingConns"`
-	ConnOutgoing        uint64  `json:"cardano_node_metrics_connectionManager_outgoingConns"`
-	ConnUniDir          uint64  `json:"cardano_node_metrics_connectionManager_unidirectionalConns"`
-	ConnBiDir           uint64  `json:"cardano_node_metrics_connectionManager_duplexConns"`
-	ConnDuplex          uint64  `json:"cardano_node_metrics_connectionManager_prunableConns"`
+func createRemoteClientConnection(address string) net.Conn {
+	var err error
+	var conn net.Conn
+	var dialProto string
+	var dialAddress string
+	if address != "" {
+		dialProto = "tcp"
+		dialAddress = address
+	} else {
+		return conn
+	}
+
+	conn, err = net.DialTimeout(dialProto, dialAddress, 10*time.Second)
+	if err != nil {
+		fmt.Printf("ERROR: %s\n", err)
+		os.Exit(1)
+	}
+	return conn
 }
 
-func getPromMetrics(ctx context.Context) (*PromMetrics, error) {
-	var metrics *PromMetrics
-	var respBodyBytes []byte
-	respBodyBytes, statusCode, err := getNodeMetrics(ctx)
+func tcpinfoRtt(address string) int {
+	var result int = 99999
+	// Get a connection and setup our error channels
+	conn, err := net.DialTimeout("tcp", address, 3*time.Second)
 	if err != nil {
-		failCount++
-		return metrics, fmt.Errorf("Failed getNodeMetrics: %s\n", err)
+		return result
 	}
-	if statusCode != http.StatusOK {
-		failCount++
-		return metrics, fmt.Errorf("Failed HTTP: %d\n", statusCode)
+	if conn == nil {
+		return result
 	}
-
-	b, err := prom2json(respBodyBytes)
+	tc, err := tcp.NewConn(conn)
 	if err != nil {
-		failCount++
-		return metrics, fmt.Errorf("Failed prom2json: %s\n", err)
+		return result
 	}
-
-	if err := json.Unmarshal(b, &metrics); err != nil {
-		failCount++
-		return metrics, fmt.Errorf("Failed JSON unmarshal: %s\n", err)
+	var o tcpinfo.Info
+	var b [256]byte
+	i, err := tc.Option(o.Level(), o.Name(), b[:])
+	if err != nil {
+		return result
 	}
-	failCount = 0
-	return metrics, nil
+	txt, err := json.Marshal(i)
+	if err != nil {
+		return result
+	}
+	var q *tcpinfo.Info
+	if err := json.Unmarshal(txt, &q); err != nil {
+		result = int(q.RTT.Seconds() * 1000)
+	}
+	return result
 }

@@ -19,12 +19,17 @@ import (
 	"net"
 	"os"
 
-	"github.com/blinklabs-io/gouroboros"
+	ouroboros "github.com/blinklabs-io/gouroboros"
+	"github.com/blinklabs-io/gouroboros/protocol/chainsync"
 	"github.com/blinklabs-io/gouroboros/protocol/localstatequery"
 )
 
 func buildLocalStateQueryConfig() localstatequery.Config {
 	return localstatequery.NewConfig()
+}
+
+func buildChainSyncConfig() chainsync.Config {
+	return chainsync.NewConfig()
 }
 
 func createClientConnection(cfg *Config) net.Conn {
@@ -47,6 +52,7 @@ func createClientConnection(cfg *Config) net.Conn {
 	return conn
 }
 
+// Get Genesis Config from a running node using Ouroboros NtC
 func getGenesisConfig(cfg *Config) *localstatequery.GenesisConfigResult {
 	var result *localstatequery.GenesisConfigResult
 	// Get a connection and setup our error channels
@@ -62,7 +68,8 @@ func getGenesisConfig(cfg *Config) *localstatequery.GenesisConfigResult {
 			os.Exit(1)
 		}
 	}()
-	o, err := ouroboros.NewConnection(
+	// Configure our Ouroboros connection
+	oConn, err := ouroboros.NewConnection(
 		ouroboros.WithConnection(conn),
 		ouroboros.WithNetworkMagic(uint32(cfg.Node.NetworkMagic)),
 		ouroboros.WithErrorChan(errorChan),
@@ -73,16 +80,16 @@ func getGenesisConfig(cfg *Config) *localstatequery.GenesisConfigResult {
 	if err != nil {
 		return result
 	}
-	// Start our client
-	o.LocalStateQuery().Client.Start()
-	result, err = o.LocalStateQuery().Client.GetGenesisConfig()
+	// Query our client
+	oConn.LocalStateQuery().Client.Start()
+	result, err = oConn.LocalStateQuery().Client.GetGenesisConfig()
 	if err != nil {
 		return result
 	}
 	return result
 }
 
-// Get Protocol Parameters from a running node using Ouroboros
+// Get Protocol Parameters from a running node using Ouroboros NtC
 func getProtocolParams(cfg *Config) *localstatequery.CurrentProtocolParamsResult {
 	var result *localstatequery.CurrentProtocolParamsResult
 	// Get a connection and setup our error channels
@@ -98,7 +105,8 @@ func getProtocolParams(cfg *Config) *localstatequery.CurrentProtocolParamsResult
 			os.Exit(1)
 		}
 	}()
-	o, err := ouroboros.NewConnection(
+	// Configure our Ouroboros connection
+	oConn, err := ouroboros.NewConnection(
 		ouroboros.WithConnection(conn),
 		ouroboros.WithNetworkMagic(uint32(cfg.Node.NetworkMagic)),
 		ouroboros.WithErrorChan(errorChan),
@@ -109,9 +117,47 @@ func getProtocolParams(cfg *Config) *localstatequery.CurrentProtocolParamsResult
 	if err != nil {
 		return result
 	}
-	// Start our client
-	o.LocalStateQuery().Client.Start()
-	result, err = o.LocalStateQuery().Client.GetCurrentProtocolParams()
+	// Query our client
+	oConn.LocalStateQuery().Client.Start()
+	result, err = oConn.LocalStateQuery().Client.GetCurrentProtocolParams()
+	if err != nil {
+		return result
+	}
+	return result
+}
+
+// Get remote tip
+//
+//nolint:unused
+func getRemoteTip(cfg *Config, address string) *chainsync.Tip {
+	var result *chainsync.Tip
+	// Get a connection and setup our error channels
+	conn := createRemoteClientConnection(address)
+	if conn == nil {
+		return result
+	}
+	errorChan := make(chan error)
+	go func() {
+		for {
+			err := <-errorChan
+			fmt.Printf("ERROR: %s\n", err)
+			os.Exit(1)
+		}
+	}()
+	oConn, err := ouroboros.NewConnection(
+		ouroboros.WithConnection(conn),
+		ouroboros.WithNetworkMagic(uint32(cfg.Node.NetworkMagic)),
+		ouroboros.WithErrorChan(errorChan),
+		ouroboros.WithNodeToNode(true),
+		ouroboros.WithKeepAlive(false),
+		ouroboros.WithChainSyncConfig(buildChainSyncConfig()),
+	)
+	if err != nil {
+		return result
+	}
+	// Query our client
+	oConn.ChainSync().Client.Start()
+	result, err = oConn.ChainSync().Client.GetCurrentTip()
 	if err != nil {
 		return result
 	}
