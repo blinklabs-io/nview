@@ -1162,6 +1162,7 @@ func getProcessMetrics(ctx context.Context) (*process.Process, error) {
 	return r, nil
 }
 
+//nolint:unused
 func createRemoteClientConnection(address string) net.Conn {
 	var err error
 	var conn net.Conn
