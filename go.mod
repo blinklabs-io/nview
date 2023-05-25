@@ -6,6 +6,8 @@ require (
 	github.com/blinklabs-io/gouroboros v0.40.1
 	github.com/gdamore/tcell/v2 v2.6.0
 	github.com/kelseyhightower/envconfig v1.4.0
+	github.com/mikioh/tcp v0.0.0-20190314235350-803a9b46060c
+	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b
 	github.com/prometheus/client_model v0.4.0
 	github.com/prometheus/common v0.43.0
 	github.com/rivo/tview v0.0.0-20230406072732-e22ce9588bb4
@@ -25,6 +27,7 @@ require (
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
+	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
 	github.com/shoenig/go-m1cpu v0.1.5 // indirect
