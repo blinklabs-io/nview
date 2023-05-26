@@ -1044,7 +1044,7 @@ func getPeerText(ctx context.Context) string {
 			}
 			peerPort, err := strconv.Atoi(peerPORT)
 			if err != nil {
-				return fmt.Sprintf(" [red]Unable to convert port to string!\n[white]")
+				return fmt.Sprintf(" [red]%s[white]", "Unable to convert port to string!")
 			}
 			peerStats.RTTresults = append(peerStats.RTTresults, Peer{
 				IP:        peerIP,
