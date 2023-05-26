@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -186,6 +187,7 @@ func main() {
 		if event.Rune() == 112 { // p
 			active = "peer"
 			checkPeers = true
+			pingPeers = false
 			showPeers = false
 			text.Clear()
 			footerText.Clear()
@@ -244,7 +246,10 @@ func main() {
 			if active == "peer" {
 				if checkPeers {
 					checkPeers = false
-					showPeers = true
+					pingPeers = true
+					text.Clear()
+					text.SetText(getPeerText(ctx))
+				} else {
 					text.Clear()
 					text.SetText(getPeerText(ctx))
 				}
@@ -847,6 +852,7 @@ func getInfoText(ctx context.Context) string {
 var peerAnalysisDate uint64
 
 var checkPeers bool = false
+var pingPeers bool = false
 var showPeers bool = false
 
 //nolint:unused
@@ -855,10 +861,24 @@ func getPeerText(ctx context.Context) string {
 	// Refresh metrics from host
 	processMetrics, err := getProcessMetrics(ctx)
 	if err != nil {
+		uptimes = 0
+		failCount++
 		return fmt.Sprintf(" [red]Could not get process metrics![white]%s\n", "")
+	} else {
+		// Calculate uptime for our process
+		createTime, err := processMetrics.CreateTimeWithContext(ctx)
+		if err == nil {
+			// createTime is milliseconds since UNIX epoch, convert to seconds
+			uptimes = uint64(time.Now().Unix() - (createTime / 1000))
+		}
 	}
 
 	var sb strings.Builder
+
+	// Main section
+	uptime := timeLeft(uptimes)
+	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
+	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
 
 	// Get process in/out connections
 	connections, err := processMetrics.ConnectionsWithContext(ctx)
@@ -903,7 +923,7 @@ func getPeerText(ctx context.Context) string {
 	var ip net.IP
 	if ips != nil {
 		ip = ips[0]
-		if !checkPeers {
+		if !checkPeers && !pingPeers {
 			sb.WriteString(fmt.Sprintf(" Public IP : %s\n", ip))
 		}
 	}
@@ -974,6 +994,12 @@ func getPeerText(ctx context.Context) string {
 		))
 
 		checkPeers = false
+		pingPeers = true
+		// sb.WriteString(fmt.Sprintf("checkPeers=%v, pingPeers=%v, showPeers=%v\n", checkPeers, pingPeers, showPeers))
+		failCount = 0
+		return sb.String()
+	} else if pingPeers {
+		pingPeers = false
 		peerCount := len(peersFiltered)
 		printStart := width - (peerCount * 2) - 2
 		sb.WriteString(fmt.Sprintf("%"+strconv.Itoa(printStart-1)+"s [blue]%"+strconv.Itoa(peerCount)+"s[white]/[green]%d[white]\n",
@@ -987,7 +1013,7 @@ func getPeerText(ctx context.Context) string {
 			peerArr := strings.Split(v, ";")
 			peerIP := peerArr[0]
 			peerPORT := peerArr[1]
-			// peerDIR := peerArr[2]
+			peerDIR := peerArr[2]
 
 			// TODO: geolocation
 
@@ -1016,7 +1042,19 @@ func getPeerText(ctx context.Context) string {
 			} else {
 				peerStats.CNT0 = peerStats.CNT0 + 1
 			}
-			peerStats.RTTresults = append(peerStats.RTTresults, fmt.Sprintf("%d;%s", peerRTT, v))
+			peerPort, err := strconv.Atoi(peerPORT)
+			if err != nil {
+				return fmt.Sprintf(" [red]%s[white]", "Unable to convert port to string!")
+			}
+			peerStats.RTTresults = append(peerStats.RTTresults, Peer{
+				IP:        peerIP,
+				Port:      peerPort,
+				Direction: peerDIR,
+				RTT:       peerRTT,
+			})
+			sort.SliceStable(peerStats.RTTresults, func(i, j int) bool {
+				return peerStats.RTTresults[i].RTT < peerStats.RTTresults[j].RTT
+			})
 		}
 		peerCNTreachable := peerCount - peerStats.CNT0
 		if peerCNTreachable > 0 {
@@ -1033,8 +1071,13 @@ func getPeerText(ctx context.Context) string {
 		// TODO: lookup geoIP data
 		sb.WriteString(fmt.Sprintf(" [yellow]%-46s[white]\n", "Peer analysis done!"))
 		peerAnalysisDate = uint64(time.Now().Unix() - 1)
-		checkPeers = true
+		checkPeers = false
+		showPeers = true
+		// sb.WriteString(fmt.Sprintf("checkPeers=%v, pingPeers=%v, showPeers=%v\n", checkPeers, pingPeers, showPeers))
+		failCount = 0
+		return sb.String()
 	} else if showPeers {
+		peerCount := len(peersFiltered)
 		sb.WriteString("       RTT : Peers / Percent\n")
 		sb.WriteString(fmt.Sprintf(
 			"    0-50ms : [blue]%5s[white]   [blue]%.f[white]%%",
@@ -1042,7 +1085,7 @@ func getPeerText(ctx context.Context) string {
 			peerStats.PCT1,
 		))
 		sb.WriteString(fmt.Sprintf(
-			"%"+strconv.Itoa(5-len(fmt.Sprintf("%.f", peerStats.PCT1)))+"s",
+			"%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT1)))+"s",
 			" ",
 		))
 		for i := 0; i < granularitySmall; i++ {
@@ -1059,7 +1102,7 @@ func getPeerText(ctx context.Context) string {
 			peerStats.PCT2,
 		))
 		sb.WriteString(fmt.Sprintf(
-			"%"+strconv.Itoa(5-len(fmt.Sprintf("%.f", peerStats.PCT2)))+"s",
+			"%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT2)))+"s",
 			"",
 		))
 		for i := 0; i < granularitySmall; i++ {
@@ -1076,7 +1119,7 @@ func getPeerText(ctx context.Context) string {
 			peerStats.PCT3,
 		))
 		sb.WriteString(fmt.Sprintf(
-			"%"+strconv.Itoa(5-len(fmt.Sprintf("%.f", peerStats.PCT3)))+"s",
+			"%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT3)))+"s",
 			"",
 		))
 		for i := 0; i < granularitySmall; i++ {
@@ -1093,7 +1136,7 @@ func getPeerText(ctx context.Context) string {
 			peerStats.PCT4,
 		))
 		sb.WriteString(fmt.Sprintf(
-			"%"+strconv.Itoa(5-len(fmt.Sprintf("%.f", peerStats.PCT4)))+"s",
+			"%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT4)))+"s",
 			"",
 		))
 		for i := 0; i < granularitySmall; i++ {
@@ -1104,6 +1147,89 @@ func getPeerText(ctx context.Context) string {
 			}
 		}
 		sb.WriteString("[white]\n") // closeRow
+
+		// Divider
+		sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", width-1)))
+
+		sb.WriteString(fmt.Sprintf(" Total / Undetermined : [blue]%d[white] / ", peerCount))
+		if peerStats.CNT0 == 0 {
+			sb.WriteString("[blue]0[white]")
+		} else {
+			sb.WriteString(fmt.Sprintf("[fuchsia]%d[white]", peerStats.CNT0))
+		}
+		// TODO: figure out spacing here
+		if peerStats.RTTAVG >= 200 {
+			sb.WriteString(fmt.Sprintf(" Average RTT : [fuchsia]%d[white] ms\n", peerStats.RTTAVG))
+		} else if peerStats.RTTAVG >= 100 {
+			sb.WriteString(fmt.Sprintf(" Average RTT : [red]%d[white] ms\n", peerStats.RTTAVG))
+		} else if peerStats.RTTAVG >= 50 {
+			sb.WriteString(fmt.Sprintf(" Average RTT : [yellow]%d[white] ms\n", peerStats.RTTAVG))
+		} else if peerStats.RTTAVG >= 0 {
+			sb.WriteString(fmt.Sprintf(" Average RTT : [green]%d[white] ms\n", peerStats.RTTAVG))
+		} else {
+			sb.WriteString(fmt.Sprintf(" Average RTT : [red]%s[white] ms\n", "---"))
+		}
+
+		// Divider
+		sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", width-1)))
+
+		sb.WriteString(fmt.Sprintf("[blue]   # %24s  I/O RTT   Geolocation[white]([green]Coming soon![white])\n", "REMOTE PEER"))
+		peerNbrStart := 1
+		// peerLocationWidth := width - 41
+		for peerNbr, peer := range peerStats.RTTresults {
+			if peerNbr < peerNbrStart {
+				continue
+			}
+			// sb.WriteString(fmt.Sprintf(" DEBUG: peer=%#v\n", peer))
+			peerRTT := peer.RTT
+			peerPORT := peer.Port
+			peerDIR := peer.Direction
+			peerIP := peer.IP
+			if strings.Contains(peer.IP, ":") {
+				if len(strings.Split(peer.IP, ":")) > 3 {
+					splitIP := strings.Split(peer.IP, ":")
+					peerIP = fmt.Sprintf("%s...%s:%s",
+						splitIP[0],
+						splitIP[:len(splitIP)-2],
+						splitIP[:len(splitIP)-1],
+					)
+				}
+			}
+			// TODO: geolocation
+			peerLocationFmt := "---"
+
+			// Set color
+			color := "fuchsia"
+			if peerRTT < 50 {
+				color = "green"
+			} else if peerRTT < 100 {
+				color = "yellow"
+			} else if peerRTT < 200 {
+				color = "red"
+			}
+			if peerRTT < 99999 {
+				sb.WriteString(fmt.Sprintf(
+					" %3d %19s:%-5d %-3s ["+color+"]%-5d[white] %s\n",
+					peerNbr,
+					peerIP,
+					peerPORT,
+					peerDIR,
+					peerRTT,
+					peerLocationFmt,
+				))
+			} else {
+				sb.WriteString(fmt.Sprintf(
+					" %3d %19s:%-5d %-3s [fuchsia]%-5s[white] %s\n",
+					peerNbr,
+					peerIP,
+					peerPORT,
+					peerDIR,
+					"---",
+					peerLocationFmt,
+				))
+			}
+		}
+		// sb.WriteString(fmt.Sprintf("checkPeers=%v, pingPeers=%v, showPeers=%v\n", checkPeers, pingPeers, showPeers))
 	}
 	sb.WriteString("[white]\n")
 
@@ -1135,7 +1261,14 @@ type PeerStats struct {
 	PCT2items  int
 	PCT3items  int
 	PCT4items  int
-	RTTresults []string
+	RTTresults []Peer
+}
+
+type Peer struct {
+	Direction string
+	IP        string
+	RTT       int
+	Port      int
 }
 
 func getProcessMetrics(ctx context.Context) (*process.Process, error) {
