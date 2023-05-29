@@ -28,6 +28,7 @@ func buildLocalStateQueryConfig() localstatequery.Config {
 	return localstatequery.NewConfig()
 }
 
+//nolint:unused
 func buildChainSyncConfig() chainsync.Config {
 	return chainsync.NewConfig()
 }
