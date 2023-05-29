@@ -9,7 +9,7 @@ require (
 	github.com/mikioh/tcp v0.0.0-20190314235350-803a9b46060c
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b
 	github.com/prometheus/client_model v0.4.0
-	github.com/prometheus/common v0.43.0
+	github.com/prometheus/common v0.44.0
 	github.com/rivo/tview v0.0.0-20230406072732-e22ce9588bb4
 	github.com/shirou/gopsutil/v3 v3.23.4
 	golang.org/x/term v0.8.0
