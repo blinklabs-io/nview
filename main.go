@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -379,35 +380,11 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	// Genesis Config
 	sb.WriteString(fmt.Sprintf(" Genesis Config: %#v\n\n", genesisConfig))
 
-	// Some Debugging
+	// Application config
 	sb.WriteString(fmt.Sprintf(" Application config: %#v\n\n", cfg))
 
-	// Get protocol parameters
-	protoParams := getProtocolParams(cfg)
-	sb.WriteString(fmt.Sprintf(" Protocol params: %#v\n\n", protoParams))
-
-	// Core section
-	var width = 71
-	var twoColWidth int = (width - 3) / 2
-	var twoColSecond int = twoColWidth + 2
-	// if role == "Core" {
-	if true {
-		// Core Divider
-		sb.WriteString(fmt.Sprintf("- [yellow]CORE[white] %s\n",
-			strings.Repeat("-", width-6),
-		))
-		sb.WriteString(fmt.Sprintf(" KES current/remaining %"+strconv.Itoa(twoColSecond-1)+"s: ",
-			" ",
-		))
-		sb.WriteString(fmt.Sprintf(" [blue]%d[white] / ", promMetrics.KesPeriod))
-		if promMetrics.RemainingKesPeriods <= 0 {
-			sb.WriteString(fmt.Sprintf("[fuchsia]%d[white]\n", promMetrics.RemainingKesPeriods))
-		} else if promMetrics.RemainingKesPeriods <= 8 {
-			sb.WriteString(fmt.Sprintf("[red]%d[white]\n", promMetrics.RemainingKesPeriods))
-		} else {
-			sb.WriteString(fmt.Sprintf("[blue]%d[white]\n", promMetrics.RemainingKesPeriods))
-		}
-	}
+	// PromMetrics
+	sb.WriteString(fmt.Sprintf(" Prometheus metrics: %#v\n\n", promMetrics))
 
 	failCount = 0
 	return fmt.Sprint(sb.String())
@@ -428,7 +405,11 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 	}
 
 	// Set role
-	if promMetrics.AboutToLead > 0 {
+	if cfg.Node.BlockProducer {
+		if role != "Core" {
+			role = "Core"
+		}
+	} else if promMetrics.AboutToLead > 0 {
 		if role != "Core" {
 			role = "Core"
 		}
@@ -439,6 +420,8 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 	// Style / UI
 	var width = 71
 
+	var twoColWidth int = (width - 3) / 2
+	var twoColSecond int = twoColWidth + 2
 	var threeColWidth = (width - 5) / 3
 	//var threeCol2Start = threeColWidth+3
 	//var threeCol3Start = threeColWidth*2+4
@@ -763,7 +746,7 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 		"%",
 	))
 	sb.WriteString(fmt.Sprintf(
-		" Mem (Live) : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth-len(memLive))+"s",
+		" Mem (Live) : [blue]%s[white]%-"+strconv.Itoa(threeCol2ValueWidth-len(memLive))+"s",
 		memLive,
 		"G",
 	))
@@ -778,7 +761,7 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 		"G",
 	))
 	sb.WriteString(fmt.Sprintf(
-		" Mem (Heap) : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth-len(memHeap))+"s",
+		" Mem (Heap) : [blue]%s[white]%-"+strconv.Itoa(threeCol2ValueWidth-len(memHeap))+"s",
 		memHeap,
 		"G",
 	))
@@ -793,7 +776,69 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 		sb.WriteString(fmt.Sprintf("- [yellow]CORE[white] %s\n",
 			strings.Repeat("-", width-6),
 		))
-		sb.WriteString(fmt.Sprintf(" [green]%s[white]\n", "Coming soon!"))
+
+		// Row 1
+		sb.WriteString(fmt.Sprintf(" KES current/remaining %"+strconv.Itoa(twoColSecond-1-22)+"s: ",
+			" ",
+		))
+		sb.WriteString(fmt.Sprintf("[blue]%d[white] / ", promMetrics.KesPeriod))
+		if promMetrics.RemainingKesPeriods <= 0 {
+			sb.WriteString(fmt.Sprintf("[fuchsia]%d[white]\n", promMetrics.RemainingKesPeriods))
+		} else if promMetrics.RemainingKesPeriods <= 8 {
+			sb.WriteString(fmt.Sprintf("[red]%d[white]\n", promMetrics.RemainingKesPeriods))
+		} else {
+			sb.WriteString(fmt.Sprintf("[blue]%d[white]\n", promMetrics.RemainingKesPeriods))
+		}
+		// Row 2
+		sb.WriteString(fmt.Sprintf(" KES expiration date %"+strconv.Itoa(twoColSecond-1-20)+"s: ",
+			" ",
+		))
+		kesString := strings.Replace(strings.Replace(kesExpiration(genesisConfig, promMetrics).Format(time.RFC3339), "Z", " ", 1), "T", " ", 1)
+		sb.WriteString(fmt.Sprintf("[blue]%-"+strconv.Itoa(twoColWidth)+"s[white]\n", kesString))
+		// Row 3
+		sb.WriteString(fmt.Sprintf(" Missed slot leader checks %"+strconv.Itoa(twoColSecond-1-26)+"s: ",
+			" ",
+		))
+		var missedSlotsPct float32
+		if promMetrics.AboutToLead > 0 {
+			missedSlotsPct = float32(promMetrics.MissedSlots) / (float32(promMetrics.AboutToLead + promMetrics.MissedSlots)) * 100
+		}
+		sb.WriteString(fmt.Sprintf("[blue]%s[white] ([blue]%s[white] %%)\n",
+			strconv.FormatUint(promMetrics.MissedSlots, 10),
+			fmt.Sprintf("%.4f", missedSlotsPct),
+		))
+
+		// BLOCK PRODUCTION Divider
+		sb.WriteString(fmt.Sprintf("- [yellow]BLOCK PRODUCTION[white] %s\n",
+			strings.Repeat("-", width-18),
+		))
+
+		// TODO: block log functionality
+		var adoptedFmt string = "green"
+		var invalidFmt string = "blue"
+		if promMetrics.IsLeader != promMetrics.Adopted {
+			adoptedFmt = "yellow"
+		}
+		if promMetrics.DidntAdopt != 0 {
+			invalidFmt = "red"
+		}
+		leader := strconv.FormatUint(promMetrics.IsLeader, 10)
+		sb.WriteString(fmt.Sprintf(
+			" Leader : [blue]%-"+strconv.Itoa(threeCol1ValueWidth-len(leader))+"s[white] ",
+			leader,
+		))
+		sb.WriteString("     ") // 5 spaces extra
+		adopted := strconv.FormatUint(promMetrics.Adopted, 10)
+		sb.WriteString(fmt.Sprintf(
+			"Adopted : ["+adoptedFmt+"]%-"+strconv.Itoa(threeCol2ValueWidth-len(adopted))+"s[white] ",
+			adopted,
+		))
+		sb.WriteString("    ") // 4 spaces extra
+		invalid := strconv.FormatUint(promMetrics.DidntAdopt, 10)
+		sb.WriteString(fmt.Sprintf(
+			"Invalid : ["+invalidFmt+"]%-"+strconv.Itoa(threeCol3ValueWidth-len(invalid))+"s[white] ",
+			invalid,
+		))
 	}
 
 	failCount = 0
@@ -880,10 +925,19 @@ func getPeerText(ctx context.Context) string {
 	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
 
+	// bail on FreeBSD due to missing connections support
+	if runtime.GOOS == "freebsd" {
+		sb.WriteString(fmt.Sprintf(" [yellow]%s[white]\n",
+			"FreeBSD peer analysis is currently unsupported",
+		))
+		return fmt.Sprint(sb.String())
+	}
+
 	// Get process in/out connections
 	connections, err := processMetrics.ConnectionsWithContext(ctx)
 	if err != nil {
-		return fmt.Sprintf("Failed to get processes: %v", err)
+		sb.WriteString(fmt.Sprintf(" [red]Failed to get processes[white]: %v", err))
+		return fmt.Sprint(sb.String())
 	}
 
 	var peersIn []string
@@ -907,22 +961,8 @@ func getPeerText(ctx context.Context) string {
 	// Start "checkPeers"
 	var peersFiltered []string
 
-	// First, check for external address using custom resolver so we can
-	// use a given DNS server to resolve our public address
-	r := &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			d := net.Dialer{
-				Timeout: time.Second * time.Duration(3),
-			}
-			return d.DialContext(ctx, network, "resolver1.opendns.com:53")
-		},
-	}
-	// Lookup special address to get our public IP
-	ips, _ := r.LookupIP(ctx, "ip4", "myip.opendns.com")
-	var ip net.IP
-	if ips != nil {
-		ip = ips[0]
+	ip, _ := getPublicIP(ctx)
+	if ip != nil {
 		if !checkPeers && !pingPeers {
 			sb.WriteString(fmt.Sprintf(" Public IP : %s\n", ip))
 		}
@@ -1173,7 +1213,7 @@ func getPeerText(ctx context.Context) string {
 		// Divider
 		sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", width-1)))
 
-		sb.WriteString(fmt.Sprintf("[blue]   # %24s  I/O RTT   Geolocation[white]([green]Coming soon![white])\n", "REMOTE PEER"))
+		sb.WriteString(fmt.Sprintf("[blue]   # %24s  I/O RTT   Geolocation[white] ([green]Coming soon![white])\n", "REMOTE PEER"))
 		peerNbrStart := 1
 		// peerLocationWidth := width - 41
 		for peerNbr, peer := range peerStats.RTTresults {

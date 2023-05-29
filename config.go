@@ -36,13 +36,14 @@ type AppConfig struct {
 }
 
 type NodeConfig struct {
-	Binary            string             // TODO: make this configurable
 	ByronGenesis      ByronGenesisConfig `yaml:"byron"`
+	Binary            string             // TODO: make this configurable
 	Network           string             `yaml:"network"          envconfig:"CARDANO_NETWORK"`
+	SocketPath        string             `yaml:"socketPath"       envconfig:"CARDANO_NODE_SOCKET_PATH"`
 	NetworkMagic      uint32             `yaml:"networkMagic"     envconfig:"CARDANO_NODE_NETWORK_MAGIC"`
 	Port              uint32             `yaml:"port"             envconfig:"CARDANO_PORT"`
 	ShelleyTransEpoch int32              `yaml:"shellyTransEpoch" envconfig:"SHELLEY_TRANS_EPOCH"`
-	SocketPath        string             `yaml:"socketPath"       envconfig:"CARDANO_NODE_SOCKET_PATH"`
+	BlockProducer     bool               `yaml:"blockProducer"    envconfig:"CARDANO_BLOCK_PRODUCER"`
 }
 
 type PrometheusConfig struct {
