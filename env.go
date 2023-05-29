@@ -92,6 +92,13 @@ func getSlotTipRef(g *localstatequery.GenesisConfigResult) uint64 {
 	return byronSlots + ((currentTimeSec - byronEndTime) / uint64(g.SlotLength/1000000))
 }
 
+// Calculate KES expiration from node metrics
+func kesExpiration(g *localstatequery.GenesisConfigResult, p *PromMetrics) time.Time {
+	currentTimeSec := uint64(time.Now().Unix() - 1)
+	expirationTimeSec := currentTimeSec - (uint64(g.SlotLength/1000000) * (getSlotTipRef(g) % uint64(g.SlotsPerKESPeriod))) + (uint64(g.SlotLength/1000000) + uint64(g.SlotsPerKESPeriod)*p.RemainingKesPeriods)
+	return time.Unix(int64(expirationTimeSec), 0)
+}
+
 // Calculate expected interval between blocks
 func slotInterval(g *localstatequery.GenesisConfigResult) uint64 {
 	// g.SlotLength is nanoseconds
