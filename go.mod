@@ -1,4 +1,4 @@
-module github.com/blinklabs-io/tview
+module github.com/blinklabs-io/nview
 
 go 1.18
 
