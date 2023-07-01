@@ -119,8 +119,7 @@ func main() {
 	} else {
 		network = strings.ToUpper(cfg.Node.Network[:1]) + cfg.Node.Network[1:]
 	}
-	var nodeVersion string = "8.0.0"     // TODO: get the real version
-	var nodeRevision string = "69a117b7" // TODO: get the real revision
+	nodeVersion, nodeRevision, _ := getNodeVersion()
 	var headerLength int
 	var headerPadding int
 	headerLength = len([]rune(cfg.App.NodeName)) + len(role) + len(nodeVersion) + len(nodeRevision) + len(network) + 19
