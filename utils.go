@@ -17,8 +17,26 @@ package main
 import (
 	"context"
 	"net"
+	"os/exec"
+	"strings"
 	"time"
 )
+
+func getNodeVersion() (version string, revision string, err error) {
+	cfg := GetConfig()
+	cmd := exec.Command(cfg.Node.Binary, "version")
+	stdout, err := cmd.Output()
+	if err != nil {
+		return "N/A", "N/A", err
+	}
+	strArray := strings.Split(string(stdout), string(' '))
+	version = strArray[1]
+	revision = strArray[7]
+	if len(revision) > 8 {
+		revision = revision[0:8]
+	}
+	return version, revision, nil
+}
 
 func getPublicIP(ctx context.Context) (net.IP, error) {
 	// First, check for external address using custom resolver so we can
