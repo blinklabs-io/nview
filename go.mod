@@ -1,6 +1,6 @@
 module github.com/blinklabs-io/nview
 
-go 1.18
+go 1.19
 
 require (
 	github.com/blinklabs-io/gouroboros v0.48.0
