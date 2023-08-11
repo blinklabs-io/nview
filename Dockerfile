@@ -1,4 +1,4 @@
-FROM golang:1.18 AS build
+FROM ghcr.io/blinklabs-io/go:1.19.12-1 AS build
 
 WORKDIR /code
 COPY . .
