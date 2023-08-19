@@ -11,7 +11,7 @@ app:
   # Named Cardano network for cardano-node
   #
   # This is a short-cut to select the NetworkMagic and can be used to
-  # select mainnet, preprod, or preview networks.
+  # select mainnet, preprod, preview, or sancho networks.
   #
   # This can also be set via the NETWORK environment variable and overrides
   # the node specific setting below
@@ -21,7 +21,7 @@ node:
   # Named Cardano network for cardano-node
   #
   # This is a short-cut to select the NetworkMagic and can be used to
-  # select mainnet, preprod, or preview networks.
+  # select mainnet, preprod, preview, or sancho networks.
   #
   # This can also be set via the CARDANO_NETWORK environment variable
   network: mainnet

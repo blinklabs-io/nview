@@ -189,6 +189,9 @@ func (c *Config) populateByronGenesis() error {
 			c.Node.ByronGenesis.StartTime = 1666656000
 		case "preprod":
 			c.Node.ByronGenesis.StartTime = 1654041600
+		case "sancho":
+			c.Node.ByronGenesis.K = 432
+			c.Node.ByronGenesis.StartTime = 1686789000
 		case "mainnet":
 			c.Node.ByronGenesis.StartTime = 1506203091
 		}
@@ -199,6 +202,9 @@ func (c *Config) populateByronGenesis() error {
 			c.Node.ByronGenesis.StartTime = 1666656000
 		case "preprod":
 			c.Node.ByronGenesis.StartTime = 1654041600
+		case "sancho":
+			c.Node.ByronGenesis.K = 432
+			c.Node.ByronGenesis.StartTime = 1686789000
 		case "mainnet":
 			c.Node.ByronGenesis.StartTime = 1506203091
 		}
