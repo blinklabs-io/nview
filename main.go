@@ -33,6 +33,8 @@ import (
 	"github.com/rivo/tview"
 	"github.com/shirou/gopsutil/v3/process"
 	terminal "golang.org/x/term"
+
+	"github.com/blinklabs-io/nview/internal/version"
 )
 
 // Global command line flags
@@ -298,10 +300,17 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 
 	var sb strings.Builder
 
+	// Style / UI
+	var width = 71
+
+	var twoColWidth int = (width - 3) / 2
+	var twoColSecond int = twoColWidth + 2
+
 	// Main section
 	uptime := timeLeft(uptimes)
-	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
-	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
+	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%-"+strconv.Itoa(twoColSecond-9-len(uptime))+"s[white]", uptime))
+	sb.WriteString(fmt.Sprintf(" nview Version: [blue]%-"+strconv.Itoa(twoColWidth)+"s[white]\n", version.GetVersionString()))
+	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", width+1)))
 
 	// Epoch progress
 	var epochProgress float32
@@ -470,8 +479,9 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 
 	// Main section
 	uptime := timeLeft(uptimes)
-	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
-	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
+	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%-"+strconv.Itoa(twoColSecond-9-len(uptime))+"s[white]", uptime))
+	sb.WriteString(fmt.Sprintf(" nview Version: [blue]%-"+strconv.Itoa(twoColWidth)+"s[white]\n", version.GetVersionString()))
+	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", width+1)))
 
 	// Epoch progress
 	var epochProgress float32
@@ -860,10 +870,17 @@ func getInfoText(ctx context.Context) string {
 
 	var sb strings.Builder
 
+	// Style / UI
+	var width = 71
+
+	var twoColWidth int = (width - 3) / 2
+	var twoColSecond int = twoColWidth + 2
+
 	// Main section
 	uptime := timeLeft(uptimes)
-	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
-	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
+	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%-"+strconv.Itoa(twoColSecond-9-len(uptime))+"s[white]", uptime))
+	sb.WriteString(fmt.Sprintf(" nview Version: [blue]%-"+strconv.Itoa(twoColWidth)+"s[white]\n", version.GetVersionString()))
+	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", width+1)))
 
 	if showPeers {
 		sb.WriteString(fmt.Sprintf(
@@ -919,10 +936,17 @@ func getPeerText(ctx context.Context) string {
 
 	var sb strings.Builder
 
+	// Style / UI
+	var width = 71
+
+	var twoColWidth int = (width - 3) / 2
+	var twoColSecond int = twoColWidth + 2
+
 	// Main section
 	uptime := timeLeft(uptimes)
-	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%s[white]\n", uptime))
-	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", 20)))
+	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%-"+strconv.Itoa(twoColSecond-9-len(uptime))+"s[white]", uptime))
+	sb.WriteString(fmt.Sprintf(" nview Version: [blue]%-"+strconv.Itoa(twoColWidth)+"s[white]\n", version.GetVersionString()))
+	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", width+1)))
 
 	// bail on FreeBSD due to missing connections support
 	if runtime.GOOS == "freebsd" {
@@ -1024,7 +1048,6 @@ func getPeerText(ctx context.Context) string {
 		charMarked = string('▌')
 		charUnmarked = string('▖')
 	}
-	width := 71
 	granularity := width - 3
 	granularitySmall := granularity / 2
 	if checkPeers {
