@@ -104,11 +104,10 @@ func main() {
 		)
 	}
 	// Set current epoch from Prometheus metrics
-	currentEpoch = uint32(metrics.EpochNum)
-	// TODO: temp hack to use currentEpoch
-	if currentEpoch > 0 {
-		// Do something non-useful
-		text.SetText(fmt.Sprintf("%d", currentEpoch))
+	if metrics != nil {
+		currentEpoch = uint32(metrics.EpochNum)
+	} else {
+		currentEpoch = 0
 	}
 
 	// Populate initial text from metrics
@@ -418,7 +417,7 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 		if role != "Core" {
 			role = "Core"
 		}
-	} else if promMetrics.AboutToLead > 0 {
+	} else if promMetrics != nil && promMetrics.AboutToLead > 0 {
 		if role != "Core" {
 			role = "Core"
 		}
@@ -487,7 +486,9 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 	// Epoch progress
 	var epochProgress float32
 	genesisConfig := getGenesisConfig(cfg)
-	if promMetrics.EpochNum >= uint64(cfg.Node.ShelleyTransEpoch) {
+	if promMetrics == nil {
+		epochProgress = float32(0.0)
+	} else if promMetrics.EpochNum >= uint64(cfg.Node.ShelleyTransEpoch) {
 		epochProgress = float32(
 			(float32(promMetrics.SlotInEpoch) / float32(genesisConfig.EpochLength)) * 100,
 		)
@@ -500,10 +501,13 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 	// epochTimeLeft := timeLeft(timeUntilNextEpoch())
 
 	// Epoch
+	if promMetrics != nil {
+		currentEpoch = uint32(promMetrics.EpochNum)
+	}
 	sb.WriteString(
 		fmt.Sprintf(
 			" Epoch [blue]%d[white] [[blue]%s%%[white]], [blue]%s[white] %-12s\n",
-			promMetrics.EpochNum,
+			currentEpoch,
 			epochProgress1dec,
 			"N/A",
 			"remaining",
