@@ -20,10 +20,12 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/blinklabs-io/nview/internal/config"
 )
 
 func getNodeVersion() (version string, revision string, err error) {
-	cfg := GetConfig()
+	cfg := config.GetConfig()
 	cmd := exec.Command(cfg.Node.Binary, "version")
 	stdout, err := cmd.Output()
 	if err != nil {

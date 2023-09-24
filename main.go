@@ -34,6 +34,7 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 	terminal "golang.org/x/term"
 
+	"github.com/blinklabs-io/nview/internal/config"
 	"github.com/blinklabs-io/nview/internal/version"
 )
 
@@ -80,7 +81,7 @@ func main() {
 	flag.Parse()
 
 	// Load config
-	cfg, err := LoadConfig(cmdlineFlags.configFile)
+	cfg, err := config.LoadConfig(cmdlineFlags.configFile)
 	if err != nil {
 		fmt.Printf("Failed to load config: %s", err)
 		os.Exit(1)
@@ -284,7 +285,7 @@ var uptimes uint64
 var epochItemsLast = 0
 
 func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
-	cfg := GetConfig()
+	cfg := config.GetConfig()
 	// Refresh process metrics from host
 	processMetrics, err := getProcessMetrics(ctx)
 	if err != nil {
@@ -399,7 +400,7 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 }
 
 func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
-	cfg := GetConfig()
+	cfg := config.GetConfig()
 	processMetrics, err := getProcessMetrics(ctx)
 	if err != nil {
 		uptimes = 0
@@ -916,9 +917,8 @@ var checkPeers bool = false
 var pingPeers bool = false
 var showPeers bool = false
 
-//nolint:unused
 func getPeerText(ctx context.Context) string {
-	cfg := GetConfig()
+	cfg := config.GetConfig()
 	// Refresh metrics from host
 	processMetrics, err := getProcessMetrics(ctx)
 	if err != nil {
@@ -1334,7 +1334,7 @@ type Peer struct {
 }
 
 func getProcessMetrics(ctx context.Context) (*process.Process, error) {
-	cfg := GetConfig()
+	cfg := config.GetConfig()
 	r, _ := process.NewProcessWithContext(ctx, 0)
 	processes, err := process.ProcessesWithContext(ctx)
 	if err != nil {
