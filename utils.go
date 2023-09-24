@@ -16,11 +16,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net"
+	"net/http"
 	"os/exec"
 	"strings"
 	"time"
 
+	geoip "github.com/Shivam010/go-freeGeoIP"
 	"github.com/blinklabs-io/nview/internal/config"
 )
 
@@ -61,4 +64,17 @@ func getPublicIP(ctx context.Context) (net.IP, error) {
 		return ips[0], nil
 	}
 	return nil, nil
+}
+
+func getGeoIP(ctx context.Context, address string) string {
+	client := &geoip.Client{
+		Cache:   geoip.DefaultCache(),
+		HttpCli: &http.Client{Timeout: time.Second * 2},
+	}
+	ip := geoip.ParseIP(address)
+	resp := client.GetGeoInfo(ctx, ip)
+	if err := resp.Error; err != nil {
+		return "---" // fmt.Sprintf("%s", resp.Error)
+	}
+	return fmt.Sprintf("%s, %s", resp.Info.City, resp.Info.CountryCode)
 }

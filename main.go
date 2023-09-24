@@ -1121,11 +1121,13 @@ func getPeerText(ctx context.Context) string {
 			if err != nil {
 				return fmt.Sprintf(" [red]%s[white]", "Unable to convert port to string!")
 			}
+			peerLocation := getGeoIP(ctx, peerIP)
 			peerStats.RTTresults = append(peerStats.RTTresults, Peer{
 				IP:        peerIP,
 				Port:      peerPort,
 				Direction: peerDIR,
 				RTT:       peerRTT,
+				Location:  peerLocation,
 			})
 			sort.SliceStable(peerStats.RTTresults, func(i, j int) bool {
 				return peerStats.RTTresults[i].RTT < peerStats.RTTresults[j].RTT
@@ -1143,7 +1145,6 @@ func getPeerText(ctx context.Context) string {
 			peerStats.PCT4 = float32(peerStats.CNT4) / float32(peerCNTreachable) * 100
 			peerStats.PCT4items = int(peerStats.PCT4) * granularitySmall / 100
 		}
-		// TODO: lookup geoIP data
 		sb.WriteString(fmt.Sprintf(" [yellow]%-46s[white]\n", "Peer analysis done!"))
 		peerAnalysisDate = uint64(time.Now().Unix() - 1)
 		checkPeers = false
@@ -1272,8 +1273,7 @@ func getPeerText(ctx context.Context) string {
 					)
 				}
 			}
-			// TODO: geolocation
-			peerLocationFmt := "---"
+			peerLocationFmt := peer.Location
 
 			// Set color
 			color := "fuchsia"
@@ -1346,6 +1346,7 @@ type Peer struct {
 	IP        string
 	RTT       int
 	Port      int
+	Location  string
 }
 
 func getProcessMetrics(ctx context.Context) (*process.Process, error) {
