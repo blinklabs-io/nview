@@ -191,6 +191,7 @@ func main() {
 			checkPeers = true
 			pingPeers = false
 			showPeers = false
+			scrollPeers = false
 			text.Clear()
 			footerText.Clear()
 			footerText.SetText(" [yellow](esc/q) Quit[white] | [yellow](h) Return home")
@@ -254,6 +255,11 @@ func main() {
 				} else {
 					text.Clear()
 					text.SetText(getPeerText(ctx))
+					// Scroll to the top only once
+					if scrollPeers {
+						scrollPeers = false
+						text.ScrollToBeginning()
+					}
 				}
 			}
 			if active == "test" {
@@ -920,6 +926,7 @@ var peerAnalysisDate uint64
 var checkPeers bool = false
 var pingPeers bool = false
 var showPeers bool = false
+var scrollPeers bool = false
 
 func getPeerText(ctx context.Context) string {
 	cfg := config.GetConfig()
@@ -1061,11 +1068,13 @@ func getPeerText(ctx context.Context) string {
 
 		checkPeers = false
 		pingPeers = true
+		scrollPeers = false
 		// sb.WriteString(fmt.Sprintf("checkPeers=%v, pingPeers=%v, showPeers=%v\n", checkPeers, pingPeers, showPeers))
 		failCount = 0
 		return sb.String()
 	} else if pingPeers {
 		pingPeers = false
+		scrollPeers = false
 		peerCount := len(peersFiltered)
 		printStart := width - (peerCount * 2) - 2
 		sb.WriteString(fmt.Sprintf("%"+strconv.Itoa(printStart-1)+"s [blue]%"+strconv.Itoa(peerCount)+"s[white]/[green]%d[white]\n",
@@ -1139,10 +1148,12 @@ func getPeerText(ctx context.Context) string {
 		peerAnalysisDate = uint64(time.Now().Unix() - 1)
 		checkPeers = false
 		showPeers = true
+		scrollPeers = true
 		// sb.WriteString(fmt.Sprintf("checkPeers=%v, pingPeers=%v, showPeers=%v\n", checkPeers, pingPeers, showPeers))
 		failCount = 0
 		return sb.String()
 	} else if showPeers {
+		scrollPeers = false
 		peerCount := len(peersFiltered)
 		sb.WriteString("       RTT : Peers / Percent\n")
 		sb.WriteString(fmt.Sprintf(
