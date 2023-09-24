@@ -23,12 +23,14 @@ import (
 	"time"
 
 	"github.com/blinklabs-io/gouroboros/protocol/localstatequery"
+
+	"github.com/blinklabs-io/nview/internal/config"
 )
 
 // Fetches the node metrics and return a byte array
 func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 	// Load our config and get host/port
-	cfg := GetConfig()
+	cfg := config.GetConfig()
 	url := fmt.Sprintf(
 		"http://%s:%d/metrics",
 		cfg.Prometheus.Host,
@@ -71,7 +73,7 @@ func getCurrentKESPeriod(g *localstatequery.GenesisConfigResult) uint64 {
 
 // Calculate epoch from current second
 func getEpoch() uint64 {
-	cfg := GetConfig()
+	cfg := config.GetConfig()
 	currentTimeSec := uint64(time.Now().Unix() - 1)
 	byronEndTime := cfg.Node.ByronGenesis.StartTime + ((uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000)
 	result := uint64(
@@ -82,7 +84,7 @@ func getEpoch() uint64 {
 
 // Calculate slot number
 func getSlotTipRef(g *localstatequery.GenesisConfigResult) uint64 {
-	cfg := GetConfig()
+	cfg := config.GetConfig()
 	currentTimeSec := uint64(time.Now().Unix() - 1)
 	byronSlots := uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength
 	byronEndTime := cfg.Node.ByronGenesis.StartTime + ((uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000)
@@ -122,7 +124,7 @@ func timeLeft(t uint64) string {
 }
 
 func timeUntilNextEpoch() uint64 {
-	cfg := GetConfig()
+	cfg := config.GetConfig()
 	currentTimeSec := uint64(time.Now().Unix() - 1)
 	ste := uint64(cfg.Node.ShelleyTransEpoch)
 	bgel := cfg.Node.ByronGenesis.EpochLength

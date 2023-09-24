@@ -22,6 +22,8 @@ import (
 	ouroboros "github.com/blinklabs-io/gouroboros"
 	"github.com/blinklabs-io/gouroboros/protocol/chainsync"
 	"github.com/blinklabs-io/gouroboros/protocol/localstatequery"
+
+	"github.com/blinklabs-io/nview/internal/config"
 )
 
 func buildLocalStateQueryConfig() localstatequery.Config {
@@ -33,7 +35,7 @@ func buildChainSyncConfig() chainsync.Config {
 	return chainsync.NewConfig()
 }
 
-func createClientConnection(cfg *Config) net.Conn {
+func createClientConnection(cfg *config.Config) net.Conn {
 	var err error
 	var conn net.Conn
 	var dialProto string
@@ -54,7 +56,7 @@ func createClientConnection(cfg *Config) net.Conn {
 }
 
 // Get Genesis Config from a running node using Ouroboros NtC
-func getGenesisConfig(cfg *Config) *localstatequery.GenesisConfigResult {
+func getGenesisConfig(cfg *config.Config) *localstatequery.GenesisConfigResult {
 	var result *localstatequery.GenesisConfigResult
 	// Get a connection and setup our error channels
 	conn := createClientConnection(cfg)
@@ -93,7 +95,7 @@ func getGenesisConfig(cfg *Config) *localstatequery.GenesisConfigResult {
 // Get Protocol Parameters from a running node using Ouroboros NtC
 //
 //nolint:unused
-func getProtocolParams(cfg *Config) *localstatequery.CurrentProtocolParamsResult {
+func getProtocolParams(cfg *config.Config) *localstatequery.CurrentProtocolParamsResult {
 	var result *localstatequery.CurrentProtocolParamsResult
 	// Get a connection and setup our error channels
 	conn := createClientConnection(cfg)
@@ -132,7 +134,7 @@ func getProtocolParams(cfg *Config) *localstatequery.CurrentProtocolParamsResult
 // Get remote tip
 //
 //nolint:unused
-func getRemoteTip(cfg *Config, address string) *chainsync.Tip {
+func getRemoteTip(cfg *config.Config, address string) *chainsync.Tip {
 	var result *chainsync.Tip
 	// Get a connection and setup our error channels
 	conn := createRemoteClientConnection(address)
