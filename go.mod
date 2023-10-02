@@ -12,7 +12,7 @@ require (
 	github.com/prometheus/client_model v0.4.0
 	github.com/prometheus/common v0.44.0
 	github.com/rivo/tview v0.0.0-20230406072732-e22ce9588bb4
-	github.com/shirou/gopsutil/v3 v3.23.8
+	github.com/shirou/gopsutil/v3 v3.23.9
 	golang.org/x/term v0.12.0
 	gopkg.in/yaml.v2 v2.4.0
 )
