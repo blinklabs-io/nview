@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gdamore/tcell/v2"
@@ -1080,21 +1081,23 @@ func getPeerText(ctx context.Context) string {
 		sb.WriteString(fmt.Sprintf("%"+strconv.Itoa(printStart-1)+"s [blue]%"+strconv.Itoa(peerCount)+"s[white]/[green]%d[white]\n",
 			" ", "0", peerCount,
 		))
-		//var index int
-		var lastpeerIP string
 		// counters, etc.
 		var peerRTT int
+		var wg sync.WaitGroup
 		for _, v := range peersFiltered {
-			peerArr := strings.Split(v, ";")
-			peerIP := peerArr[0]
-			peerPORT := peerArr[1]
-			peerDIR := peerArr[2]
+			// increment waitgroup counter
+			wg.Add(1)
+			// Avoid re-use of v in all go-routines
+			// https://go.dev/doc/faq#closures_and_goroutines
+			v := v
 
-			// TODO: geolocation
+			go func() {
+				defer wg.Done()
+				peerArr := strings.Split(v, ";")
+				peerIP := peerArr[0]
+				peerPORT := peerArr[1]
+				peerDIR := peerArr[2]
 
-			if peerIP == lastpeerIP && peerRTT != 99999 {
-				peerStats.RTTSUM = peerStats.RTTSUM + peerRTT // skip RTT check and reuse old peerRTT
-			} else {
 				// Start RTT loop
 				// for tool in ... return peerRTT
 				sb.WriteString(fmt.Sprintf(" Getting RTT for: %s:%s\n", peerIP, peerPORT))
@@ -1102,33 +1105,32 @@ func getPeerText(ctx context.Context) string {
 				if peerRTT != 99999 {
 					peerStats.RTTSUM = peerStats.RTTSUM + peerRTT
 				}
-
-			}
-			lastpeerIP = peerIP
-			// Update counters
-			if peerRTT < 50 {
-				peerStats.CNT1 = peerStats.CNT1 + 1
-			} else if peerRTT < 100 {
-				peerStats.CNT2 = peerStats.CNT2 + 1
-			} else if peerRTT < 200 {
-				peerStats.CNT3 = peerStats.CNT3 + 1
-			} else if peerRTT < 99999 {
-				peerStats.CNT4 = peerStats.CNT4 + 1
-			} else {
-				peerStats.CNT0 = peerStats.CNT0 + 1
-			}
-			peerPort, err := strconv.Atoi(peerPORT)
-			if err != nil {
-				return fmt.Sprintf(" [red]%s[white]", "Unable to convert port to string!")
-			}
-			peerLocation := getGeoIP(ctx, peerIP)
-			peerStats.RTTresults = append(peerStats.RTTresults, Peer{
-				IP:        peerIP,
-				Port:      peerPort,
-				Direction: peerDIR,
-				RTT:       peerRTT,
-				Location:  peerLocation,
-			})
+				// Update counters
+				if peerRTT < 50 {
+					peerStats.CNT1 = peerStats.CNT1 + 1
+				} else if peerRTT < 100 {
+					peerStats.CNT2 = peerStats.CNT2 + 1
+				} else if peerRTT < 200 {
+					peerStats.CNT3 = peerStats.CNT3 + 1
+				} else if peerRTT < 99999 {
+					peerStats.CNT4 = peerStats.CNT4 + 1
+				} else {
+					peerStats.CNT0 = peerStats.CNT0 + 1
+				}
+				peerPort, err := strconv.Atoi(peerPORT)
+				if err != nil {
+					peerPort = 0
+				}
+				peerLocation := getGeoIP(ctx, peerIP)
+				peerStats.RTTresults = append(peerStats.RTTresults, Peer{
+					IP:        peerIP,
+					Port:      peerPort,
+					Direction: peerDIR,
+					RTT:       peerRTT,
+					Location:  peerLocation,
+				})
+			}()
+			wg.Wait()
 			sort.SliceStable(peerStats.RTTresults, func(i, j int) bool {
 				return peerStats.RTTresults[i].RTT < peerStats.RTTresults[j].RTT
 			})
@@ -1251,7 +1253,7 @@ func getPeerText(ctx context.Context) string {
 		// Divider
 		sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", width-1)))
 
-		sb.WriteString(fmt.Sprintf("[blue]   # %24s  I/O RTT   Geolocation[white] ([green]Coming soon![white])\n", "REMOTE PEER"))
+		sb.WriteString(fmt.Sprintf("[blue]   # %24s  I/O RTT   Geolocation[white]\n", "REMOTE PEER"))
 		peerNbrStart := 1
 		// peerLocationWidth := width - 41
 		for peerNbr, peer := range peerStats.RTTresults {
