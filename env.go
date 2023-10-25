@@ -47,7 +47,10 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 		return respBodyBytes, http.StatusInternalServerError, err
 	}
 	// Set a 3 second timeout
-	ctx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cfg.Prometheus.Timeout))
+	ctx, cancel := context.WithTimeout(
+		ctx,
+		time.Second*time.Duration(cfg.Prometheus.Timeout),
+	)
 	defer cancel()
 	req = req.WithContext(ctx)
 	// Get metrics from the node
@@ -86,7 +89,9 @@ func getEpoch() uint64 {
 func getSlotTipRef(g *localstatequery.GenesisConfigResult) uint64 {
 	cfg := config.GetConfig()
 	currentTimeSec := uint64(time.Now().Unix() - 1)
-	byronSlots := uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength
+	byronSlots := uint64(
+		cfg.Node.ShelleyTransEpoch,
+	) * cfg.Node.ByronGenesis.EpochLength
 	byronEndTime := cfg.Node.ByronGenesis.StartTime + ((uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000)
 	if currentTimeSec < byronEndTime {
 		return ((currentTimeSec - cfg.Node.ByronGenesis.StartTime) * 1000) / cfg.Node.ByronGenesis.SlotLength
@@ -95,7 +100,10 @@ func getSlotTipRef(g *localstatequery.GenesisConfigResult) uint64 {
 }
 
 // Calculate KES expiration from node metrics
-func kesExpiration(g *localstatequery.GenesisConfigResult, p *PromMetrics) time.Time {
+func kesExpiration(
+	g *localstatequery.GenesisConfigResult,
+	p *PromMetrics,
+) time.Time {
 	currentTimeSec := uint64(time.Now().Unix() - 1)
 	expirationTimeSec := currentTimeSec - (uint64(g.SlotLength/1000000) * (getSlotTipRef(g) % uint64(g.SlotsPerKESPeriod))) + (uint64(g.SlotLength/1000000) + uint64(g.SlotsPerKESPeriod)*p.RemainingKesPeriods)
 	return time.Unix(int64(expirationTimeSec), 0)

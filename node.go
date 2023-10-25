@@ -95,7 +95,9 @@ func getGenesisConfig(cfg *config.Config) *localstatequery.GenesisConfigResult {
 // Get Protocol Parameters from a running node using Ouroboros NtC
 //
 //nolint:unused
-func getProtocolParams(cfg *config.Config) *localstatequery.CurrentProtocolParamsResult {
+func getProtocolParams(
+	cfg *config.Config,
+) *localstatequery.CurrentProtocolParamsResult {
 	var result *localstatequery.CurrentProtocolParamsResult
 	// Get a connection and setup our error channels
 	conn := createClientConnection(cfg)
