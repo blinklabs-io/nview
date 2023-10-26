@@ -96,7 +96,9 @@ func prom2json(prom []byte) ([]byte, error) {
 	out := make(map[string]interface{})
 	b := []byte{}
 	parser := &expfmt.TextParser{}
-	families, err := parser.TextToMetricFamilies(strings.NewReader(string(prom)))
+	families, err := parser.TextToMetricFamilies(
+		strings.NewReader(string(prom)),
+	)
 	if err != nil {
 		return b, err
 	}

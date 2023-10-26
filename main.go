@@ -78,7 +78,12 @@ var currentEpoch uint32 = 0
 
 func main() {
 	// Check if any command line flags are given
-	flag.StringVar(&cmdlineFlags.configFile, "config", "", "path to config file to load")
+	flag.StringVar(
+		&cmdlineFlags.configFile,
+		"config",
+		"",
+		"path to config file to load",
+	)
 	flag.Parse()
 
 	// Load config
@@ -93,7 +98,9 @@ func main() {
 
 	// Exit if NODE_NAME is > 19 characters
 	if len([]rune(cfg.App.NodeName)) > 19 {
-		fmt.Println("Please keep node name at or below 19 characters in length!")
+		fmt.Println(
+			"Please keep node name at or below 19 characters in length!",
+		)
 		os.Exit(1)
 	}
 
@@ -101,7 +108,10 @@ func main() {
 	metrics, err := getPromMetrics(ctx)
 	if err != nil {
 		text.SetText(
-			fmt.Sprintf(" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s", err),
+			fmt.Sprintf(
+				" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s",
+				err,
+			),
 		)
 	}
 	// Set current epoch from Prometheus metrics
@@ -125,14 +135,26 @@ func main() {
 	nodeVersion, nodeRevision, _ := getNodeVersion()
 	var headerLength int
 	var headerPadding int
-	headerLength = len([]rune(cfg.App.NodeName)) + len(role) + len(nodeVersion) + len(nodeRevision) + len(network) + 19
+	headerLength = len(
+		[]rune(cfg.App.NodeName),
+	) + len(
+		role,
+	) + len(
+		nodeVersion,
+	) + len(
+		nodeRevision,
+	) + len(
+		network,
+	) + 19
 	if headerLength >= width {
 		headerPadding = 0
 	} else {
 		headerPadding = (width - headerLength) / 2
 	}
 	defaultHeaderText := fmt.Sprintf(
-		"%"+strconv.Itoa(headerPadding)+"s > [green]%s[white] - [yellow](%s - %s)[white] : [blue]%s[white] [[blue]%s[white]] <",
+		"%"+strconv.Itoa(
+			headerPadding,
+		)+"s > [green]%s[white] - [yellow](%s - %s)[white] : [blue]%s[white] [[blue]%s[white]] <",
 		"",
 		cfg.App.NodeName,
 		role,
@@ -184,7 +206,9 @@ func main() {
 			active = "info"
 			text.Clear()
 			footerText.Clear()
-			footerText.SetText(" [yellow](esc/q) Quit[white] | [yellow](h) Return home")
+			footerText.SetText(
+				" [yellow](esc/q) Quit[white] | [yellow](h) Return home",
+			)
 			text.SetText(getInfoText(ctx))
 		}
 		if event.Rune() == 112 { // p
@@ -195,7 +219,9 @@ func main() {
 			scrollPeers = false
 			text.Clear()
 			footerText.Clear()
-			footerText.SetText(" [yellow](esc/q) Quit[white] | [yellow](h) Return home")
+			footerText.SetText(
+				" [yellow](esc/q) Quit[white] | [yellow](h) Return home",
+			)
 			text.SetText(getPeerText(ctx))
 		}
 		if event.Rune() == 113 || event.Key() == tcell.KeyEscape { // q
@@ -205,7 +231,9 @@ func main() {
 			active = "test"
 			text.Clear()
 			footerText.Clear()
-			footerText.SetText(" [yellow](esc/q) Quit[white] | [yellow](h) Return home")
+			footerText.SetText(
+				" [yellow](esc/q) Quit[white] | [yellow](h) Return home",
+			)
 			metrics, err = getPromMetrics(ctx)
 			if err != nil {
 				text.SetText(
@@ -315,8 +343,20 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 
 	// Main section
 	uptime := timeLeft(uptimes)
-	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%-"+strconv.Itoa(twoColSecond-9-len(uptime))+"s[white]", uptime))
-	sb.WriteString(fmt.Sprintf(" nview Version: [blue]%-"+strconv.Itoa(twoColWidth)+"s[white]\n", version.GetVersionString()))
+	sb.WriteString(
+		fmt.Sprintf(
+			" Uptime: [blue]%-"+strconv.Itoa(
+				twoColSecond-9-len(uptime),
+			)+"s[white]",
+			uptime,
+		),
+	)
+	sb.WriteString(
+		fmt.Sprintf(
+			" nview Version: [blue]%-"+strconv.Itoa(twoColWidth)+"s[white]\n",
+			version.GetVersionString(),
+		),
+	)
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", width+1)))
 
 	// Epoch progress
@@ -347,8 +387,15 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	sb.WriteString(fmt.Sprintf(" Epoch Debug%s\n", ""))
 	currentTimeSec := uint64(time.Now().Unix() - 1)
 	sb.WriteString(fmt.Sprintf("currentTimeSec    = %d\n", currentTimeSec))
-	sb.WriteString(fmt.Sprintf("startTime         = %d\n", cfg.Node.ByronGenesis.StartTime))
-	sb.WriteString(fmt.Sprintf("shellyTransEpoch  = %d\n", cfg.Node.ShelleyTransEpoch))
+	sb.WriteString(
+		fmt.Sprintf(
+			"startTime         = %d\n",
+			cfg.Node.ByronGenesis.StartTime,
+		),
+	)
+	sb.WriteString(
+		fmt.Sprintf("shellyTransEpoch  = %d\n", cfg.Node.ShelleyTransEpoch),
+	)
 	sb.WriteString(fmt.Sprintf("byron length      = %d\n", ((uint64(
 		cfg.Node.ShelleyTransEpoch,
 	) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000)))
@@ -362,10 +409,23 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 		cfg.Node.ByronGenesis.StartTime + ((uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000),
 	)
 	sb.WriteString(fmt.Sprintf("byronEndTime      = %d\n", byronEndTime))
-	sb.WriteString(fmt.Sprintf("byron EpochLength = %d\n", cfg.Node.ByronGenesis.EpochLength))
-	sb.WriteString(fmt.Sprintf("byron SlotLength  = %d\n", cfg.Node.ByronGenesis.SlotLength))
 	sb.WriteString(
-		fmt.Sprintf("currentTimeSec-byronEndTime = %d\n", (currentTimeSec - byronEndTime)),
+		fmt.Sprintf(
+			"byron EpochLength = %d\n",
+			cfg.Node.ByronGenesis.EpochLength,
+		),
+	)
+	sb.WriteString(
+		fmt.Sprintf(
+			"byron SlotLength  = %d\n",
+			cfg.Node.ByronGenesis.SlotLength,
+		),
+	)
+	sb.WriteString(
+		fmt.Sprintf(
+			"currentTimeSec-byronEndTime = %d\n",
+			(currentTimeSec - byronEndTime),
+		),
 	)
 	sb.WriteString(
 		fmt.Sprintf(
@@ -373,8 +433,15 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 			(cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength),
 		),
 	)
-	sb.WriteString(fmt.Sprintf("slotInterval      = %d\n", slotInterval(genesisConfig)))
-	sb.WriteString(fmt.Sprintf("ActiveSlotsCoeff  = %#v\n", genesisConfig.ActiveSlotsCoeff))
+	sb.WriteString(
+		fmt.Sprintf("slotInterval      = %d\n", slotInterval(genesisConfig)),
+	)
+	sb.WriteString(
+		fmt.Sprintf(
+			"ActiveSlotsCoeff  = %#v\n",
+			genesisConfig.ActiveSlotsCoeff,
+		),
+	)
 
 	result := uint64(
 		cfg.Node.ShelleyTransEpoch,
@@ -382,7 +449,9 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 	sb.WriteString(fmt.Sprintf("result=%d\n", result))
 
 	sb.WriteString(fmt.Sprintf(" Epoch getEpoch: %d\n", getEpoch()))
-	sb.WriteString(fmt.Sprintf(" Epoch timeUntilNextEpoch: %d\n", timeUntilNextEpoch()))
+	sb.WriteString(
+		fmt.Sprintf(" Epoch timeUntilNextEpoch: %d\n", timeUntilNextEpoch()),
+	)
 	sb.WriteString(
 		fmt.Sprintf(
 			"   timeLeft now: %s\n\n\n",
@@ -486,8 +555,20 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 
 	// Main section
 	uptime := timeLeft(uptimes)
-	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%-"+strconv.Itoa(twoColSecond-9-len(uptime))+"s[white]", uptime))
-	sb.WriteString(fmt.Sprintf(" nview Version: [blue]%-"+strconv.Itoa(twoColWidth)+"s[white]\n", version.GetVersionString()))
+	sb.WriteString(
+		fmt.Sprintf(
+			" Uptime: [blue]%-"+strconv.Itoa(
+				twoColSecond-9-len(uptime),
+			)+"s[white]",
+			uptime,
+		),
+	)
+	sb.WriteString(
+		fmt.Sprintf(
+			" nview Version: [blue]%-"+strconv.Itoa(twoColWidth)+"s[white]\n",
+			version.GetVersionString(),
+		),
+	)
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", width+1)))
 
 	// Epoch progress
@@ -567,7 +648,9 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 	))
 	if promMetrics.SlotNum == 0 {
 		sb.WriteString(fmt.Sprintf(
-			" Status     : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
+			" Status     : [blue]%-"+strconv.Itoa(
+				threeCol2ValueWidth,
+			)+"s[white]",
 			"starting",
 		))
 	} else if tipDiff <= slotInterval(genesisConfig) {
@@ -617,41 +700,59 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 	if p2p {
 		// Row 1
 		sb.WriteString(fmt.Sprintf(
-			" P2P        : [green]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]",
+			" P2P        : [green]%-"+strconv.Itoa(
+				threeCol1ValueWidth,
+			)+"s[white]",
 			"enabled",
 		))
 		sb.WriteString(fmt.Sprintf(
-			" Cold Peers : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
+			" Cold Peers : [blue]%-"+strconv.Itoa(
+				threeCol2ValueWidth,
+			)+"s[white]",
 			strconv.FormatUint(promMetrics.PeersCold, 10),
 		))
 		sb.WriteString(fmt.Sprintf(
-			" Uni-Dir    : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n",
+			" Uni-Dir    : [blue]%-"+strconv.Itoa(
+				threeCol3ValueWidth,
+			)+"s[white]\n",
 			strconv.FormatUint(promMetrics.ConnUniDir, 10),
 		))
 		// Row 2
 		sb.WriteString(fmt.Sprintf(
-			" Incoming   : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]",
+			" Incoming   : [blue]%-"+strconv.Itoa(
+				threeCol1ValueWidth,
+			)+"s[white]",
 			strconv.FormatUint(promMetrics.ConnIncoming, 10),
 		))
 		sb.WriteString(fmt.Sprintf(
-			" Warm Peers : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
+			" Warm Peers : [blue]%-"+strconv.Itoa(
+				threeCol2ValueWidth,
+			)+"s[white]",
 			strconv.FormatUint(promMetrics.PeersWarm, 10),
 		))
 		sb.WriteString(fmt.Sprintf(
-			" Bi-Dir     : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n",
+			" Bi-Dir     : [blue]%-"+strconv.Itoa(
+				threeCol3ValueWidth,
+			)+"s[white]\n",
 			strconv.FormatUint(promMetrics.ConnBiDir, 10),
 		))
 		// Row 3
 		sb.WriteString(fmt.Sprintf(
-			" Outgoing   : [blue]%-"+strconv.Itoa(threeCol1ValueWidth)+"s[white]",
+			" Outgoing   : [blue]%-"+strconv.Itoa(
+				threeCol1ValueWidth,
+			)+"s[white]",
 			strconv.FormatUint(promMetrics.ConnOutgoing, 10),
 		))
 		sb.WriteString(fmt.Sprintf(
-			" Hot Peers  : [blue]%-"+strconv.Itoa(threeCol2ValueWidth)+"s[white]",
+			" Hot Peers  : [blue]%-"+strconv.Itoa(
+				threeCol2ValueWidth,
+			)+"s[white]",
 			strconv.FormatUint(promMetrics.PeersHot, 10),
 		))
 		sb.WriteString(fmt.Sprintf(
-			" Duplex     : [blue]%-"+strconv.Itoa(threeCol3ValueWidth)+"s[white]\n",
+			" Duplex     : [blue]%-"+strconv.Itoa(
+				threeCol3ValueWidth,
+			)+"s[white]\n",
 			strconv.FormatUint(promMetrics.ConnDuplex, 10),
 		))
 	} else {
@@ -704,7 +805,9 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 
 	// Row 1
 	sb.WriteString(fmt.Sprintf(
-		" Last Delay : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth-len(delay))+"s",
+		" Last Delay : [blue]%s[white]%-"+strconv.Itoa(
+			threeCol1ValueWidth-len(delay),
+		)+"s",
 		delay,
 		"s",
 	))
@@ -718,17 +821,23 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 	))
 	// Row 2
 	sb.WriteString(fmt.Sprintf(
-		" Within 1s  : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth-len(blk1s))+"s",
+		" Within 1s  : [blue]%s[white]%-"+strconv.Itoa(
+			threeCol1ValueWidth-len(blk1s),
+		)+"s",
 		blk1s,
 		"%",
 	))
 	sb.WriteString(fmt.Sprintf(
-		" Within 3s  : [blue]%s[white]%-"+strconv.Itoa(threeCol2ValueWidth-len(blk3s))+"s",
+		" Within 3s  : [blue]%s[white]%-"+strconv.Itoa(
+			threeCol2ValueWidth-len(blk3s),
+		)+"s",
 		blk3s,
 		"%",
 	))
 	sb.WriteString(fmt.Sprintf(
-		" Within 5s  : [blue]%s[white]%-"+strconv.Itoa(threeCol3ValueWidth-len(blk5s))+"s\n",
+		" Within 5s  : [blue]%s[white]%-"+strconv.Itoa(
+			threeCol3ValueWidth-len(blk5s),
+		)+"s\n",
 		blk5s,
 		"%",
 	))
@@ -754,11 +863,19 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 		}
 		rss = processMemory.RSS
 	}
-	cWidth := strconv.Itoa(threeCol1ValueWidth - len(fmt.Sprintf("%.2f", cpuPercent)))
+	cWidth := strconv.Itoa(
+		threeCol1ValueWidth - len(fmt.Sprintf("%.2f", cpuPercent)),
+	)
 
 	memRss := fmt.Sprintf("%.1f", float64(rss)/float64(1073741824))
-	memLive := fmt.Sprintf("%.1f", float64(promMetrics.MemLive)/float64(1073741824))
-	memHeap := fmt.Sprintf("%.1f", float64(promMetrics.MemHeap)/float64(1073741824))
+	memLive := fmt.Sprintf(
+		"%.1f",
+		float64(promMetrics.MemLive)/float64(1073741824),
+	)
+	memHeap := fmt.Sprintf(
+		"%.1f",
+		float64(promMetrics.MemHeap)/float64(1073741824),
+	)
 
 	// Row 1
 	sb.WriteString(fmt.Sprintf(
@@ -767,7 +884,9 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 		"%",
 	))
 	sb.WriteString(fmt.Sprintf(
-		" Mem (Live) : [blue]%s[white]%-"+strconv.Itoa(threeCol2ValueWidth-len(memLive))+"s",
+		" Mem (Live) : [blue]%s[white]%-"+strconv.Itoa(
+			threeCol2ValueWidth-len(memLive),
+		)+"s",
 		memLive,
 		"G",
 	))
@@ -777,12 +896,16 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 	))
 	// Row 2
 	sb.WriteString(fmt.Sprintf(
-		" Mem (RSS)  : [blue]%s[white]%-"+strconv.Itoa(threeCol1ValueWidth-len(memRss))+"s",
+		" Mem (RSS)  : [blue]%s[white]%-"+strconv.Itoa(
+			threeCol1ValueWidth-len(memRss),
+		)+"s",
 		memRss,
 		"G",
 	))
 	sb.WriteString(fmt.Sprintf(
-		" Mem (Heap) : [blue]%s[white]%-"+strconv.Itoa(threeCol2ValueWidth-len(memHeap))+"s",
+		" Mem (Heap) : [blue]%s[white]%-"+strconv.Itoa(
+			threeCol2ValueWidth-len(memHeap),
+		)+"s",
 		memHeap,
 		"G",
 	))
@@ -799,30 +922,65 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 		))
 
 		// Row 1
-		sb.WriteString(fmt.Sprintf(" KES current/remaining %"+strconv.Itoa(twoColSecond-1-22)+"s: ",
-			" ",
-		))
+		sb.WriteString(
+			fmt.Sprintf(
+				" KES current/remaining %"+strconv.Itoa(
+					twoColSecond-1-22,
+				)+"s: ",
+				" ",
+			),
+		)
 		sb.WriteString(fmt.Sprintf("[blue]%d[white] / ", promMetrics.KesPeriod))
 		if promMetrics.RemainingKesPeriods <= 0 {
-			sb.WriteString(fmt.Sprintf("[fuchsia]%d[white]\n", promMetrics.RemainingKesPeriods))
+			sb.WriteString(
+				fmt.Sprintf(
+					"[fuchsia]%d[white]\n",
+					promMetrics.RemainingKesPeriods,
+				),
+			)
 		} else if promMetrics.RemainingKesPeriods <= 8 {
 			sb.WriteString(fmt.Sprintf("[red]%d[white]\n", promMetrics.RemainingKesPeriods))
 		} else {
 			sb.WriteString(fmt.Sprintf("[blue]%d[white]\n", promMetrics.RemainingKesPeriods))
 		}
 		// Row 2
-		sb.WriteString(fmt.Sprintf(" KES expiration date %"+strconv.Itoa(twoColSecond-1-20)+"s: ",
+		sb.WriteString(
+			fmt.Sprintf(
+				" KES expiration date %"+strconv.Itoa(twoColSecond-1-20)+"s: ",
+				" ",
+			),
+		)
+		kesString := strings.Replace(
+			strings.Replace(
+				kesExpiration(genesisConfig, promMetrics).Format(time.RFC3339),
+				"Z",
+				" ",
+				1,
+			),
+			"T",
 			" ",
-		))
-		kesString := strings.Replace(strings.Replace(kesExpiration(genesisConfig, promMetrics).Format(time.RFC3339), "Z", " ", 1), "T", " ", 1)
-		sb.WriteString(fmt.Sprintf("[blue]%-"+strconv.Itoa(twoColWidth)+"s[white]\n", kesString))
+			1,
+		)
+		sb.WriteString(
+			fmt.Sprintf(
+				"[blue]%-"+strconv.Itoa(twoColWidth)+"s[white]\n",
+				kesString,
+			),
+		)
 		// Row 3
-		sb.WriteString(fmt.Sprintf(" Missed slot leader checks %"+strconv.Itoa(twoColSecond-1-26)+"s: ",
-			" ",
-		))
+		sb.WriteString(
+			fmt.Sprintf(
+				" Missed slot leader checks %"+strconv.Itoa(
+					twoColSecond-1-26,
+				)+"s: ",
+				" ",
+			),
+		)
 		var missedSlotsPct float32
 		if promMetrics.AboutToLead > 0 {
-			missedSlotsPct = float32(promMetrics.MissedSlots) / (float32(promMetrics.AboutToLead + promMetrics.MissedSlots)) * 100
+			missedSlotsPct = float32(
+				promMetrics.MissedSlots,
+			) / (float32(promMetrics.AboutToLead + promMetrics.MissedSlots)) * 100
 		}
 		sb.WriteString(fmt.Sprintf("[blue]%s[white] ([blue]%s[white] %%)\n",
 			strconv.FormatUint(promMetrics.MissedSlots, 10),
@@ -845,19 +1003,25 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 		}
 		leader := strconv.FormatUint(promMetrics.IsLeader, 10)
 		sb.WriteString(fmt.Sprintf(
-			" Leader : [blue]%-"+strconv.Itoa(threeCol1ValueWidth-len(leader))+"s[white] ",
+			" Leader : [blue]%-"+strconv.Itoa(
+				threeCol1ValueWidth-len(leader),
+			)+"s[white] ",
 			leader,
 		))
 		sb.WriteString("     ") // 5 spaces extra
 		adopted := strconv.FormatUint(promMetrics.Adopted, 10)
 		sb.WriteString(fmt.Sprintf(
-			"Adopted : ["+adoptedFmt+"]%-"+strconv.Itoa(threeCol2ValueWidth-len(adopted))+"s[white] ",
+			"Adopted : ["+adoptedFmt+"]%-"+strconv.Itoa(
+				threeCol2ValueWidth-len(adopted),
+			)+"s[white] ",
 			adopted,
 		))
 		sb.WriteString("    ") // 4 spaces extra
 		invalid := strconv.FormatUint(promMetrics.DidntAdopt, 10)
 		sb.WriteString(fmt.Sprintf(
-			"Invalid : ["+invalidFmt+"]%-"+strconv.Itoa(threeCol3ValueWidth-len(invalid))+"s[white] ",
+			"Invalid : ["+invalidFmt+"]%-"+strconv.Itoa(
+				threeCol3ValueWidth-len(invalid),
+			)+"s[white] ",
 			invalid,
 		))
 	}
@@ -890,8 +1054,20 @@ func getInfoText(ctx context.Context) string {
 
 	// Main section
 	uptime := timeLeft(uptimes)
-	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%-"+strconv.Itoa(twoColSecond-9-len(uptime))+"s[white]", uptime))
-	sb.WriteString(fmt.Sprintf(" nview Version: [blue]%-"+strconv.Itoa(twoColWidth)+"s[white]\n", version.GetVersionString()))
+	sb.WriteString(
+		fmt.Sprintf(
+			" Uptime: [blue]%-"+strconv.Itoa(
+				twoColSecond-9-len(uptime),
+			)+"s[white]",
+			uptime,
+		),
+	)
+	sb.WriteString(
+		fmt.Sprintf(
+			" nview Version: [blue]%-"+strconv.Itoa(twoColWidth)+"s[white]\n",
+			version.GetVersionString(),
+		),
+	)
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", width+1)))
 
 	if showPeers {
@@ -901,8 +1077,12 @@ func getInfoText(ctx context.Context) string {
 		))
 
 		sb.WriteString(" Runs a latency test on connections to the node.\n")
-		sb.WriteString(" Once the analysis is finished, RTTs(Round Trip Time) for each peer\n")
-		sb.WriteString(" is display and grouped in ranges of 0-50, 50-100, 100-200, 200<.\n\n")
+		sb.WriteString(
+			" Once the analysis is finished, RTTs(Round Trip Time) for each peer\n",
+		)
+		sb.WriteString(
+			" is display and grouped in ranges of 0-50, 50-100, 100-200, 200<.\n\n",
+		)
 	} else {
 		sb.WriteString(
 			"[white:black:r] INFO [white:-:-] Displays live metrics gathered from node Prometheus endpoint\n\n",
@@ -936,7 +1116,10 @@ func getPeerText(ctx context.Context) string {
 	if err != nil {
 		uptimes = 0
 		failCount++
-		return fmt.Sprintf(" [red]Could not get process metrics![white]%s\n", "")
+		return fmt.Sprintf(
+			" [red]Could not get process metrics![white]%s\n",
+			"",
+		)
 	} else {
 		// Calculate uptime for our process
 		createTime, err := processMetrics.CreateTimeWithContext(ctx)
@@ -956,8 +1139,20 @@ func getPeerText(ctx context.Context) string {
 
 	// Main section
 	uptime := timeLeft(uptimes)
-	sb.WriteString(fmt.Sprintf(" Uptime: [blue]%-"+strconv.Itoa(twoColSecond-9-len(uptime))+"s[white]", uptime))
-	sb.WriteString(fmt.Sprintf(" nview Version: [blue]%-"+strconv.Itoa(twoColWidth)+"s[white]\n", version.GetVersionString()))
+	sb.WriteString(
+		fmt.Sprintf(
+			" Uptime: [blue]%-"+strconv.Itoa(
+				twoColSecond-9-len(uptime),
+			)+"s[white]",
+			uptime,
+		),
+	)
+	sb.WriteString(
+		fmt.Sprintf(
+			" nview Version: [blue]%-"+strconv.Itoa(twoColWidth)+"s[white]\n",
+			version.GetVersionString(),
+		),
+	)
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", width+1)))
 
 	// bail on FreeBSD due to missing connections support
@@ -971,7 +1166,9 @@ func getPeerText(ctx context.Context) string {
 	// Get process in/out connections
 	connections, err := processMetrics.ConnectionsWithContext(ctx)
 	if err != nil {
-		sb.WriteString(fmt.Sprintf(" [red]Failed to get processes[white]: %v", err))
+		sb.WriteString(
+			fmt.Sprintf(" [red]Failed to get processes[white]: %v", err),
+		)
 		return fmt.Sprint(sb.String())
 	}
 
@@ -983,12 +1180,18 @@ func getPeerText(ctx context.Context) string {
 		if c.Status == "ESTABLISHED" {
 			// If local port == node port, it's incoming (except P2P)
 			if c.Laddr.Port == cfg.Node.Port {
-				peersIn = append(peersIn, fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port))
+				peersIn = append(
+					peersIn,
+					fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port),
+				)
 			}
 			// If local port != node port, ekg port, or prometheus port, it's outgoing
 			if c.Laddr.Port != cfg.Node.Port && c.Laddr.Port != uint32(12788) &&
 				c.Laddr.Port != cfg.Prometheus.Port {
-				peersOut = append(peersOut, fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port))
+				peersOut = append(
+					peersOut,
+					fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port),
+				)
 			}
 		}
 	}
@@ -1063,9 +1266,11 @@ func getPeerText(ctx context.Context) string {
 	granularity := width - 3
 	granularitySmall := granularity / 2
 	if checkPeers {
-		sb.WriteString(fmt.Sprintf(" [yellow]%-"+strconv.Itoa(width-3)+"s[white]\n",
-			"Peer analysis started... please wait!",
-		))
+		sb.WriteString(
+			fmt.Sprintf(" [yellow]%-"+strconv.Itoa(width-3)+"s[white]\n",
+				"Peer analysis started... please wait!",
+			),
+		)
 
 		checkPeers = false
 		pingPeers = true
