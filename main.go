@@ -488,6 +488,35 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 		}
 	}
 
+	// Determine if we're P2P
+	p2p := true
+	if cfg.Node.Network == "mainnet" {
+		cmd, err := processMetrics.CmdlineWithContext(ctx)
+		if err == nil {
+			if !strings.Contains(cmd, "p2p") && strings.Contains(cmd, "--config") {
+				cmdArray := strings.Split(cmd, " ")
+				for p, arg := range cmdArray {
+					if arg == "--config" {
+						nodeConfigFile := cmdArray[p+1]
+						buf, err := os.ReadFile(nodeConfigFile)
+						if err == nil {
+							type nodeConfig struct {
+								EnableP2P bool `json:"EnableP2P"`
+							}
+							var nc nodeConfig
+							err = json.Unmarshal(buf, &nc)
+							if err != nil {
+								p2p = false
+							} else {
+								p2p = nc.EnableP2P
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// Set role
 	if cfg.Node.BlockProducer {
 		if role != "Core" {
@@ -695,8 +724,6 @@ func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 		strings.Repeat("-", width-13),
 	))
 
-	// TODO: actually check for p2p
-	p2p := true
 	if p2p {
 		// Row 1
 		sb.WriteString(fmt.Sprintf(
