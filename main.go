@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -1181,14 +1180,6 @@ func getPeerText(ctx context.Context) string {
 		),
 	)
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", width+1)))
-
-	// bail on FreeBSD due to missing connections support
-	if runtime.GOOS == "freebsd" {
-		sb.WriteString(fmt.Sprintf(" [yellow]%s[white]\n",
-			"FreeBSD peer analysis is currently unsupported",
-		))
-		return fmt.Sprint(sb.String())
-	}
 
 	// Get process in/out connections
 	connections, err := processMetrics.ConnectionsWithContext(ctx)
