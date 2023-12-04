@@ -1,7 +1,7 @@
 github.com/Shivam010/go-freeGeoIP v0.1.1 h1:C3429ZzKXlltMrpb/7OIgUb2uR8xkAVEIdcslyeLqkE=
 github.com/Shivam010/go-freeGeoIP v0.1.1/go.mod h1:wQ0uai0rKfE8rS97cPg9zUVPo4rwEfJcfU5Y8tvj49M=
-github.com/blinklabs-io/gouroboros v0.64.0 h1:8wm1blxhE+qI/GElc3/pmi3YoI3jepEEPFJK6LkP/JE=
-github.com/blinklabs-io/gouroboros v0.64.0/go.mod h1:fph4LBNmSliMxt5ut40lXqqbZHWmXjT6p7o1hCyDEbQ=
+github.com/blinklabs-io/gouroboros v0.66.0 h1:1jZ5r+ZUoSzy+hK/NoZeTiUdBCC2w0ikshnM291B3ps=
+github.com/blinklabs-io/gouroboros v0.66.0/go.mod h1:fph4LBNmSliMxt5ut40lXqqbZHWmXjT6p7o1hCyDEbQ=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
