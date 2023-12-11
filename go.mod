@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/Shivam010/go-freeGeoIP v0.1.1
 	github.com/blinklabs-io/gouroboros v0.67.0
-	github.com/gdamore/tcell/v2 v2.6.0
+	github.com/gdamore/tcell/v2 v2.7.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mikioh/tcp v0.0.0-20190314235350-803a9b46060c
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b
@@ -25,7 +25,7 @@ require (
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
-	github.com/mattn/go-runewidth v0.0.14 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
 	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
