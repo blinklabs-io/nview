@@ -75,6 +75,12 @@ var role string = "Relay"
 // Track current epoch
 var currentEpoch uint32 = 0
 
+// Text strings
+var homeText string
+var infoText string
+var peerText string
+var testText string
+
 func main() {
 	// Check if any command line flags are given
 	flag.StringVar(
@@ -121,7 +127,8 @@ func main() {
 	}
 
 	// Populate initial text from metrics
-	text.SetText(getHomeText(ctx, metrics)).SetBorder(true)
+	homeText = getHomeText(ctx, metrics)
+	text.SetText(homeText).SetBorder(true)
 
 	// Set our header
 	var width int = 71
@@ -187,7 +194,6 @@ func main() {
 		if event.Rune() == 104 || event.Rune() == 114 { // h or r
 			active = "main"
 			showPeers = false
-			text.Clear()
 			footerText.Clear()
 			footerText.SetText(defaultFooterText)
 			metrics, err = getPromMetrics(ctx)
@@ -199,16 +205,25 @@ func main() {
 					),
 				)
 			}
-			text.SetText(getHomeText(ctx, metrics))
+			tmpText := getHomeText(ctx, metrics)
+			if tmpText != "" && tmpText != homeText {
+				homeText = tmpText
+				text.Clear()
+				text.SetText(homeText)
+			}
 		}
 		if event.Rune() == 105 { // i
 			active = "info"
-			text.Clear()
 			footerText.Clear()
 			footerText.SetText(
 				" [yellow](esc/q) Quit[white] | [yellow](h) Return home",
 			)
-			text.SetText(getInfoText(ctx))
+			tmpText := getInfoText(ctx)
+			if tmpText != "" && tmpText != infoText {
+				infoText = tmpText
+				text.Clear()
+				text.SetText(infoText)
+			}
 		}
 		if event.Rune() == 112 { // p
 			active = "peer"
@@ -216,25 +231,29 @@ func main() {
 			pingPeers = false
 			showPeers = false
 			scrollPeers = false
-			text.Clear()
 			footerText.Clear()
 			footerText.SetText(
 				" [yellow](esc/q) Quit[white] | [yellow](h) Return home",
 			)
-			text.SetText(getPeerText(ctx))
+			tmpText := getPeerText(ctx)
+			if tmpText != "" && tmpText != peerText {
+				peerText = tmpText
+				text.Clear()
+				text.SetText(peerText)
+			}
 		}
 		if event.Rune() == 113 || event.Key() == tcell.KeyEscape { // q
 			app.Stop()
 		}
 		if event.Rune() == 116 { // t
 			active = "test"
-			text.Clear()
 			footerText.Clear()
 			footerText.SetText(
 				" [yellow](esc/q) Quit[white] | [yellow](h) Return home",
 			)
 			metrics, err = getPromMetrics(ctx)
 			if err != nil {
+				text.Clear()
 				text.SetText(
 					fmt.Sprintf(
 						" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s",
@@ -242,7 +261,12 @@ func main() {
 					),
 				)
 			}
-			text.SetText(getTestText(ctx, metrics))
+			tmpText := getTestText(ctx, metrics)
+			if tmpText != "" && tmpText != testText {
+				testText = tmpText
+				text.Clear()
+				text.SetText(testText)
+			}
 		}
 		return event
 	})
@@ -262,7 +286,6 @@ func main() {
 				)
 			}
 			if active == "main" {
-				text.Clear()
 				metrics, err = getPromMetrics(ctx)
 				if err != nil {
 					text.SetText(
@@ -272,17 +295,30 @@ func main() {
 						),
 					)
 				}
-				text.SetText(getHomeText(ctx, metrics))
+				tmpText := getHomeText(ctx, metrics)
+				if tmpText != "" && tmpText != homeText {
+					homeText = tmpText
+					text.Clear()
+					text.SetText(homeText)
+				}
 			}
 			if active == "peer" {
 				if checkPeers {
 					checkPeers = false
 					pingPeers = true
-					text.Clear()
-					text.SetText(getPeerText(ctx))
+					tmpText := getPeerText(ctx)
+					if tmpText != "" && tmpText != peerText {
+						peerText = tmpText
+						text.Clear()
+						text.SetText(peerText)
+					}
 				} else {
-					text.Clear()
-					text.SetText(getPeerText(ctx))
+					tmpText := getPeerText(ctx)
+					if tmpText != "" && tmpText != peerText {
+						peerText = tmpText
+						text.Clear()
+						text.SetText(peerText)
+					}
 					// Scroll to the top only once
 					if scrollPeers {
 						scrollPeers = false
@@ -291,9 +327,9 @@ func main() {
 				}
 			}
 			if active == "test" {
-				text.Clear()
 				metrics, err = getPromMetrics(ctx)
 				if err != nil {
+					text.Clear()
 					text.SetText(
 						fmt.Sprintf(
 							" [red]Cannot get metrics from node![white]\n [red]ERROR[white]: %s",
@@ -301,7 +337,12 @@ func main() {
 						),
 					)
 				}
-				text.SetText(getTestText(ctx, metrics))
+				tmpText := getTestText(ctx, metrics)
+				if tmpText != "" && tmpText != testText {
+					testText = tmpText
+					text.Clear()
+					text.SetText(testText)
+				}
 			}
 			time.Sleep(time.Second * 2)
 		}
@@ -476,15 +517,15 @@ func getTestText(ctx context.Context, promMetrics *PromMetrics) string {
 func getHomeText(ctx context.Context, promMetrics *PromMetrics) string {
 	cfg := config.GetConfig()
 	processMetrics, err := getProcessMetrics(ctx)
-	if err != nil {
-		uptimes = 0
-	} else {
+	if err == nil {
 		// Calculate uptime for our process
 		createTime, err := processMetrics.CreateTimeWithContext(ctx)
 		if err == nil {
 			// createTime is milliseconds since UNIX epoch, convert to seconds
 			uptimes = uint64(time.Now().Unix() - (createTime / 1000))
 		}
+	} else {
+		uptimes = 0
 	}
 
 	// Determine if we're P2P
