@@ -15,16 +15,73 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
+	"strings"
 
 	ouroboros "github.com/blinklabs-io/gouroboros"
 	"github.com/blinklabs-io/gouroboros/protocol/chainsync"
 	"github.com/blinklabs-io/gouroboros/protocol/localstatequery"
+	"github.com/shirou/gopsutil/v3/process"
 
 	"github.com/blinklabs-io/nview/internal/config"
 )
+
+var (
+	genesisConfig *localstatequery.GenesisConfigResult
+	p2p           bool   = true
+	role          string = "Relay"
+)
+
+func setRole() {
+	cfg := config.GetConfig()
+	r := "Relay"
+	if cfg.Node.BlockProducer {
+		r = "Core"
+	} else if promMetrics != nil && promMetrics.AboutToLead > 0 {
+		r = "Core"
+	}
+	if role != r {
+		role = r
+	}
+}
+
+func getP2P(ctx context.Context, processMetrics *process.Process) bool {
+	cfg := config.GetConfig()
+	if cfg.Node.Network == "mainnet" {
+		if processMetrics == nil {
+			return p2p
+		}
+		cmd, err := processMetrics.CmdlineWithContext(ctx)
+		if err == nil {
+			if !strings.Contains(cmd, "p2p") && strings.Contains(cmd, "--config") {
+				cmdArray := strings.Split(cmd, " ")
+				for p, arg := range cmdArray {
+					if arg == "--config" {
+						nodeConfigFile := cmdArray[p+1]
+						buf, err := os.ReadFile(nodeConfigFile)
+						if err == nil {
+							type nodeConfig struct {
+								EnableP2P bool `json:"EnableP2P"`
+							}
+							var nc nodeConfig
+							err = json.Unmarshal(buf, &nc)
+							if err != nil {
+								p2p = false
+							} else {
+								p2p = nc.EnableP2P
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return p2p
+}
 
 func buildLocalStateQueryConfig() localstatequery.Config {
 	return localstatequery.NewConfig()

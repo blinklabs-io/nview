@@ -25,6 +25,17 @@ import (
 	"github.com/prometheus/common/expfmt"
 )
 
+// Track current epoch
+var currentEpoch uint32 = 0
+
+func setCurrentEpoch() {
+	if promMetrics != nil {
+		currentEpoch = uint32(promMetrics.EpochNum)
+	}
+}
+
+var promMetrics *PromMetrics
+
 type PromMetrics struct {
 	BlockNum            uint64  `json:"cardano_node_metrics_blockNum_int"`
 	EpochNum            uint64  `json:"cardano_node_metrics_epoch_int"`
