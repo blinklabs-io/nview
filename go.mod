@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/Shivam010/go-freeGeoIP v0.1.1
-	github.com/blinklabs-io/gouroboros v0.69.2
+	github.com/blinklabs-io/gouroboros v0.69.3
 	github.com/gdamore/tcell/v2 v2.7.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mikioh/tcp v0.0.0-20190314235350-803a9b46060c
