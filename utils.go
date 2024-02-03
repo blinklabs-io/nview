@@ -43,6 +43,8 @@ func getNodeVersion() (version string, revision string, err error) {
 	return version, revision, nil
 }
 
+var publicIP *net.IP
+
 func getPublicIP(ctx context.Context) (net.IP, error) {
 	// First, check for external address using custom resolver so we can
 	// use a given DNS server to resolve our public address
@@ -75,6 +77,9 @@ func getGeoIP(ctx context.Context, address string) string {
 	resp := client.GetGeoInfo(ctx, ip)
 	if err := resp.Error; err != nil {
 		return "---" // fmt.Sprintf("%s", resp.Error)
+	}
+	if resp.Info.City == "" {
+		return resp.Info.CountryCode
 	}
 	return fmt.Sprintf("%s, %s", resp.Info.City, resp.Info.CountryCode)
 }

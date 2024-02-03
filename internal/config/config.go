@@ -32,6 +32,7 @@ type Config struct {
 type AppConfig struct {
 	NodeName string `yaml:"nodeName" envconfig:"NODE_NAME"`
 	Network  string `yaml:"network"  envconfig:"NETWORK"`
+	Refresh  uint32 `yaml:"refresh"  envconfig:"REFRESH"`
 	Retries  uint32 `yaml:"retries"  envconfig:"RETRIES"`
 }
 
@@ -49,6 +50,7 @@ type NodeConfig struct {
 type PrometheusConfig struct {
 	Host    string `yaml:"host"    envconfig:"PROM_HOST"`
 	Port    uint32 `yaml:"port"    envconfig:"PROM_PORT"`
+	Refresh uint32 `yaml:"refresh" envconfig:"PROM_REFRESH"`
 	Timeout uint32 `yaml:"timeout" envconfig:"PROM_TIMEOUT"`
 }
 
@@ -64,6 +66,7 @@ var globalConfig = &Config{
 	App: AppConfig{
 		NodeName: "Cardano Node",
 		Network:  "",
+		Refresh:  1,
 		Retries:  3,
 	},
 	Node: NodeConfig{
@@ -76,6 +79,7 @@ var globalConfig = &Config{
 	Prometheus: PrometheusConfig{
 		Host:    "127.0.0.1",
 		Port:    12798,
+		Refresh: 3,
 		Timeout: 3,
 	},
 }
