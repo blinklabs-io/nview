@@ -75,6 +75,8 @@ func getCurrentKESPeriod(g *localstatequery.GenesisConfigResult) uint64 {
 }
 
 // Calculate epoch from current second
+//
+//nolint:unused
 func getEpoch() uint64 {
 	cfg := config.GetConfig()
 	currentTimeSec := uint64(time.Now().Unix() - 1)
@@ -121,6 +123,7 @@ func timeLeft(t uint64) string {
 	return fmt.Sprintf("%s%02d:%02d:%02d", result, int(h), int(m), int(s))
 }
 
+//nolint:unused
 func timeUntilNextEpoch() uint64 {
 	cfg := config.GetConfig()
 	currentTimeSec := uint64(time.Now().Unix() - 1)
