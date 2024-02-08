@@ -81,3 +81,9 @@ prometheus:
 ```
 
 An example configuration is provided at `config.yaml.example`.
+
+## GeoLocation
+
+We embed free GeoLite2 city data created by MaxMind, available
+from https://www.maxmind.com and licensed under CC BY-SA 4.0
+<https://creativecommons.org/licenses/by-sa/4.0/>

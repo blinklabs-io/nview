@@ -16,14 +16,15 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"net"
-	"net/http"
 	"os/exec"
 	"strings"
 	"time"
 
-	geoip "github.com/Shivam010/go-freeGeoIP"
+	"github.com/oschwald/geoip2-golang"
+
 	"github.com/blinklabs-io/nview/internal/config"
 )
 
@@ -68,18 +69,28 @@ func getPublicIP(ctx context.Context) (net.IP, error) {
 	return nil, nil
 }
 
+// MaxMind database (20240206), available from https://www.maxmind.com
+//
+//go:embed resources/GeoLite2-City.mmdb
+var MaxmindDB []byte
+
 func getGeoIP(ctx context.Context, address string) string {
-	client := &geoip.Client{
-		Cache:   geoip.DefaultCache(),
-		HttpCli: &http.Client{Timeout: time.Second * 2},
+	db, err := geoip2.FromBytes(MaxmindDB)
+	if err != nil {
+		return "---"
 	}
-	ip := geoip.ParseIP(address)
-	resp := client.GetGeoInfo(ctx, ip)
-	if err := resp.Error; err != nil {
-		return "---" // fmt.Sprintf("%s", resp.Error)
+	defer db.Close()
+	ip := net.ParseIP(address)
+	record, err := db.City(ip)
+	if err != nil {
+		return "---"
 	}
-	if resp.Info.City == "" {
-		return resp.Info.CountryCode
+	if len(record.City.Names["en"]) == 0 {
+		if len(record.Country.IsoCode) == 0 {
+			return "---"
+		} else {
+			return fmt.Sprintf("%v", record.Country.IsoCode)
+		}
 	}
-	return fmt.Sprintf("%s, %s", resp.Info.City, resp.Info.CountryCode)
+	return fmt.Sprintf("%v, %v", record.City.Names["en"], record.Country.IsoCode)
 }
