@@ -5,6 +5,10 @@ complement remote monitoring tools by providing a local view of a running
 node from the command line. It's a TUI (terminal user interface) designed to
 fit most screens.
 
+<div align="center">
+    <img src="./nview-20240208.png" alt="nview screenshot" width="640">
+</div>
+
 ## Design and functionality
 
 The goal with nview is to provide an alternative to the Guild LiveView
