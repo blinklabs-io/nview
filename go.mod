@@ -3,12 +3,12 @@ module github.com/blinklabs-io/nview
 go 1.20
 
 require (
-	github.com/Shivam010/go-freeGeoIP v0.1.1
 	github.com/blinklabs-io/gouroboros v0.70.1
 	github.com/gdamore/tcell/v2 v2.7.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mikioh/tcp v0.0.0-20190314235350-803a9b46060c
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b
+	github.com/oschwald/geoip2-golang v1.9.0
 	github.com/prometheus/client_model v0.5.0
 	github.com/prometheus/common v0.46.0
 	github.com/rivo/tview v0.0.0-20230406072732-e22ce9588bb4
@@ -27,7 +27,7 @@ require (
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect
-	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
+	github.com/oschwald/maxminddb-golang v1.11.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
