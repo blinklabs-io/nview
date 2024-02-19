@@ -9,7 +9,7 @@ require (
 	github.com/mikioh/tcp v0.0.0-20190314235350-803a9b46060c
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b
 	github.com/oschwald/geoip2-golang v1.9.0
-	github.com/prometheus/client_model v0.5.0
+	github.com/prometheus/client_model v0.6.0
 	github.com/prometheus/common v0.47.0
 	github.com/rivo/tview v0.0.0-20230406072732-e22ce9588bb4
 	github.com/shirou/gopsutil/v3 v3.24.1
