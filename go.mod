@@ -12,7 +12,7 @@ require (
 	github.com/prometheus/client_model v0.6.0
 	github.com/prometheus/common v0.48.0
 	github.com/rivo/tview v0.0.0-20230406072732-e22ce9588bb4
-	github.com/shirou/gopsutil/v3 v3.24.1
+	github.com/shirou/gopsutil/v3 v3.24.2
 	golang.org/x/term v0.17.0
 	gopkg.in/yaml.v2 v2.4.0
 )
@@ -35,7 +35,7 @@ require (
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/utxorpc/go-codegen v0.4.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	github.com/yusufpapurcu/wmi v1.2.3 // indirect
+	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	golang.org/x/crypto v0.19.0 // indirect
 	golang.org/x/sys v0.17.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
