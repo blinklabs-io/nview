@@ -1,5 +1,5 @@
-github.com/blinklabs-io/gouroboros v0.75.0 h1:zM3Rmvuyzd40DFfckD26pmYNiZ9Vg6WaAVHA9habjLM=
-github.com/blinklabs-io/gouroboros v0.75.0/go.mod h1:d+OyO0y2OSUnj3y2CvG7YL9ACd8YVHsY0ndna/1RrIw=
+github.com/blinklabs-io/gouroboros v0.76.0 h1:o1GHNW/p3AYEd2ubfZTQb6FWmyt2zKCZEwg5k8J4Pbc=
+github.com/blinklabs-io/gouroboros v0.76.0/go.mod h1:+EKdUQk5CUtXF/WI2N7mrOxIQSRW0VEaYENffS3I4GM=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
@@ -73,8 +73,8 @@ github.com/tklauser/go-sysconf v0.3.12 h1:0QaGUFOdQaIVdPgfITYzaTegZvdCjmYO52cSFA
 github.com/tklauser/go-sysconf v0.3.12/go.mod h1:Ho14jnntGE1fpdOqQEEaiKRpvIavV0hSfmBq8nJbHYI=
 github.com/tklauser/numcpus v0.6.1 h1:ng9scYS7az0Bk4OZLvrNXNSAO2Pxr1XXRAPyjhIx+Fk=
 github.com/tklauser/numcpus v0.6.1/go.mod h1:1XfjsgE2zo8GVw7POkMbHENHzVg3GzmoZ9fESEdAacY=
-github.com/utxorpc/go-codegen v0.4.0 h1:9YzCURt5Jrnwii8VmQYeKH6K/wYXMQx+DmdjzieSZpM=
-github.com/utxorpc/go-codegen v0.4.0/go.mod h1:rFk8LI55uFqnwftPYTTklTKB8Lhwh4K+ltb2BtrFe3g=
+github.com/utxorpc/go-codegen v0.4.4 h1:NnRFkqKJ9ZkZ3pffpD3bb6K0IU6IaDXbkVD/DzDmuKs=
+github.com/utxorpc/go-codegen v0.4.4/go.mod h1:NWAVa5/vHWgSrp/wJzXnMpbaBeST0PmWCU5vX63hZdw=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
 github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
