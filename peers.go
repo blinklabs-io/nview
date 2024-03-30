@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	netutil "github.com/shirou/gopsutil/v3/net"
+
 	"github.com/blinklabs-io/nview/internal/config"
 )
 
@@ -42,7 +44,7 @@ func filterPeers(ctx context.Context) error {
 	cfg := config.GetConfig()
 
 	// Get process in/out connections
-	connections, err := processMetrics.ConnectionsWithContext(ctx)
+	connections, err := netutil.ConnectionsPidWithContext(ctx, "tcp", processMetrics.Pid)
 	if err != nil {
 		return err
 	}

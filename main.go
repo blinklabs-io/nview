@@ -29,6 +29,7 @@ import (
 	"github.com/mikioh/tcp"
 	"github.com/mikioh/tcpinfo"
 	"github.com/rivo/tview"
+	netutil "github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
 	terminal "golang.org/x/term"
 
@@ -659,7 +660,7 @@ func getConnectionText(ctx context.Context) string {
 			return connectionText
 		}
 		// Get process in/out connections
-		connections, err := processMetrics.ConnectionsWithContext(ctx)
+		connections, err := netutil.ConnectionsPidWithContext(ctx, "tcp", processMetrics.Pid)
 		if err != nil {
 			sb.WriteString(fmt.Sprintf("Failed to get processes: %v", err))
 		}
