@@ -149,47 +149,6 @@ func getGenesisConfig(cfg *config.Config) *localstatequery.GenesisConfigResult {
 	return result
 }
 
-// Get Protocol Parameters from a running node using Ouroboros NtC
-//
-//nolint:unused
-func getProtocolParams(
-	cfg *config.Config,
-) *localstatequery.CurrentProtocolParamsResult {
-	var result *localstatequery.CurrentProtocolParamsResult
-	// Get a connection and setup our error channels
-	conn := createClientConnection(cfg)
-	if conn == nil {
-		return result
-	}
-	errorChan := make(chan error)
-	go func() {
-		for {
-			err := <-errorChan
-			fmt.Printf("ERROR: %s\n", err)
-			os.Exit(1)
-		}
-	}()
-	// Configure our Ouroboros connection
-	oConn, err := ouroboros.NewConnection(
-		ouroboros.WithConnection(conn),
-		ouroboros.WithNetworkMagic(uint32(cfg.Node.NetworkMagic)),
-		ouroboros.WithErrorChan(errorChan),
-		ouroboros.WithNodeToNode(false),
-		ouroboros.WithKeepAlive(false),
-		ouroboros.WithLocalStateQueryConfig(buildLocalStateQueryConfig()),
-	)
-	if err != nil {
-		return result
-	}
-	// Query our client
-	oConn.LocalStateQuery().Client.Start()
-	result, err = oConn.LocalStateQuery().Client.GetCurrentProtocolParams()
-	if err != nil {
-		return result
-	}
-	return result
-}
-
 // Get remote tip
 //
 //nolint:unused
