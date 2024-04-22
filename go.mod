@@ -3,7 +3,7 @@ module github.com/blinklabs-io/nview
 go 1.21
 
 require (
-	github.com/blinklabs-io/gouroboros v0.78.0
+	github.com/blinklabs-io/gouroboros v0.79.0
 	github.com/gdamore/tcell/v2 v2.7.4
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mikioh/tcp v0.0.0-20190314235350-803a9b46060c
@@ -36,7 +36,7 @@ require (
 	github.com/utxorpc/go-codegen v0.4.4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	golang.org/x/crypto v0.21.0 // indirect
+	golang.org/x/crypto v0.22.0 // indirect
 	golang.org/x/sys v0.19.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
