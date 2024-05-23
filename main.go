@@ -227,7 +227,9 @@ func main() {
 	resourceTextView.SetText(resourceText).SetTitle("Resources").SetBorder(true)
 
 	connectionText = getConnectionText(ctx)
-	connectionTextView.SetText(connectionText).SetTitle("Connections").SetBorder(true)
+	connectionTextView.SetText(connectionText).
+		SetTitle("Connections").
+		SetBorder(true)
 
 	coreText = getCoreText(ctx)
 	coreTextView.SetText(coreText).SetTitle("Core").SetBorder(true)
@@ -236,7 +238,9 @@ func main() {
 	chainTextView.SetText(chainText).SetTitle("Chain").SetBorder(true)
 
 	blockText = getBlockText(ctx)
-	blockTextView.SetText(blockText).SetTitle("Block Propagation").SetBorder(true)
+	blockTextView.SetText(blockText).
+		SetTitle("Block Propagation").
+		SetBorder(true)
 
 	peerText = getPeerText(ctx)
 	peerTextView.SetText(peerText).SetTitle("Peers").SetBorder(true)
@@ -255,6 +259,7 @@ func main() {
 			1,
 			1,
 			false).
+
 		// Row 2 is our main text section, and its own flex
 		AddItem(layout.
 			AddItem(leftSide.SetDirection(tview.FlexRow).
@@ -345,7 +350,11 @@ func main() {
 				coreTextView.Clear()
 				coreTextView.SetText(coreText)
 			}
-			tmpText = fmt.Sprintf("%s\n%s", getEpochText(ctx), getChainText(ctx))
+			tmpText = fmt.Sprintf(
+				"%s\n%s",
+				getEpochText(ctx),
+				getChainText(ctx),
+			)
 			if tmpText != "" && tmpText != chainText {
 				chainText = tmpText
 				chainTextView.Clear()
@@ -423,7 +432,11 @@ func main() {
 				coreTextView.Clear()
 				coreTextView.SetText(coreText)
 			}
-			tmpText = fmt.Sprintf("%s\n%s", getEpochText(ctx), getChainText(ctx))
+			tmpText = fmt.Sprintf(
+				"%s\n%s",
+				getEpochText(ctx),
+				getChainText(ctx),
+			)
 			if tmpText != "" && tmpText != chainText {
 				chainText = tmpText
 				chainTextView.Clear()
@@ -797,29 +810,49 @@ func getBlockText(ctx context.Context) string {
 	delay := fmt.Sprintf("%.2f", promMetrics.BlockDelay)
 
 	// Row 1
-	sb.WriteString(fmt.Sprintf(" [green]Last Delay : [white]%s[blue]%-"+strconv.Itoa(10-len(delay))+"s",
-		delay,
-		"s",
-	))
-	sb.WriteString(fmt.Sprintf(" [green]Served     : [white]%-"+strconv.Itoa(10)+"s",
-		strconv.FormatUint(promMetrics.BlocksServed, 10),
-	))
-	sb.WriteString(fmt.Sprintf(" [green]Late (>5s) : [white]%-"+strconv.Itoa(10)+"s\n",
-		strconv.FormatUint(promMetrics.BlocksLate, 10),
-	))
+	sb.WriteString(
+		fmt.Sprintf(
+			" [green]Last Delay : [white]%s[blue]%-"+strconv.Itoa(
+				10-len(delay),
+			)+"s",
+			delay,
+			"s",
+		),
+	)
+	sb.WriteString(
+		fmt.Sprintf(" [green]Served     : [white]%-"+strconv.Itoa(10)+"s",
+			strconv.FormatUint(promMetrics.BlocksServed, 10),
+		),
+	)
+	sb.WriteString(
+		fmt.Sprintf(" [green]Late (>5s) : [white]%-"+strconv.Itoa(10)+"s\n",
+			strconv.FormatUint(promMetrics.BlocksLate, 10),
+		),
+	)
 	// Row 2
-	sb.WriteString(fmt.Sprintf(" [green]Within 1s  : [white]%s%-"+strconv.Itoa(10-len(blk1s))+"s",
-		blk1s,
-		"%",
-	))
-	sb.WriteString(fmt.Sprintf(" [green]Within 3s  : [white]%s%-"+strconv.Itoa(10-len(blk3s))+"s",
-		blk3s,
-		"%",
-	))
-	sb.WriteString(fmt.Sprintf(" [green]Within 5s  : [white]%s%-"+strconv.Itoa(10-len(blk5s))+"s\n",
-		blk5s,
-		"%",
-	))
+	sb.WriteString(
+		fmt.Sprintf(
+			" [green]Within 1s  : [white]%s%-"+strconv.Itoa(10-len(blk1s))+"s",
+			blk1s,
+			"%",
+		),
+	)
+	sb.WriteString(
+		fmt.Sprintf(
+			" [green]Within 3s  : [white]%s%-"+strconv.Itoa(10-len(blk3s))+"s",
+			blk3s,
+			"%",
+		),
+	)
+	sb.WriteString(
+		fmt.Sprintf(
+			" [green]Within 5s  : [white]%s%-"+strconv.Itoa(
+				10-len(blk5s),
+			)+"s\n",
+			blk5s,
+			"%",
+		),
+	)
 
 	failCount = 0
 	return fmt.Sprint(sb.String())
@@ -835,14 +868,23 @@ func getNodeText(ctx context.Context) string {
 	}
 	nodeVersion, nodeRevision, _ := getNodeVersion()
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf(" [green]Name       : [white]%s\n", cfg.App.NodeName))
+	sb.WriteString(
+		fmt.Sprintf(" [green]Name       : [white]%s\n", cfg.App.NodeName),
+	)
 	sb.WriteString(fmt.Sprintf(" [green]Role       : [white]%s\n", role))
 	sb.WriteString(fmt.Sprintf(" [green]Network    : [white]%s\n", network))
-	sb.WriteString(fmt.Sprintf(" [green]Version    : [white]%s\n",
-		fmt.Sprintf("[white]%s[blue] [[white]%s[blue]]", nodeVersion, nodeRevision),
+	sb.WriteString(fmt.Sprintf(
+		" [green]Version    : [white]%s\n",
+		fmt.Sprintf(
+			"[white]%s[blue] [[white]%s[blue]]",
+			nodeVersion,
+			nodeRevision,
+		),
 	))
 	if publicIP != nil {
-		sb.WriteString(fmt.Sprintf(" [green]Public IP  : [white]%s\n", publicIP))
+		sb.WriteString(
+			fmt.Sprintf(" [green]Public IP  : [white]%s\n", publicIP),
+		)
 	} else {
 		sb.WriteString(fmt.Sprintln())
 	}
@@ -960,7 +1002,12 @@ func getPeerText(ctx context.Context) string {
 	// Divider
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", width-1)))
 
-	sb.WriteString(fmt.Sprintf(" [green]Total / Undetermined : [white]%d[white] / ", peerCount))
+	sb.WriteString(
+		fmt.Sprintf(
+			" [green]Total / Undetermined : [white]%d[white] / ",
+			peerCount,
+		),
+	)
 	if peerStats.CNT0 == 0 {
 		sb.WriteString("[blue]0[white]")
 	} else {
@@ -968,7 +1015,12 @@ func getPeerText(ctx context.Context) string {
 	}
 	// TODO: figure out spacing here
 	if peerStats.RTTAVG >= 200 {
-		sb.WriteString(fmt.Sprintf(" Average RTT : [fuchsia]%d[white] ms\n", peerStats.RTTAVG))
+		sb.WriteString(
+			fmt.Sprintf(
+				" Average RTT : [fuchsia]%d[white] ms\n",
+				peerStats.RTTAVG,
+			),
+		)
 	} else if peerStats.RTTAVG >= 100 {
 		sb.WriteString(fmt.Sprintf(" Average RTT : [red]%d[white] ms\n", peerStats.RTTAVG))
 	} else if peerStats.RTTAVG >= 50 {
@@ -982,7 +1034,9 @@ func getPeerText(ctx context.Context) string {
 	// Divider
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", width-1)))
 
-	sb.WriteString(fmt.Sprintf("   [green]# %24s  I/O RTT   Geolocation\n", "REMOTE PEER"))
+	sb.WriteString(
+		fmt.Sprintf("   [green]# %24s  I/O RTT   Geolocation\n", "REMOTE PEER"),
+	)
 	// peerLocationWidth := width - 41
 	for peerNbr, peer := range peerStats.RTTresultsSlice {
 		peerNbr++
@@ -1065,15 +1119,42 @@ func getResourceText(ctx context.Context) string {
 	}
 
 	memRss := fmt.Sprintf("%.1f", float64(rss)/float64(1073741824))
-	memLive := fmt.Sprintf("%.1f", float64(promMetrics.MemLive)/float64(1073741824))
-	memHeap := fmt.Sprintf("%.1f", float64(promMetrics.MemHeap)/float64(1073741824))
+	memLive := fmt.Sprintf(
+		"%.1f",
+		float64(promMetrics.MemLive)/float64(1073741824),
+	)
+	memHeap := fmt.Sprintf(
+		"%.1f",
+		float64(promMetrics.MemHeap)/float64(1073741824),
+	)
 
-	sb.WriteString(fmt.Sprintf(" [green]CPU (sys)  : [white]%s%%\n", fmt.Sprintf("%.2f", cpuPercent)))
-	sb.WriteString(fmt.Sprintf(" [green]Mem (Live) : [white]%s[blue]G\n", memLive))
-	sb.WriteString(fmt.Sprintf(" [green]Mem (RSS)  : [white]%s[blue]G\n", memRss))
-	sb.WriteString(fmt.Sprintf(" [green]Mem (Heap) : [white]%s[blue]G\n", memHeap))
-	sb.WriteString(fmt.Sprintf(" [green]GC Minor   : [white]%s\n", strconv.FormatUint(promMetrics.GcMinor, 10)))
-	sb.WriteString(fmt.Sprintf(" [green]GC Major   : [white]%s\n", strconv.FormatUint(promMetrics.GcMajor, 10)))
+	sb.WriteString(
+		fmt.Sprintf(
+			" [green]CPU (sys)  : [white]%s%%\n",
+			fmt.Sprintf("%.2f", cpuPercent),
+		),
+	)
+	sb.WriteString(
+		fmt.Sprintf(" [green]Mem (Live) : [white]%s[blue]G\n", memLive),
+	)
+	sb.WriteString(
+		fmt.Sprintf(" [green]Mem (RSS)  : [white]%s[blue]G\n", memRss),
+	)
+	sb.WriteString(
+		fmt.Sprintf(" [green]Mem (Heap) : [white]%s[blue]G\n", memHeap),
+	)
+	sb.WriteString(
+		fmt.Sprintf(
+			" [green]GC Minor   : [white]%s\n",
+			strconv.FormatUint(promMetrics.GcMinor, 10),
+		),
+	)
+	sb.WriteString(
+		fmt.Sprintf(
+			" [green]GC Major   : [white]%s\n",
+			strconv.FormatUint(promMetrics.GcMajor, 10),
+		),
+	)
 	return fmt.Sprint(sb.String())
 }
 
