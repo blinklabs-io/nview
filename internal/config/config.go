@@ -37,14 +37,15 @@ type AppConfig struct {
 }
 
 type NodeConfig struct {
-	ByronGenesis      ByronGenesisConfig `yaml:"byron"`
-	Binary            string             `yaml:"binary"           envconfig:"CARDANO_NODE_BINARY"`
-	Network           string             `yaml:"network"          envconfig:"CARDANO_NETWORK"`
-	SocketPath        string             `yaml:"socketPath"       envconfig:"CARDANO_NODE_SOCKET_PATH"`
-	NetworkMagic      uint32             `yaml:"networkMagic"     envconfig:"CARDANO_NODE_NETWORK_MAGIC"`
-	Port              uint32             `yaml:"port"             envconfig:"CARDANO_PORT"`
-	ShelleyTransEpoch int32              `yaml:"shellyTransEpoch" envconfig:"SHELLEY_TRANS_EPOCH"`
-	BlockProducer     bool               `yaml:"blockProducer"    envconfig:"CARDANO_BLOCK_PRODUCER"`
+	ByronGenesis      ByronGenesisConfig   `yaml:"byron"`
+	Binary            string               `yaml:"binary"           envconfig:"CARDANO_NODE_BINARY"`
+	Network           string               `yaml:"network"          envconfig:"CARDANO_NETWORK"`
+	SocketPath        string               `yaml:"socketPath"       envconfig:"CARDANO_NODE_SOCKET_PATH"`
+	NetworkMagic      uint32               `yaml:"networkMagic"     envconfig:"CARDANO_NODE_NETWORK_MAGIC"`
+	Port              uint32               `yaml:"port"             envconfig:"CARDANO_PORT"`
+	ShelleyGenesis    ShelleyGenesisConfig `yaml:"shelley"`
+	ShelleyTransEpoch int32                `yaml:"shellyTransEpoch" envconfig:"SHELLEY_TRANS_EPOCH"`
+	BlockProducer     bool                 `yaml:"blockProducer"    envconfig:"CARDANO_BLOCK_PRODUCER"`
 }
 
 type PrometheusConfig struct {
@@ -59,6 +60,12 @@ type ByronGenesisConfig struct {
 	EpochLength uint64 `yaml:"epochLength" envconfig:"BYRON_EPOCH_LENGTH"`
 	K           uint64 `yaml:"k"           envconfig:"BYRON_K"`
 	SlotLength  uint64 `yaml:"slotLength"  envconfig:"BYRON_SLOT_LENGTH"`
+}
+
+type ShelleyGenesisConfig struct {
+	EpochLength       uint64 `yaml:"epochLength"       envconfig:"SHELLEY_EPOCH_LENGTH"`
+	SlotLength        uint64 `yaml:"slotLength"        envconfig:"SHELLEY_SLOT_LENGTH"`
+	SlotsPerKESPeriod uint64 `yaml:"slotsPerKESPeriod" envconfig:"SHELLEY_SLOTS_PER_KES_PERIOD"`
 }
 
 // Singleton config instance with default values
@@ -109,6 +116,10 @@ func LoadConfig(configFile string) (*Config, error) {
 	}
 	// Populate ByronGenesis from named networks
 	if err := globalConfig.populateByronGenesis(); err != nil {
+		return nil, err
+	}
+	// Populate ShelleyGenesis from named networks
+	if err := globalConfig.populateShelleyGenesis(); err != nil {
 		return nil, err
 	}
 	// Populate ShelleyTransEpoch from named networks
@@ -216,5 +227,36 @@ func (c *Config) populateByronGenesis() error {
 		return fmt.Errorf("unable to populate byron genesis config")
 	}
 	c.Node.ByronGenesis.EpochLength = (10 * c.Node.ByronGenesis.K)
+	return nil
+}
+
+// Populates ShelleyGenesisConfig from named networks
+func (c *Config) populateShelleyGenesis() error {
+	if c.Node.ShelleyGenesis.EpochLength != 0 {
+		return nil
+	}
+	// Our slot length is always 1000 in supported networks
+	c.Node.ShelleyGenesis.SlotLength = 1000
+	// Our slots per KES period is always 129600 in supported networks
+	c.Node.ShelleyGenesis.SlotsPerKESPeriod = 129600
+	// Our epoch length is 432000, except sanchonet/preview
+	c.Node.ShelleyGenesis.EpochLength = 432000
+	if c.App.Network != "" {
+		switch c.App.Network {
+		case "sancho":
+			c.Node.ShelleyGenesis.EpochLength = 86400
+		case "preview":
+			c.Node.ShelleyGenesis.EpochLength = 86400
+		}
+	} else if c.Node.Network != "" {
+		switch c.Node.Network {
+		case "sancho":
+			c.Node.ShelleyGenesis.EpochLength = 86400
+		case "preview":
+			c.Node.ShelleyGenesis.EpochLength = 86400
+		}
+	} else {
+		return fmt.Errorf("unable to populate shelley genesis config")
+	}
 	return nil
 }

@@ -131,8 +131,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Set the genesisConfig
-	genesisConfig = getGenesisConfig(cfg)
 	// Determine if we're P2P
 	p2p = getP2P(ctx, processMetrics)
 	// Set role
@@ -490,11 +488,11 @@ var epochItemsLast = 0
 func getEpochProgress() float32 {
 	cfg := config.GetConfig()
 	var epochProgress float32
-	if promMetrics == nil || genesisConfig == nil {
+	if promMetrics == nil {
 		epochProgress = float32(0.0)
 	} else if promMetrics.EpochNum >= uint64(cfg.Node.ShelleyTransEpoch) {
 		epochProgress = float32(
-			(float32(promMetrics.SlotInEpoch) / float32(genesisConfig.EpochLength)) * 100,
+			(float32(promMetrics.SlotInEpoch) / float32(cfg.Node.ShelleyGenesis.EpochLength)) * 100,
 		)
 	} else {
 		epochProgress = float32(
@@ -509,8 +507,6 @@ func getEpochText(ctx context.Context) string {
 
 	epochProgress := getEpochProgress()
 	epochProgress1dec := fmt.Sprintf("%.1f", epochProgress)
-	// TODO: set this calculation
-	// epochTimeLeft := timeLeft(timeUntilNextEpoch())
 
 	sb.WriteString(
 		fmt.Sprintf(
@@ -566,7 +562,7 @@ func getChainText(ctx context.Context) string {
 		len(strconv.FormatUint(promMetrics.MempoolTx, 10)) -
 		len(strconv.FormatUint(mempoolTxKBytes, 10)))
 
-	tipRef := getSlotTipRef(genesisConfig)
+	tipRef := getSlotTipRef()
 	tipDiff := (tipRef - promMetrics.SlotNum)
 
 	// Row 1
@@ -594,7 +590,7 @@ func getChainText(ctx context.Context) string {
 			)+"s[green]",
 			"starting",
 		))
-	} else if tipDiff <= slotInterval(genesisConfig) {
+	} else if tipDiff <= 20 {
 		sb.WriteString(fmt.Sprintf(
 			" Tip (diff) : [white]%-"+strconv.Itoa(9)+"s[green]",
 			fmt.Sprintf("%s 😀", strconv.FormatUint(tipDiff, 10)),
@@ -889,7 +885,7 @@ func getNodeText(ctx context.Context) string {
 		sb.WriteString(fmt.Sprintln())
 	}
 	sb.WriteString(fmt.Sprintf(" [green]Uptime     : [white]%s\n",
-		timeLeft(uptimes),
+		timeFromSeconds(uptimes),
 	))
 	return fmt.Sprint(sb.String())
 }
