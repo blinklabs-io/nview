@@ -22,8 +22,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/blinklabs-io/gouroboros/protocol/localstatequery"
-
 	"github.com/blinklabs-io/nview/internal/config"
 )
 
@@ -67,28 +65,8 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 	return respBodyBytes, resp.StatusCode, nil
 }
 
-// Calculate current KES period from tip ref
-//
-//nolint:unused
-func getCurrentKESPeriod(g *localstatequery.GenesisConfigResult) uint64 {
-	return getSlotTipRef(g) / uint64(g.SlotsPerKESPeriod)
-}
-
-// Calculate epoch from current second
-//
-//nolint:unused
-func getEpoch() uint64 {
-	cfg := config.GetConfig()
-	currentTimeSec := uint64(time.Now().Unix() - 1)
-	byronEndTime := cfg.Node.ByronGenesis.StartTime + ((uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000)
-	result := uint64(
-		cfg.Node.ShelleyTransEpoch,
-	) + ((currentTimeSec - byronEndTime) / cfg.Node.ByronGenesis.EpochLength / cfg.Node.ByronGenesis.SlotLength)
-	return uint64(result)
-}
-
 // Calculate slot number
-func getSlotTipRef(g *localstatequery.GenesisConfigResult) uint64 {
+func getSlotTipRef() uint64 {
 	cfg := config.GetConfig()
 	currentTimeSec := uint64(time.Now().Unix() - 1)
 	byronSlots := uint64(
@@ -98,20 +76,11 @@ func getSlotTipRef(g *localstatequery.GenesisConfigResult) uint64 {
 	if currentTimeSec < byronEndTime {
 		return ((currentTimeSec - cfg.Node.ByronGenesis.StartTime) * 1000) / cfg.Node.ByronGenesis.SlotLength
 	}
-	return byronSlots + ((currentTimeSec - byronEndTime) / uint64(g.SlotLength/1000000))
-}
-
-// Calculate expected interval between blocks
-func slotInterval(g *localstatequery.GenesisConfigResult) uint64 {
-	// g.SlotLength is nanoseconds
-	// 0.05 is g.ActiveSlotsCoeff resolved
-	// 0.5 is decentralisation (removed in babbage... so use default)
-	result := (float64(g.SlotLength/1000000) / 0.05 / 0.5) + 0.5
-	return uint64(result)
+	return byronSlots + ((currentTimeSec - byronEndTime) / uint64(cfg.Node.ShelleyGenesis.SlotLength/1000))
 }
 
 // Time is in seconds
-func timeLeft(t uint64) string {
+func timeFromSeconds(t uint64) string {
 	d := t / 60 / 60 / 24
 	h := math.Mod(float64(t/60/60), 24)
 	m := math.Mod(float64(t/60), 60)
@@ -121,16 +90,4 @@ func timeLeft(t uint64) string {
 		result = fmt.Sprintf("%dd ", d)
 	}
 	return fmt.Sprintf("%s%02d:%02d:%02d", result, int(h), int(m), int(s))
-}
-
-//nolint:unused
-func timeUntilNextEpoch() uint64 {
-	cfg := config.GetConfig()
-	currentTimeSec := uint64(time.Now().Unix() - 1)
-	ste := uint64(cfg.Node.ShelleyTransEpoch)
-	bgel := cfg.Node.ByronGenesis.EpochLength
-	bgsl := cfg.Node.ByronGenesis.SlotLength
-	byronLength := (ste * bgel * bgsl) / 1000
-	result := byronLength + ((getEpoch() + 1 - ste) * bgel * bgsl) - currentTimeSec + cfg.Node.ByronGenesis.StartTime
-	return uint64(result)
 }
