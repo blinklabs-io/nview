@@ -92,5 +92,9 @@ func getGeoIP(ctx context.Context, address string) string {
 			return fmt.Sprintf("%v", record.Country.IsoCode)
 		}
 	}
-	return fmt.Sprintf("%v, %v", record.City.Names["en"], record.Country.IsoCode)
+	return fmt.Sprintf(
+		"%v, %v",
+		record.City.Names["en"],
+		record.Country.IsoCode,
+	)
 }

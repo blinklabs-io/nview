@@ -57,7 +57,8 @@ func getP2P(ctx context.Context, processMetrics *process.Process) bool {
 		}
 		cmd, err := processMetrics.CmdlineWithContext(ctx)
 		if err == nil {
-			if !strings.Contains(cmd, "p2p") && strings.Contains(cmd, "--config") {
+			if !strings.Contains(cmd, "p2p") &&
+				strings.Contains(cmd, "--config") {
 				cmdArray := strings.Split(cmd, " ")
 				for p, arg := range cmdArray {
 					if arg == "--config" {

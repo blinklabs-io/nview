@@ -35,7 +35,8 @@ var scrollPeers bool = false
 
 func filterPeers(ctx context.Context) error {
 	var peers []string
-	if len(peerStats.RTTresultsSlice) != 0 && len(peerStats.RTTresultsSlice) == len(peersFiltered) {
+	if len(peerStats.RTTresultsSlice) != 0 &&
+		len(peerStats.RTTresultsSlice) == len(peersFiltered) {
 		return nil
 	}
 	if processMetrics == nil {
@@ -44,7 +45,11 @@ func filterPeers(ctx context.Context) error {
 	cfg := config.GetConfig()
 
 	// Get process in/out connections
-	connections, err := netutil.ConnectionsPidWithContext(ctx, "tcp", processMetrics.Pid)
+	connections, err := netutil.ConnectionsPidWithContext(
+		ctx,
+		"tcp",
+		processMetrics.Pid,
+	)
 	if err != nil {
 		return err
 	}
@@ -219,7 +224,10 @@ func pingPeers(ctx context.Context) error {
 					UpdatedAt: time.Now(),
 				}
 				peerStats.RTTresultsMap[peerIP] = peer
-				peerStats.RTTresultsSlice = append(peerStats.RTTresultsSlice, peer)
+				peerStats.RTTresultsSlice = append(
+					peerStats.RTTresultsSlice,
+					peer,
+				)
 				sort.Sort(peerStats.RTTresultsSlice)
 			}()
 			wg.Wait()
@@ -227,16 +235,33 @@ func pingPeers(ctx context.Context) error {
 		peerCNTreachable := peerCount - peerStats.CNT0
 		if peerCNTreachable > 0 {
 			peerStats.RTTAVG = peerStats.RTTSUM / peerCNTreachable
-			peerStats.PCT1 = float32(peerStats.CNT1) / float32(peerCNTreachable) * 100
+			peerStats.PCT1 = float32(
+				peerStats.CNT1,
+			) / float32(
+				peerCNTreachable,
+			) * 100
 			peerStats.PCT1items = int(peerStats.PCT1) * granularitySmall / 100
-			peerStats.PCT2 = float32(peerStats.CNT2) / float32(peerCNTreachable) * 100
+			peerStats.PCT2 = float32(
+				peerStats.CNT2,
+			) / float32(
+				peerCNTreachable,
+			) * 100
 			peerStats.PCT2items = int(peerStats.PCT2) * granularitySmall / 100
-			peerStats.PCT3 = float32(peerStats.CNT3) / float32(peerCNTreachable) * 100
+			peerStats.PCT3 = float32(
+				peerStats.CNT3,
+			) / float32(
+				peerCNTreachable,
+			) * 100
 			peerStats.PCT3items = int(peerStats.PCT3) * granularitySmall / 100
-			peerStats.PCT4 = float32(peerStats.CNT4) / float32(peerCNTreachable) * 100
+			peerStats.PCT4 = float32(
+				peerStats.CNT4,
+			) / float32(
+				peerCNTreachable,
+			) * 100
 			peerStats.PCT4items = int(peerStats.PCT4) * granularitySmall / 100
 		}
-		if len(peerStats.RTTresultsSlice) != 0 && len(peerStats.RTTresultsSlice) >= peerCount {
+		if len(peerStats.RTTresultsSlice) != 0 &&
+			len(peerStats.RTTresultsSlice) >= peerCount {
 			checkPeers = false
 			scrollPeers = true
 		}
