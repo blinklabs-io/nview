@@ -3,7 +3,7 @@ module github.com/blinklabs-io/nview
 go 1.21
 
 require (
-	github.com/blinklabs-io/gouroboros v0.89.0
+	github.com/blinklabs-io/gouroboros v0.89.1
 	github.com/gdamore/tcell/v2 v2.7.4
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mikioh/tcp v0.0.0-20190314235350-803a9b46060c
@@ -19,7 +19,7 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/fxamacker/cbor/v2 v2.6.0 // indirect
+	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/gdamore/encoding v1.0.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/jinzhu/copier v0.4.0 // indirect
