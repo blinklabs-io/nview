@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/blinklabs-io/gouroboros"
+	ouroboros "github.com/blinklabs-io/gouroboros"
 	"github.com/kelseyhightower/envconfig"
 	"gopkg.in/yaml.v2"
 )
@@ -138,8 +138,8 @@ func GetConfig() *Config {
 func (c *Config) populateNetworkMagic() error {
 	if c.Node.NetworkMagic == 0 {
 		if c.App.Network != "" {
-			network := ouroboros.NetworkByName(c.App.Network)
-			if network == ouroboros.NetworkInvalid {
+			network, ok := ouroboros.NetworkByName(c.App.Network)
+			if !ok {
 				return fmt.Errorf("unknown network: %s", c.App.Network)
 			}
 			// Set Node's network, networkMagic, port, and socketPath
@@ -149,8 +149,8 @@ func (c *Config) populateNetworkMagic() error {
 			c.Node.SocketPath = "/ipc/node.socket"
 			return nil
 		} else if c.Node.Network != "" {
-			network := ouroboros.NetworkByName(c.Node.Network)
-			if network == ouroboros.NetworkInvalid {
+			network, ok := ouroboros.NetworkByName(c.Node.Network)
+			if !ok {
 				return fmt.Errorf("unknown network: %s", c.Node.Network)
 			}
 			c.Node.NetworkMagic = uint32(network.NetworkMagic)
