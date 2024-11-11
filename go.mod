@@ -15,7 +15,7 @@ require (
 	github.com/prometheus/common v0.60.1
 	github.com/rivo/tview v0.0.0-20230406072732-e22ce9588bb4
 	github.com/shirou/gopsutil/v3 v3.24.5
-	golang.org/x/term v0.25.0
+	golang.org/x/term v0.26.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -42,7 +42,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	golang.org/x/crypto v0.28.0 // indirect
-	golang.org/x/sys v0.26.0 // indirect
+	golang.org/x/sys v0.27.0 // indirect
 	golang.org/x/text v0.19.0 // indirect
 	google.golang.org/protobuf v1.35.1 // indirect
 )
