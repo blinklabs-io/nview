@@ -34,7 +34,7 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 		cfg.Prometheus.Host,
 		cfg.Prometheus.Port,
 	)
-	var respBodyBytes []byte
+	respBodyBytes := []byte{}
 	// Setup request
 	req, err := http.NewRequest(
 		http.MethodGet,
@@ -55,6 +55,11 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return respBodyBytes, http.StatusInternalServerError, err
+	}
+	if resp == nil {
+		return respBodyBytes, http.StatusInternalServerError, fmt.Errorf(
+			"empty response",
+		)
 	}
 	// Read the entire response body and close it to prevent a memory leak
 	respBodyBytes, err = io.ReadAll(resp.Body)
