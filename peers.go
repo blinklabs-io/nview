@@ -87,6 +87,9 @@ func filterPeers(ctx context.Context) error {
 	// Process peersIn
 	for _, peer := range peersIn {
 		p := strings.Split(peer, ":")
+		if p == nil {
+			continue
+		}
 		peerIP := p[0]
 		peerPORT := p[1]
 		if strings.HasPrefix(peerIP, "[") { // IPv6
@@ -100,7 +103,11 @@ func filterPeers(ctx context.Context) error {
 		} else {
 			added := false
 			for i, toCheck := range peers {
-				checkIP := strings.Split(toCheck, ":")[0]
+				checkIPArr := strings.Split(toCheck, ":")
+				if checkIPArr == nil {
+					continue
+				}
+				checkIP := checkIPArr[0]
 				if checkIP == peerIP {
 					if p[2] != "i" {
 						// Remove and re-add as duplex (i+o)
@@ -120,6 +127,9 @@ func filterPeers(ctx context.Context) error {
 	// Process peersOut
 	for _, peer := range peersOut {
 		p := strings.Split(peer, ":")
+		if p == nil {
+			continue
+		}
 		peerIP := p[0]
 		peerPORT := p[1]
 		if strings.HasPrefix(peerIP, "[") { // IPv6
@@ -133,7 +143,11 @@ func filterPeers(ctx context.Context) error {
 		} else {
 			added := false
 			for i, toCheck := range peers {
-				checkIP := strings.Split(toCheck, ":")[0]
+				checkIPArr := strings.Split(toCheck, ":")
+				if checkIPArr == nil {
+					continue
+				}
+				checkIP := checkIPArr[0]
 				if checkIP == peerIP {
 					if p[2] != "o" {
 						// Remove and re-add as duplex (i+o)
@@ -175,6 +189,9 @@ func pingPeers(ctx context.Context) error {
 			go func() {
 				defer wg.Done()
 				peerArr := strings.Split(v, ";")
+				if peerArr == nil {
+					return
+				}
 				peerIP := peerArr[0]
 				peerPORT := peerArr[1]
 				peerDIR := peerArr[2]

@@ -1043,6 +1043,9 @@ func getPeerText(ctx context.Context) string {
 		if strings.Contains(peer.IP, ":") {
 			if len(strings.Split(peer.IP, ":")) > 3 {
 				splitIP := strings.Split(peer.IP, ":")
+				if splitIP == nil {
+					continue
+				}
 				peerIP = fmt.Sprintf("%s...%s:%s",
 					splitIP[0],
 					splitIP[:len(splitIP)-2],
@@ -1223,7 +1226,7 @@ func tcpinfoRtt(address string) int {
 	if err != nil {
 		return result
 	}
-	var q *tcpinfo.Info
+	q := &tcpinfo.Info{}
 	if err := json.Unmarshal(txt, &q); err != nil {
 		result = int(q.RTT.Seconds() * 1000)
 	}

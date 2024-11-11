@@ -1,4 +1,4 @@
-// Copyright 2023 Blink Labs Software
+// Copyright 2024 Blink Labs Software
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,6 +36,9 @@ func getNodeVersion() (version string, revision string, err error) {
 		return "N/A", "N/A", err
 	}
 	strArray := strings.Split(string(stdout), string(' '))
+	if strArray == nil {
+		return "N/A", "N/A", fmt.Errorf("error")
+	}
 	version = strArray[1]
 	revision = strArray[7]
 	if len(revision) > 8 {
