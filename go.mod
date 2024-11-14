@@ -5,7 +5,7 @@ go 1.22
 toolchain go1.22.8
 
 require (
-	github.com/blinklabs-io/gouroboros v0.103.1
+	github.com/blinklabs-io/gouroboros v0.103.6
 	github.com/gdamore/tcell/v2 v2.7.4
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mikioh/tcp v0.0.0-20190314235350-803a9b46060c
@@ -38,11 +38,11 @@ require (
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
-	github.com/utxorpc/go-codegen v0.11.0 // indirect
+	github.com/utxorpc/go-codegen v0.12.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	golang.org/x/crypto v0.28.0 // indirect
+	golang.org/x/crypto v0.29.0 // indirect
 	golang.org/x/sys v0.27.0 // indirect
-	golang.org/x/text v0.19.0 // indirect
+	golang.org/x/text v0.20.0 // indirect
 	google.golang.org/protobuf v1.35.1 // indirect
 )
