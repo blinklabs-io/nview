@@ -11,7 +11,7 @@ require (
 	github.com/oschwald/geoip2-golang v1.11.0
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.61.0
-	github.com/rivo/tview v0.0.0-20241103174730-c76f7879f592
+	github.com/rivo/tview v0.0.0-20241227133733-17b7edb88c57
 	github.com/shirou/gopsutil/v3 v3.24.5
 	golang.org/x/term v0.28.0
 	gopkg.in/yaml.v2 v2.4.0
