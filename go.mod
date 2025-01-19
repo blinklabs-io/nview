@@ -3,7 +3,7 @@ module github.com/blinklabs-io/nview
 go 1.22.11
 
 require (
-	github.com/blinklabs-io/gouroboros v0.106.2
+	github.com/blinklabs-io/gouroboros v0.107.1
 	github.com/gdamore/tcell/v2 v2.8.1
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mikioh/tcp v0.0.0-20190314235350-803a9b46060c
