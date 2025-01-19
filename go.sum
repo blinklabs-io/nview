@@ -1,7 +1,7 @@
 filippo.io/edwards25519 v1.1.0 h1:FNf4tywRC1HmFuKW5xopWpigGjJKiJSV0Cqo0cJWDaA=
 filippo.io/edwards25519 v1.1.0/go.mod h1:BxyFTGdWcka3PhytdK4V28tE5sGfRvvvRV7EaN4VDT4=
-github.com/blinklabs-io/gouroboros v0.106.2 h1:4J87NAdpBvQrkZWNrYs1GOkcDgK5YxdlNvqsEDa/tgM=
-github.com/blinklabs-io/gouroboros v0.106.2/go.mod h1:eXNqQgN88MHZKtNNlmeKtE8xygENLzOsmG2cVSdM9aU=
+github.com/blinklabs-io/gouroboros v0.107.1 h1:BOHByzGwkGCrAkXAxaH3hPiXOPPxyYV1WrB7crJEaUE=
+github.com/blinklabs-io/gouroboros v0.107.1/go.mod h1:Igd/hQ3pIhX3/KRM5js3Jz6CF8M8oKN9aO9d9NR7wGo=
 github.com/blinklabs-io/ouroboros-mock v0.3.5 h1:/KWbSoH8Pjrd9uxOH7mVbI7XFsDCNW/O9FtLlvJDUpQ=
 github.com/blinklabs-io/ouroboros-mock v0.3.5/go.mod h1:JtUQ3Luo22hCnGBxuxNp6JaUx63VxidxWwmcaVMremw=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
