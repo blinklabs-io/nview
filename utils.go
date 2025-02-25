@@ -1,4 +1,4 @@
-// Copyright 2024 Blink Labs Software
+// Copyright 2025 Blink Labs Software
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import (
 
 func getNodeVersion() (version string, revision string, err error) {
 	cfg := config.GetConfig()
-	cmd := exec.Command(cfg.Node.Binary, "version")
+	cmd := exec.Command(cfg.Node.Binary, "version") // #nosec G204
 	stdout, err := cmd.Output()
 	if err != nil {
 		return "N/A", "N/A", err

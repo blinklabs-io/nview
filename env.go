@@ -73,10 +73,14 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 // Calculate slot number
 func getSlotTipRef() uint64 {
 	cfg := config.GetConfig()
+	// Time since epoch is in range
+	// #nosec G115
 	currentTimeSec := uint64(time.Now().Unix() - 1)
+	// #nosec G115
 	byronSlots := uint64(
 		cfg.Node.ShelleyTransEpoch,
 	) * cfg.Node.ByronGenesis.EpochLength
+	// #nosec G115
 	byronEndTime := cfg.Node.ByronGenesis.StartTime + ((uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000)
 	if currentTimeSec < byronEndTime {
 		return ((currentTimeSec - cfg.Node.ByronGenesis.StartTime) * 1000) / cfg.Node.ByronGenesis.SlotLength
