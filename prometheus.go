@@ -1,4 +1,4 @@
-// Copyright 2023 Blink Labs Software
+// Copyright 2025 Blink Labs Software
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,11 +26,11 @@ import (
 )
 
 // Track current epoch
-var currentEpoch uint32 = 0
+var currentEpoch uint64 = 0
 
 func setCurrentEpoch() {
 	if promMetrics != nil {
-		currentEpoch = uint32(promMetrics.EpochNum)
+		currentEpoch = promMetrics.EpochNum
 	}
 }
 

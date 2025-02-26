@@ -478,6 +478,7 @@ func getUptimes(ctx context.Context, processMetrics *process.Process) uint64 {
 		return uptimes
 	}
 	// createTime is milliseconds since UNIX epoch, convert to seconds
+	// #nosec G115
 	uptimes = uint64(time.Now().Unix() - (createTime / 1000))
 	return uptimes
 }
@@ -487,9 +488,13 @@ var epochItemsLast = 0
 
 func getEpochProgress() float32 {
 	cfg := config.GetConfig()
+	if cfg.Node.ShelleyTransEpoch < 0 {
+		return float32(0.0)
+	}
 	var epochProgress float32
 	if promMetrics == nil {
 		epochProgress = float32(0.0)
+		// #nosec G115
 	} else if promMetrics.EpochNum >= uint64(cfg.Node.ShelleyTransEpoch) {
 		epochProgress = float32(
 			(float32(promMetrics.SlotInEpoch) / float32(cfg.Node.ShelleyGenesis.EpochLength)) * 100,
