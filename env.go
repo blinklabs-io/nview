@@ -1,4 +1,4 @@
-// Copyright 2023 Blink Labs Software
+// Copyright 2025 Blink Labs Software
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -57,9 +58,7 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 		return respBodyBytes, http.StatusInternalServerError, err
 	}
 	if resp == nil {
-		return respBodyBytes, http.StatusInternalServerError, fmt.Errorf(
-			"empty response",
-		)
+		return respBodyBytes, http.StatusInternalServerError, errors.New("empty response")
 	}
 	// Read the entire response body and close it to prevent a memory leak
 	respBodyBytes, err = io.ReadAll(resp.Body)
