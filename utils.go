@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"net"
 	"os/exec"
@@ -37,7 +38,7 @@ func getNodeVersion() (version string, revision string, err error) {
 	}
 	strArray := strings.Split(string(stdout), string(' '))
 	if strArray == nil {
-		return "N/A", "N/A", fmt.Errorf("error")
+		return "N/A", "N/A", errors.New("error")
 	}
 	version = strArray[1]
 	revision = strArray[7]
@@ -92,7 +93,7 @@ func getGeoIP(ctx context.Context, address string) string {
 		if len(record.Country.IsoCode) == 0 {
 			return "---"
 		} else {
-			return fmt.Sprintf("%v", record.Country.IsoCode)
+			return record.Country.IsoCode
 		}
 	}
 	return fmt.Sprintf(

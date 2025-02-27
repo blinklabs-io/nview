@@ -1,4 +1,4 @@
-// Copyright 2023 Blink Labs Software
+// Copyright 2025 Blink Labs Software
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ package config
 
 import (
 	"fmt"
+	"errors"
 	"os"
 
 	ouroboros "github.com/blinklabs-io/gouroboros"
@@ -156,7 +157,7 @@ func (c *Config) populateNetworkMagic() error {
 			c.Node.NetworkMagic = uint32(network.NetworkMagic)
 			return nil
 		} else {
-			return fmt.Errorf("unable to set network magic")
+			return errors.New("unable to set network magic")
 		}
 	}
 	return nil
@@ -183,7 +184,7 @@ func (c *Config) populateShelleyTransEpoch() error {
 			c.Node.ShelleyTransEpoch = 208
 		}
 	} else {
-		return fmt.Errorf("unable to populate shelley transition epoch")
+		return errors.New("unable to populate shelley transition epoch")
 	}
 	return nil
 }
@@ -224,7 +225,7 @@ func (c *Config) populateByronGenesis() error {
 			c.Node.ByronGenesis.StartTime = 1506203091
 		}
 	} else {
-		return fmt.Errorf("unable to populate byron genesis config")
+		return errors.New("unable to populate byron genesis config")
 	}
 	c.Node.ByronGenesis.EpochLength = (10 * c.Node.ByronGenesis.K)
 	return nil
@@ -256,7 +257,7 @@ func (c *Config) populateShelleyGenesis() error {
 			c.Node.ShelleyGenesis.EpochLength = 86400
 		}
 	} else {
-		return fmt.Errorf("unable to populate shelley genesis config")
+		return errors.New("unable to populate shelley genesis config")
 	}
 	return nil
 }
