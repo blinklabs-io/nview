@@ -96,11 +96,11 @@ func LoadConfig(configFile string) (*Config, error) {
 	if configFile != "" {
 		buf, err := os.ReadFile(configFile)
 		if err != nil {
-			return nil, fmt.Errorf("error reading config file: %s", err)
+			return nil, fmt.Errorf("error reading config file: %w", err)
 		}
 		err = yaml.Unmarshal(buf, globalConfig)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing config file: %s", err)
+			return nil, fmt.Errorf("error parsing config file: %w", err)
 		}
 	}
 	// Load config values from environment variables
@@ -108,7 +108,7 @@ func LoadConfig(configFile string) (*Config, error) {
 	// vars that we hadn't explicitly specified in annotations above
 	err := envconfig.Process("dummy", globalConfig)
 	if err != nil {
-		return nil, fmt.Errorf("error processing environment: %s", err)
+		return nil, fmt.Errorf("error processing environment: %w", err)
 	}
 	// Populate NetworkMagic from named networks
 	if err := globalConfig.populateNetworkMagic(); err != nil {

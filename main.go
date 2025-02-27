@@ -1167,16 +1167,16 @@ func getProcessMetrics(ctx context.Context) (*process.Process, error) {
 	r, _ := process.NewProcessWithContext(ctx, 0)
 	processes, err := process.ProcessesWithContext(ctx)
 	if err != nil {
-		return r, fmt.Errorf("failed to get processes: %s", err)
+		return r, fmt.Errorf("failed to get processes: %w", err)
 	}
 	for _, p := range processes {
 		n, err := p.NameWithContext(ctx)
 		if err != nil {
-			return r, fmt.Errorf("failed to get process name: %s", err)
+			return r, fmt.Errorf("failed to get process name: %w", err)
 		}
 		c, err := p.CmdlineWithContext(ctx)
 		if err != nil {
-			return r, fmt.Errorf("failed to get process cmdline: %s", err)
+			return r, fmt.Errorf("failed to get process cmdline: %w", err)
 		}
 		if strings.Contains(n, cfg.Node.Binary) &&
 			strings.Contains(c, strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
