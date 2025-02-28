@@ -15,8 +15,8 @@
 package config
 
 import (
-	"fmt"
 	"errors"
+	"fmt"
 	"os"
 
 	ouroboros "github.com/blinklabs-io/gouroboros"
