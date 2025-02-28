@@ -544,14 +544,14 @@ func getEpochText(ctx context.Context) string {
 		epochItemsLast = epochItems
 		for i := 0; i <= granularity-1; i++ {
 			if i < epochItems {
-				epochBar += fmt.Sprintf("[blue]%s", charMarked)
+				epochBar += "[blue]" + charMarked
 			} else {
-				epochBar += fmt.Sprintf("[white]%s", charUnmarked)
+				epochBar += "[white]" + charUnmarked
 			}
 		}
 	}
 	sb.WriteString(fmt.Sprintf(" [blue]%s[green]\n", epochBar))
-	return fmt.Sprint(sb.String())
+	return sb.String()
 }
 
 func getChainText(ctx context.Context) string {
@@ -598,12 +598,12 @@ func getChainText(ctx context.Context) string {
 	} else if tipDiff <= 20 {
 		sb.WriteString(fmt.Sprintf(
 			" Tip (diff) : [white]%-"+strconv.Itoa(9)+"s[green]",
-			fmt.Sprintf("%s 😀", strconv.FormatUint(tipDiff, 10)),
+			strconv.FormatUint(tipDiff, 10)+" 😀",
 		))
 	} else if tipDiff <= 600 {
 		sb.WriteString(fmt.Sprintf(
 			" Tip (diff) : [yellow]%-"+strconv.Itoa(9)+"s[green]",
-			fmt.Sprintf("%s 😐", strconv.FormatUint(tipDiff, 10)),
+			strconv.FormatUint(tipDiff, 10)+" 😐",
 		))
 	} else {
 		syncProgress := float32((float32(promMetrics.SlotNum) / float32(tipRef)) * 100)
@@ -631,7 +631,7 @@ func getChainText(ctx context.Context) string {
 		mempoolTxKBytes,
 		"K",
 	))
-	return fmt.Sprint(sb.String())
+	return sb.String()
 }
 
 func getConnectionText(ctx context.Context) string {
@@ -706,7 +706,7 @@ func getConnectionText(ctx context.Context) string {
 			strconv.Itoa(len(peersOut)),
 		))
 	}
-	return fmt.Sprint(sb.String())
+	return sb.String()
 }
 
 func getCoreText(ctx context.Context) string {
@@ -766,7 +766,7 @@ func getCoreText(ctx context.Context) string {
 		))
 	}
 	failCount = 0
-	return fmt.Sprint(sb.String())
+	return sb.String()
 }
 
 func getBlockText(ctx context.Context) string {
@@ -856,7 +856,7 @@ func getBlockText(ctx context.Context) string {
 	)
 
 	failCount = 0
-	return fmt.Sprint(sb.String())
+	return sb.String()
 }
 
 func getNodeText(ctx context.Context) string {
@@ -892,7 +892,7 @@ func getNodeText(ctx context.Context) string {
 	sb.WriteString(fmt.Sprintf(" [green]Uptime     : [white]%s\n",
 		timeFromSeconds(uptimes),
 	))
-	return fmt.Sprint(sb.String())
+	return sb.String()
 }
 
 func getPeerText(ctx context.Context) string {
@@ -942,9 +942,9 @@ func getPeerText(ctx context.Context) string {
 	))
 	for i := 0; i < granularitySmall; i++ {
 		if i < int(peerStats.PCT1) {
-			sb.WriteString(fmt.Sprintf("[green]%s", charMarked))
+			sb.WriteString("[green]" + charMarked)
 		} else {
-			sb.WriteString(fmt.Sprintf("[white]%s", charUnmarked))
+			sb.WriteString("[white]" + charUnmarked)
 		}
 	}
 	sb.WriteString("[white]\n") // closeRow
@@ -959,9 +959,9 @@ func getPeerText(ctx context.Context) string {
 	))
 	for i := 0; i < granularitySmall; i++ {
 		if i < int(peerStats.PCT2) {
-			sb.WriteString(fmt.Sprintf("[yellow]%s", charMarked))
+			sb.WriteString("[yellow]" + charMarked)
 		} else {
-			sb.WriteString(fmt.Sprintf("[white]%s", charUnmarked))
+			sb.WriteString("[white]" + charUnmarked)
 		}
 	}
 	sb.WriteString("[white]\n") // closeRow
@@ -976,9 +976,9 @@ func getPeerText(ctx context.Context) string {
 	))
 	for i := 0; i < granularitySmall; i++ {
 		if i < int(peerStats.PCT3) {
-			sb.WriteString(fmt.Sprintf("[red]%s", charMarked))
+			sb.WriteString("[red]" + charMarked)
 		} else {
-			sb.WriteString(fmt.Sprintf("[white]%s", charUnmarked))
+			sb.WriteString("[white]" + charUnmarked)
 		}
 	}
 	sb.WriteString("[white]\n") // closeRow
@@ -993,15 +993,15 @@ func getPeerText(ctx context.Context) string {
 	))
 	for i := 0; i < granularitySmall; i++ {
 		if i < int(peerStats.PCT4) {
-			sb.WriteString(fmt.Sprintf("[fuchsia]%s", charMarked))
+			sb.WriteString("[fuchsia]" + charMarked)
 		} else {
-			sb.WriteString(fmt.Sprintf("[white]%s", charUnmarked))
+			sb.WriteString("[white]" + charUnmarked)
 		}
 	}
 	sb.WriteString("[white]\n") // closeRow
 
 	// Divider
-	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", width-1)))
+	sb.WriteString(strings.Repeat("-", width-1) + "\n")
 
 	sb.WriteString(
 		fmt.Sprintf(
@@ -1033,7 +1033,7 @@ func getPeerText(ctx context.Context) string {
 	}
 
 	// Divider
-	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("-", width-1)))
+	sb.WriteString(strings.Repeat("-", width-1) + "\n")
 
 	sb.WriteString(
 		fmt.Sprintf("   [green]# %24s  I/O RTT   Geolocation\n", "REMOTE PEER"),
@@ -1094,7 +1094,7 @@ func getPeerText(ctx context.Context) string {
 	sb.WriteString("[white]\n")
 
 	failCount = 0
-	return fmt.Sprint(sb.String())
+	return sb.String()
 }
 
 func getResourceText(ctx context.Context) string {
@@ -1159,7 +1159,7 @@ func getResourceText(ctx context.Context) string {
 			strconv.FormatUint(promMetrics.GcMajor, 10),
 		),
 	)
-	return fmt.Sprint(sb.String())
+	return sb.String()
 }
 
 func getProcessMetrics(ctx context.Context) (*process.Process, error) {
