@@ -122,8 +122,12 @@ func prom2json(prom []byte) ([]byte, error) {
 				out[val.GetName()] = m.GetGauge().GetValue()
 			case dto.MetricType_UNTYPED:
 				out[val.GetName()] = m.GetUntyped().GetValue()
+			case dto.MetricType_SUMMARY,
+				dto.MetricType_HISTOGRAM,
+				dto.MetricType_GAUGE_HISTOGRAM:
+				return b, nil
 			default:
-				return b, err
+				return b, nil
 			}
 		}
 	}
