@@ -34,7 +34,7 @@ format: mod-tidy
 golines:
 	golines -w --ignore-generated --chain-split-dots --max-len=80 --reformat-tags .
 
-test: tidy
+test: mod-tidy
 	go test -v -race ./...
 
 # Build our program binaries
