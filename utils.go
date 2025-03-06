@@ -73,7 +73,7 @@ func getPublicIP(ctx context.Context) (net.IP, error) {
 	return nil, nil
 }
 
-// MaxMind database (20240206), available from https://www.maxmind.com
+// MaxMind database, available from https://www.maxmind.com
 //
 //go:embed resources/GeoLite2-City.mmdb
 var MaxmindDB []byte
