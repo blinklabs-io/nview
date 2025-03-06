@@ -58,7 +58,9 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 		return respBodyBytes, http.StatusInternalServerError, err
 	}
 	if resp == nil {
-		return respBodyBytes, http.StatusInternalServerError, errors.New("empty response")
+		return respBodyBytes, http.StatusInternalServerError, errors.New(
+			"empty response",
+		)
 	}
 	// Read the entire response body and close it to prevent a memory leak
 	respBodyBytes, err = io.ReadAll(resp.Body)
