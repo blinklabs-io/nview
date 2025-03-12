@@ -182,9 +182,6 @@ func pingPeers(ctx context.Context) error {
 		for _, v := range peersFiltered {
 			// increment waitgroup counter
 			wg.Add(1)
-			// Avoid re-use of v in all go-routines
-			// https://go.dev/doc/faq#closures_and_goroutines
-			v := v
 
 			go func() {
 				defer wg.Done()
