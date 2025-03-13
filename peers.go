@@ -23,15 +23,16 @@ import (
 	"sync"
 	"time"
 
-	netutil "github.com/shirou/gopsutil/v3/net"
-
 	"github.com/blinklabs-io/nview/internal/config"
+	netutil "github.com/shirou/gopsutil/v3/net"
 )
 
 var peersFiltered []string
 
-var checkPeers bool = true
-var scrollPeers bool = false
+var (
+	checkPeers  bool = true
+	scrollPeers bool = false
+)
 
 func filterPeers(ctx context.Context) error {
 	var peers []string
@@ -329,8 +330,10 @@ type Peer struct {
 	UpdatedAt time.Time
 }
 
-type peerRTTresultsMap map[string]*Peer
-type peerRTTresultsSlice []*Peer
+type (
+	peerRTTresultsMap   map[string]*Peer
+	peerRTTresultsSlice []*Peer
+)
 
 // Len is part of sort.Interface
 func (p peerRTTresultsSlice) Len() int {

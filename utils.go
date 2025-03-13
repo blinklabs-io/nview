@@ -24,9 +24,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/oschwald/geoip2-golang"
-
 	"github.com/blinklabs-io/nview/internal/config"
+	"github.com/oschwald/geoip2-golang"
 )
 
 func getNodeVersion() (version string, revision string, err error) {
