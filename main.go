@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blinklabs-io/nview/internal/config"
+	"github.com/blinklabs-io/nview/internal/version"
 	"github.com/gdamore/tcell/v2"
 	"github.com/mikioh/tcp"
 	"github.com/mikioh/tcpinfo"
@@ -32,9 +34,6 @@ import (
 	netutil "github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
 	terminal "golang.org/x/term"
-
-	"github.com/blinklabs-io/nview/internal/config"
-	"github.com/blinklabs-io/nview/internal/version"
 )
 
 // Global command line flags
@@ -43,8 +42,10 @@ var cmdlineFlags struct {
 }
 
 // Global tview application and pages
-var app = tview.NewApplication()
-var pages = tview.NewPages()
+var (
+	app   = tview.NewApplication()
+	pages = tview.NewPages()
+)
 
 // Main viewport - flexible box
 var flex = tview.NewFlex()
@@ -52,6 +53,7 @@ var flex = tview.NewFlex()
 // Our text views
 var blockTextView = tview.NewTextView().
 	SetDynamicColors(true)
+
 var chainTextView = tview.NewTextView().
 	SetDynamicColors(true).
 	SetTextColor(tcell.ColorGreen).
@@ -59,34 +61,41 @@ var chainTextView = tview.NewTextView().
 		// Redraw the screen on a change
 		app.Draw()
 	})
+
 var connectionTextView = tview.NewTextView().
 	SetDynamicColors(true).
 	SetTextColor(tcell.ColorGreen).
 	SetChangedFunc(func() {
 		app.Draw()
 	})
+
 var coreTextView = tview.NewTextView().
 	SetDynamicColors(true).
 	SetTextColor(tcell.ColorGreen).
 	SetChangedFunc(func() {
 		app.Draw()
 	})
+
 var footerTextView = tview.NewTextView().
 	SetDynamicColors(true).
 	SetTextColor(tcell.ColorGreen)
+
 var headerTextView = tview.NewTextView().
 	SetTextColor(tcell.ColorGreen)
+
 var nodeTextView = tview.NewTextView().
 	SetDynamicColors(true).
 	SetTextColor(tcell.ColorGreen).
 	SetChangedFunc(func() {
 		app.Draw()
 	})
+
 var peerTextView = tview.NewTextView().
 	SetDynamicColors(true).
 	SetChangedFunc(func() {
 		app.Draw()
 	})
+
 var resourceTextView = tview.NewTextView().
 	SetDynamicColors(true).
 	SetTextColor(tcell.ColorGreen).
@@ -775,7 +784,7 @@ func getBlockText(ctx context.Context) string {
 	}
 
 	// Style / UI
-	var width = 71
+	width := 71
 
 	// Get our terminal size
 	tcols, tlines, err := terminal.GetSize(int(os.Stdout.Fd()))
@@ -902,7 +911,7 @@ func getPeerText(ctx context.Context) string {
 	var sb strings.Builder
 
 	// Style / UI
-	var width = 71
+	width := 71
 
 	var charMarked string
 	var charUnmarked string

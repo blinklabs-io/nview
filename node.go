@@ -20,9 +20,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/shirou/gopsutil/v3/process"
-
 	"github.com/blinklabs-io/nview/internal/config"
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 var (
