@@ -2,8 +2,10 @@ module github.com/blinklabs-io/nview
 
 go 1.23.6
 
+toolchain go1.24.1
+
 require (
-	github.com/blinklabs-io/gouroboros v0.114.1
+	github.com/blinklabs-io/gouroboros v0.115.2
 	github.com/gdamore/tcell/v2 v2.8.1
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mikioh/tcp v0.0.0-20190314235350-803a9b46060c
