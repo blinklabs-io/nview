@@ -406,7 +406,7 @@ func main() {
 			if failCount >= cfg.App.Retries {
 				panic(
 					fmt.Errorf(
-						"COULD NOT CONNECT TO A RUNNING INSTANCE, %d FAILED ATTEMPTS IN A ROW!",
+						"COULD NOT CONNECT TO A RUNNING INSTANCE, %d FAILED ATTEMPTS IN A ROW",
 						failCount,
 					),
 				)
@@ -535,7 +535,7 @@ func getEpochText(ctx context.Context) string {
 
 	// Epoch progress bar
 	var epochBar string
-	var granularity int = 68
+	granularity := 68
 	var charMarked string
 	var charUnmarked string
 	// TODO: legacy mode vs new
@@ -728,8 +728,8 @@ func getCoreText(ctx context.Context) string {
 	// Core section
 	if role == "Core" {
 		// TODO: block log functionality
-		var adoptedFmt string = "white"
-		var invalidFmt string = "white"
+		adoptedFmt := "white"
+		invalidFmt := "white"
 		if promMetrics.IsLeader != promMetrics.Adopted {
 			adoptedFmt = "yellow"
 		}
@@ -923,7 +923,7 @@ func getPeerText(ctx context.Context) string {
 		charMarked = string('▌')
 		charUnmarked = string('▖')
 	}
-	var granularity int = 68
+	granularity := 68
 	granularitySmall := granularity / 2
 	if checkPeers {
 		peerCount := len(peersFiltered)
@@ -1113,7 +1113,7 @@ func getResourceText(ctx context.Context) string {
 
 	var sb strings.Builder
 
-	var cpuPercent float64 = 0.0
+	cpuPercent := 0.0
 	var rss uint64 = 0
 	var err error
 	var processMemory *process.MemoryInfoStat
@@ -1217,7 +1217,7 @@ func createRemoteClientConnection(address string) net.Conn {
 }
 
 func tcpinfoRtt(address string) int {
-	var result int = 99999
+	result := 99999
 	// Get a connection and setup our error channels
 	conn, err := net.DialTimeout("tcp", address, 3*time.Second)
 	if err != nil {

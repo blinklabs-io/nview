@@ -80,22 +80,22 @@ func getPromMetrics(ctx context.Context) (*PromMetrics, error) {
 	respBodyBytes, statusCode, err := getNodeMetrics(ctx)
 	if err != nil {
 		failCount++
-		return metrics, fmt.Errorf("Failed getNodeMetrics: %w\n", err)
+		return metrics, fmt.Errorf("failed getNodeMetrics: %w", err)
 	}
 	if statusCode != http.StatusOK {
 		failCount++
-		return metrics, fmt.Errorf("Failed HTTP: %d\n", statusCode)
+		return metrics, fmt.Errorf("failed HTTP: %d", statusCode)
 	}
 
 	b, err := prom2json(respBodyBytes)
 	if err != nil {
 		failCount++
-		return metrics, fmt.Errorf("Failed prom2json: %w\n", err)
+		return metrics, fmt.Errorf("failed prom2json: %w", err)
 	}
 
 	if err := json.Unmarshal(b, &metrics); err != nil {
 		failCount++
-		return metrics, fmt.Errorf("Failed JSON unmarshal: %w\n", err)
+		return metrics, fmt.Errorf("failed JSON unmarshal: %w", err)
 	}
 	failCount = 0
 	return metrics, nil

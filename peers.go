@@ -173,7 +173,7 @@ func filterPeers(ctx context.Context) error {
 
 func pingPeers(ctx context.Context) error {
 	scrollPeers = false
-	var granularity int = 68
+	granularity := 68
 	granularitySmall := granularity / 2
 	if checkPeers {
 		// counters, etc.
