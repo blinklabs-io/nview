@@ -11,7 +11,7 @@ require (
 	github.com/mikioh/tcp v0.0.0-20190314235350-803a9b46060c
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b
 	github.com/oschwald/geoip2-golang v1.11.0
-	github.com/prometheus/client_model v0.6.1
+	github.com/prometheus/client_model v0.6.2
 	github.com/prometheus/common v0.63.0
 	github.com/rivo/tview v0.0.0-20241227133733-17b7edb88c57
 	github.com/shirou/gopsutil/v3 v3.24.5
@@ -45,5 +45,5 @@ require (
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
-	google.golang.org/protobuf v1.36.5 // indirect
+	google.golang.org/protobuf v1.36.6 // indirect
 )
