@@ -949,7 +949,7 @@ func getPeerText(ctx context.Context) string {
 		"%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT1)))+"s",
 		" ",
 	))
-	for i := 0; i < granularitySmall; i++ {
+	for i := range granularitySmall {
 		if i < int(peerStats.PCT1) {
 			sb.WriteString("[green]" + charMarked)
 		} else {
@@ -966,7 +966,7 @@ func getPeerText(ctx context.Context) string {
 		"%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT2)))+"s",
 		"",
 	))
-	for i := 0; i < granularitySmall; i++ {
+	for i := range granularitySmall {
 		if i < int(peerStats.PCT2) {
 			sb.WriteString("[yellow]" + charMarked)
 		} else {
@@ -983,7 +983,7 @@ func getPeerText(ctx context.Context) string {
 		"%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT3)))+"s",
 		"",
 	))
-	for i := 0; i < granularitySmall; i++ {
+	for i := range granularitySmall {
 		if i < int(peerStats.PCT3) {
 			sb.WriteString("[red]" + charMarked)
 		} else {
@@ -1000,7 +1000,7 @@ func getPeerText(ctx context.Context) string {
 		"%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT4)))+"s",
 		"",
 	))
-	for i := 0; i < granularitySmall; i++ {
+	for i := range granularitySmall {
 		if i < int(peerStats.PCT4) {
 			sb.WriteString("[fuchsia]" + charMarked)
 		} else {
