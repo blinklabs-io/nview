@@ -1,4 +1,4 @@
-// Copyright 2024 Blink Labs Software
+// Copyright 2025 Blink Labs Software
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -112,7 +113,7 @@ func filterPeers(ctx context.Context) error {
 				if checkIP == peerIP {
 					if p[2] != "i" {
 						// Remove and re-add as duplex (i+o)
-						peers = append(peers[:i], peers[i+1:]...)
+						peers = slices.Delete(peers, i, i+1)
 						peers = append(peers, fmt.Sprintf("%s;%s;i+o", peerIP, peerPORT))
 						added = true
 						break
@@ -152,7 +153,7 @@ func filterPeers(ctx context.Context) error {
 				if checkIP == peerIP {
 					if p[2] != "o" {
 						// Remove and re-add as duplex (i+o)
-						peers = append(peers[:i], peers[i+1:]...)
+						peers = slices.Delete(peers, i, i+1)
 						peers = append(peers, fmt.Sprintf("%s;%s;i+o", peerIP, peerPORT))
 						added = true
 						break
