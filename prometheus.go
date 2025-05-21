@@ -104,7 +104,7 @@ func getPromMetrics(ctx context.Context) (*PromMetrics, error) {
 // Converts a prometheus http response byte array into a JSON byte array
 func prom2json(prom []byte) ([]byte, error) {
 	// {"name": 0}
-	out := make(map[string]interface{})
+	out := make(map[string]any)
 	b := []byte{}
 	parser := &expfmt.TextParser{}
 	families, err := parser.TextToMetricFamilies(
