@@ -2,7 +2,7 @@ module github.com/blinklabs-io/nview
 
 go 1.23.6
 
-toolchain go1.24.1
+toolchain go1.24.4
 
 require (
 	github.com/blinklabs-io/gouroboros v0.122.0
