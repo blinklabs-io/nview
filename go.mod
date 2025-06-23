@@ -12,7 +12,7 @@ require (
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b
 	github.com/oschwald/geoip2-golang v1.11.0
 	github.com/prometheus/client_model v0.6.2
-	github.com/prometheus/common v0.64.0
+	github.com/prometheus/common v0.65.0
 	github.com/rivo/tview v0.0.0-20241227133733-17b7edb88c57
 	github.com/shirou/gopsutil/v3 v3.24.5
 	golang.org/x/term v0.32.0
