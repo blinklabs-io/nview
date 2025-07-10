@@ -37,7 +37,8 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 	)
 	respBodyBytes := []byte{}
 	// Setup request
-	req, err := http.NewRequest(
+	req, err := http.NewRequestWithContext(
+		ctx,
 		http.MethodGet,
 		url,
 		nil,
