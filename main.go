@@ -1,4 +1,4 @@
-// Copyright 2023 Blink Labs Software
+// Copyright 2025 Blink Labs Software
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -156,6 +156,13 @@ func main() {
 		for {
 			prom, err := getPromMetrics(ctx)
 			if err != nil && prom != nil {
+				failCount++
+				time.Sleep(time.Second * time.Duration(cfg.Prometheus.Refresh))
+				continue
+			} else if prom == nil {
+				if promMetrics == nil {
+					promMetrics = &PromMetrics{}
+				}
 				failCount++
 				time.Sleep(time.Second * time.Duration(cfg.Prometheus.Refresh))
 				continue
