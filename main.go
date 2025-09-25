@@ -1184,7 +1184,6 @@ func getProcessMetrics(ctx context.Context) (*process.Process, error) {
 	} else {
 		return getProcessMetricsByNameAndPort(cfg, ctx)
 	}
-
 }
 
 func getProcessMetricsByPidFile(cfg *config.Config, ctx context.Context) (*process.Process, error) {
@@ -1192,7 +1191,6 @@ func getProcessMetricsByPidFile(cfg *config.Config, ctx context.Context) (*proce
 	if err != nil {
 		return nil, fmt.Errorf("failed to read pid file: %w", err)
 	}
-
 	pidStr := strings.TrimSpace(string(data))
 	pid, err := strconv.Atoi(pidStr)
 	if err != nil {
