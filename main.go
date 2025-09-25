@@ -1239,13 +1239,11 @@ func getProcessMetricsByNameAndPort(cfg *config.Config, ctx context.Context) (*p
 
 		if strings.Contains(n, cfg.Node.Binary) &&
 			strings.Contains(c, strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
-			// TODO: linter thinks r = p here is ineffective, which it's not...
-			//nolint:ineffassign
 			r = p
 		}
 	}
 
-	return nil, fmt.Errorf("process containing binary '%s' and port '%d' not found", cfg.Node.Binary, cfg.Node.Port)
+	return r, nil
 }
 
 //nolint:unused
