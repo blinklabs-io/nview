@@ -1197,11 +1197,12 @@ func getProcessMetricsByPidFile(cfg *config.Config, ctx context.Context) (*proce
 	if err != nil {
 		return nil, fmt.Errorf("invalid pid in pid file: %w", err)
 	}
-
 	if pid <= 0 || pid > math.MaxInt32 {
 		return nil, fmt.Errorf("invalid pid %d: out of int32 range", pid)
 	}
 
+	// the overflow is checked above
+	//nolint:gosec
 	proc, err := process.NewProcessWithContext(ctx, int32(pid))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get process %d: %w", pid, err)
@@ -1220,7 +1221,6 @@ func getProcessMetricsByPidFile(cfg *config.Config, ctx context.Context) (*proce
 }
 
 func getProcessMetricsByNameAndPort(cfg *config.Config, ctx context.Context) (*process.Process, error) {
-	// TODO: assigning `r` here is triggering a golangci-lint failure
 	r, _ := process.NewProcessWithContext(ctx, 0)
 	processes, err := process.ProcessesWithContext(ctx)
 	if err != nil {
@@ -1239,6 +1239,8 @@ func getProcessMetricsByNameAndPort(cfg *config.Config, ctx context.Context) (*p
 
 		if strings.Contains(n, cfg.Node.Binary) &&
 			strings.Contains(c, strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
+			// TODO: linter thinks r = p here is ineffective, which it's not...
+			//nolint:ineffassign
 			r = p
 		}
 	}

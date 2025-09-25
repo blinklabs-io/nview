@@ -21,8 +21,8 @@ node:
   # Name of the node you are running.
   #
   # Valid values are:
-  #   - `cardano-node`
-  #   -  `amaru`
+  # - `cardano-node`
+  # -  `amaru`
   #
   # This can also be set via the CARDANO_NODE_BINARY environment variable
   binary: cardano-node
@@ -61,7 +61,7 @@ node:
 
   # The path to the PID File of your running node
   #
-  # This is only used when the `binary` value is `cardano-node`.
+  # This is only used when the `binary` value is `amaru`.
   # Otherwise it is ignored.
   pidFile:
 
