@@ -1220,6 +1220,7 @@ func getProcessMetricsByPidFile(cfg *config.Config, ctx context.Context) (*proce
 }
 
 func getProcessMetricsByNameAndPort(cfg *config.Config, ctx context.Context) (*process.Process, error) {
+	// TODO: assigning `r` here is triggering a golangci-lint failure
 	r, _ := process.NewProcessWithContext(ctx, 0)
 	processes, err := process.ProcessesWithContext(ctx)
 	if err != nil {
