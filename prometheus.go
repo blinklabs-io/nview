@@ -97,6 +97,8 @@ func getPromMetrics(ctx context.Context) (*PromMetrics, error) {
 		failCount++
 		return metrics, fmt.Errorf("failed JSON unmarshal: %w", err)
 	}
+
+	// panic(string(b))
 	failCount = 0
 	return metrics, nil
 }

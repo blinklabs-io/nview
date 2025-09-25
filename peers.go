@@ -41,6 +41,7 @@ func filterPeers(ctx context.Context) error {
 		len(peerStats.RTTresultsSlice) == len(peersFiltered) {
 		return nil
 	}
+
 	if processMetrics == nil {
 		return nil // TODO: what to do here
 	}
