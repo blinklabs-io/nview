@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"strconv"
@@ -1195,6 +1196,10 @@ func getProcessMetricsByPidFile(cfg *config.Config, ctx context.Context) (*proce
 	pid, err := strconv.Atoi(pidStr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid pid in pid file: %w", err)
+	}
+
+	if pid <= 0 || pid > math.MaxInt32 {
+		return nil, fmt.Errorf("invalid pid %d: out of int32 range", pid)
 	}
 
 	proc, err := process.NewProcessWithContext(ctx, int32(pid))
