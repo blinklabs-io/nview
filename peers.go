@@ -208,6 +208,12 @@ func pingPeers(ctx context.Context) error {
 						return
 					}
 				}
+				if len(peerStats.RTTresultsMap) == 0 {
+					peerStats.RTTresultsMap = make(
+						peerRTTresultsMap,
+						len(peersFiltered),
+					)
+				}
 
 				// Start RTT loop
 				// for tool in ... return peerRTT

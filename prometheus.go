@@ -23,6 +23,7 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
+	"github.com/prometheus/common/model"
 )
 
 // Track current epoch
@@ -108,7 +109,7 @@ func prom2json(prom []byte) ([]byte, error) {
 	// {"name": 0}
 	out := make(map[string]any)
 	b := []byte{}
-	parser := &expfmt.TextParser{}
+	parser := expfmt.NewTextParser(model.UTF8Validation)
 	families, err := parser.TextToMetricFamilies(
 		strings.NewReader(string(prom)),
 	)
