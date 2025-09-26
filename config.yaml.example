@@ -8,7 +8,7 @@ app:
   # This can also be set via the NODE_NAME environment variable
   nodeName: Cardano Node
 
-  # Named Cardano network for cardano-node
+  # Named Cardano network for the node
   #
   # This is a short-cut to select the NetworkMagic and can be used to
   # select mainnet, preprod, preview, or sancho networks.
@@ -18,7 +18,16 @@ app:
   network:
 
 node:
-  # Named Cardano network for cardano-node
+  # Name of the node you are running.
+  #
+  # Valid values are:
+  # - `cardano-node`
+  # -  `amaru`
+  #
+  # This can also be set via the CARDANO_NODE_BINARY environment variable
+  binary: cardano-node
+
+  # Named Cardano network for the node
   #
   # This is a short-cut to select the NetworkMagic and can be used to
   # select mainnet, preprod, preview, or sancho networks.
@@ -26,7 +35,7 @@ node:
   # This can also be set via the CARDANO_NETWORK environment variable
   network: mainnet
 
-  # NetworkMagic for network for cardano-node
+  # NetworkMagic for network for the node
   #
   # This selects the correct network for operation and can be configured to
   # any network, not just the named networks.
@@ -35,29 +44,36 @@ node:
   # variable
   networkMagic:
 
-  # Port for cardano-node
+  # Port for the node
   #
-  # Listening port for cardano-node for NtN communication.
+  # Listening port for the node for NtN communication.
   #
   # This can also be set via the CARDANO_PORT environment variable
   port: 3001
 
-  # Socket path for cardano-node
+  # Socket path for the node
   #
-  # Listening UNIX socket path and file name for cardano-node NtC
+  # Listening UNIX socket path and file name for the node NtC
   # communication.
   #
   # This can also be set via the CARDANO_NODE_SOCKET_PATH environment variable
   socketPath:
 
+  # The path to the PID File of your running node
+  #
+  # This is only used when the `binary` value is `amaru`.
+  # Otherwise it is ignored.
+  pidFile:
+
+
 prometheus:
-  # host/port for cardano-node Prometheus metrics
+  # host/port for the node Prometheus metrics
   #
   # These can also be set via the PROM_HOST and PROM_PORT environment variables
   host: 127.0.0.1
   port: 12798
 
-  # Timeout for connections to cardano-node
+  # Timeout for connections to the node
   #
   # This can also be set via the PROM_TIMEOUT environment variable
   timeout: 3

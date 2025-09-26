@@ -15,3 +15,5 @@
 # vendor/
 
 nview
+
+config.yaml

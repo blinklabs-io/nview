@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"strconv"
@@ -34,6 +35,11 @@ import (
 	netutil "github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
 	terminal "golang.org/x/term"
+)
+
+const (
+	CARADNO_NODE_BINARY = "cardano-node"
+	AMARU_BINARY        = "amaru"
 )
 
 // Global command line flags
@@ -1180,6 +1186,48 @@ func getResourceText(ctx context.Context) string {
 
 func getProcessMetrics(ctx context.Context) (*process.Process, error) {
 	cfg := config.GetConfig()
+
+	if cfg.Node.Binary == AMARU_BINARY {
+		return getProcessMetricsByPidFile(cfg, ctx)
+	} else {
+		return getProcessMetricsByNameAndPort(cfg, ctx)
+	}
+}
+
+func getProcessMetricsByPidFile(cfg *config.Config, ctx context.Context) (*process.Process, error) {
+	data, err := os.ReadFile(cfg.Node.PidFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read pid file: %w", err)
+	}
+	pidStr := strings.TrimSpace(string(data))
+	pid, err := strconv.Atoi(pidStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pid in pid file: %w", err)
+	}
+	if pid <= 0 || pid > math.MaxInt32 {
+		return nil, fmt.Errorf("invalid pid %d: out of int32 range", pid)
+	}
+
+	// the overflow is checked above
+	//nolint:gosec
+	proc, err := process.NewProcessWithContext(ctx, int32(pid))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get process %d: %w", pid, err)
+	}
+
+	exists, err := proc.IsRunning()
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if process %d is running: %w", pid, err)
+	}
+
+	if !exists {
+		return nil, fmt.Errorf("process %d is not running", pid)
+	}
+
+	return proc, nil
+}
+
+func getProcessMetricsByNameAndPort(cfg *config.Config, ctx context.Context) (*process.Process, error) {
 	r, _ := process.NewProcessWithContext(ctx, 0)
 	processes, err := process.ProcessesWithContext(ctx)
 	if err != nil {
@@ -1188,17 +1236,20 @@ func getProcessMetrics(ctx context.Context) (*process.Process, error) {
 	for _, p := range processes {
 		n, err := p.NameWithContext(ctx)
 		if err != nil {
-			return r, fmt.Errorf("failed to get process name: %w", err)
+			continue
 		}
+
 		c, err := p.CmdlineWithContext(ctx)
 		if err != nil {
-			return r, fmt.Errorf("failed to get process cmdline: %w", err)
+			continue
 		}
+
 		if strings.Contains(n, cfg.Node.Binary) &&
 			strings.Contains(c, strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
 			r = p
 		}
 	}
+
 	return r, nil
 }
 
