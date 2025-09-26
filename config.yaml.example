@@ -21,8 +21,9 @@ node:
   # Name of the node you are running.
   #
   # Valid values are:
+  # - `amaru`
   # - `cardano-node`
-  # -  `amaru`
+  # - `dingo`
   #
   # This can also be set via the CARDANO_NODE_BINARY environment variable
   binary: cardano-node
@@ -59,12 +60,13 @@ node:
   # This can also be set via the CARDANO_NODE_SOCKET_PATH environment variable
   socketPath:
 
-  # The path to the PID File of your running node
+  # Path to the PID file for the node
   #
   # This is only used when the `binary` value is `amaru`.
   # Otherwise it is ignored.
+  #
+  # This can also be set via the CARDANO_NODE_PID_FILE environment variable
   pidFile:
-
 
 prometheus:
   # host/port for the node Prometheus metrics

@@ -38,8 +38,9 @@ import (
 )
 
 const (
-	CARADNO_NODE_BINARY = "cardano-node"
 	AMARU_BINARY        = "amaru"
+	CARDANO_NODE_BINARY = "cardano-node"
+	DINGO_BINARY        = "dingo"
 )
 
 // Global command line flags
@@ -1187,14 +1188,45 @@ func getResourceText(ctx context.Context) string {
 func getProcessMetrics(ctx context.Context) (*process.Process, error) {
 	cfg := config.GetConfig()
 
-	if cfg.Node.Binary == AMARU_BINARY {
-		return getProcessMetricsByPidFile(cfg, ctx)
-	} else {
-		return getProcessMetricsByNameAndPort(cfg, ctx)
+	switch cfg.Node.Binary {
+	case AMARU_BINARY:
+		return getProcessMetricsByPidFile(ctx, cfg)
+	case DINGO_BINARY:
+		return getProcessMetricsByPid(ctx, 1)
+	default:
+		return getProcessMetricsByNameAndPort(ctx, cfg)
 	}
 }
 
-func getProcessMetricsByPidFile(cfg *config.Config, ctx context.Context) (*process.Process, error) {
+func getProcessMetricsByPid(
+	ctx context.Context,
+	pid int32,
+) (*process.Process, error) {
+	proc, err := process.NewProcessWithContext(ctx, pid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get process %d: %w", pid, err)
+	}
+
+	exists, err := proc.IsRunning()
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to check if process %d is running: %w",
+			pid,
+			err,
+		)
+	}
+
+	if !exists {
+		return nil, fmt.Errorf("process %d is not running", pid)
+	}
+
+	return proc, nil
+}
+
+func getProcessMetricsByPidFile(
+	ctx context.Context,
+	cfg *config.Config,
+) (*process.Process, error) {
 	data, err := os.ReadFile(cfg.Node.PidFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read pid file: %w", err)
@@ -1207,8 +1239,6 @@ func getProcessMetricsByPidFile(cfg *config.Config, ctx context.Context) (*proce
 	if pid <= 0 || pid > math.MaxInt32 {
 		return nil, fmt.Errorf("invalid pid %d: out of int32 range", pid)
 	}
-
-	// the overflow is checked above
 	//nolint:gosec
 	proc, err := process.NewProcessWithContext(ctx, int32(pid))
 	if err != nil {
@@ -1217,7 +1247,11 @@ func getProcessMetricsByPidFile(cfg *config.Config, ctx context.Context) (*proce
 
 	exists, err := proc.IsRunning()
 	if err != nil {
-		return nil, fmt.Errorf("failed to check if process %d is running: %w", pid, err)
+		return nil, fmt.Errorf(
+			"failed to check if process %d is running: %w",
+			pid,
+			err,
+		)
 	}
 
 	if !exists {
@@ -1227,7 +1261,10 @@ func getProcessMetricsByPidFile(cfg *config.Config, ctx context.Context) (*proce
 	return proc, nil
 }
 
-func getProcessMetricsByNameAndPort(cfg *config.Config, ctx context.Context) (*process.Process, error) {
+func getProcessMetricsByNameAndPort(
+	ctx context.Context,
+	cfg *config.Config,
+) (*process.Process, error) {
 	r, _ := process.NewProcessWithContext(ctx, 0)
 	processes, err := process.ProcessesWithContext(ctx)
 	if err != nil {
