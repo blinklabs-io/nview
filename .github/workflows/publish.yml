@@ -157,7 +157,7 @@ jobs:
           push-to-registry: true
       # Update Docker Hub from README
       - name: Docker Hub Description
-        uses: peter-evans/dockerhub-description@v4
+        uses: peter-evans/dockerhub-description@v5
         with:
           username: blinklabs
           password: ${{ secrets.DOCKER_PASSWORD }}
