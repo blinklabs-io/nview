@@ -12,7 +12,7 @@ require (
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b
 	github.com/oschwald/geoip2-golang v1.13.0
 	github.com/prometheus/client_model v0.6.2
-	github.com/prometheus/common v0.66.1
+	github.com/prometheus/common v0.67.1
 	github.com/rivo/tview v0.42.0
 	github.com/shirou/gopsutil/v3 v3.24.5
 	golang.org/x/term v0.36.0
@@ -47,9 +47,9 @@ require (
 	github.com/utxorpc/go-codegen v0.17.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	go.yaml.in/yaml/v2 v2.4.2 // indirect
+	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	golang.org/x/crypto v0.42.0 // indirect
 	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
-	google.golang.org/protobuf v1.36.8 // indirect
+	google.golang.org/protobuf v1.36.10 // indirect
 )
