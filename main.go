@@ -548,7 +548,7 @@ func getEpochText(ctx context.Context) string {
 	)
 
 	// Epoch progress bar
-	var epochBar string
+	var epochBar strings.Builder
 	granularity := 68
 	var charMarked string
 	var charUnmarked string
@@ -562,18 +562,17 @@ func getEpochText(ctx context.Context) string {
 	}
 
 	epochItems := int(epochProgress) * granularity / 100
-	if epochBar == "" || epochItems != epochItemsLast {
-		epochBar = ""
+	if epochItems != epochItemsLast {
 		epochItemsLast = epochItems
 		for i := 0; i <= granularity-1; i++ {
 			if i < epochItems {
-				epochBar += "[blue]" + charMarked
+				epochBar.WriteString("[blue]" + charMarked)
 			} else {
-				epochBar += "[white]" + charUnmarked
+				epochBar.WriteString("[white]" + charUnmarked)
 			}
 		}
 	}
-	sb.WriteString(fmt.Sprintf(" [blue]%s[green]\n", epochBar))
+	sb.WriteString(fmt.Sprintf(" [blue]%s[green]\n", epochBar.String()))
 	return sb.String()
 }
 
