@@ -52,14 +52,6 @@ node:
   # This can also be set via the CARDANO_PORT environment variable
   port: 3001
 
-  # Socket path for the node
-  #
-  # Listening UNIX socket path and file name for the node NtC
-  # communication.
-  #
-  # This can also be set via the CARDANO_NODE_SOCKET_PATH environment variable
-  socketPath:
-
   # Path to the PID file for the node
   #
   # This is only used when the `binary` value is `amaru`.
