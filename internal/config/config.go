@@ -42,7 +42,6 @@ type NodeConfig struct {
 	Binary            string               `yaml:"binary"           envconfig:"CARDANO_NODE_BINARY"`
 	PidFile           string               `yaml:"pidFile"          envconfig:"CARDANO_NODE_PID_FILE"`
 	Network           string               `yaml:"network"          envconfig:"CARDANO_NETWORK"`
-	SocketPath        string               `yaml:"socketPath"       envconfig:"CARDANO_NODE_SOCKET_PATH"`
 	NetworkMagic      uint32               `yaml:"networkMagic"     envconfig:"CARDANO_NODE_NETWORK_MAGIC"`
 	Port              uint32               `yaml:"port"             envconfig:"CARDANO_PORT"`
 	ShelleyGenesis    ShelleyGenesisConfig `yaml:"shelley"`
@@ -83,7 +82,6 @@ var globalConfig = &Config{
 		Network:           "mainnet",
 		Port:              3001,
 		ShelleyTransEpoch: -1,
-		SocketPath:        "/opt/cardano/ipc/socket",
 	},
 	Prometheus: PrometheusConfig{
 		Host:    "127.0.0.1",
@@ -148,7 +146,6 @@ func (c *Config) populateNetworkMagic() error {
 			c.Node.Network = c.App.Network
 			c.Node.NetworkMagic = uint32(network.NetworkMagic)
 			c.Node.Port = uint32(3001)
-			c.Node.SocketPath = "/ipc/node.socket"
 			return nil
 		} else if c.Node.Network != "" {
 			network, ok := ouroboros.NetworkByName(c.Node.Network)
