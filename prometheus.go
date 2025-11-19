@@ -128,9 +128,11 @@ func prom2json(prom []byte) ([]byte, error) {
 			case dto.MetricType_SUMMARY,
 				dto.MetricType_HISTOGRAM,
 				dto.MetricType_GAUGE_HISTOGRAM:
-				return b, nil
+				// Skip unsupported metric types
+				break
 			default:
-				return b, nil
+				// Skip unknown types
+				break
 			}
 		}
 	}
