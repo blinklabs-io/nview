@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"os"
 
-	ouroboros "github.com/blinklabs-io/gouroboros"
 	"github.com/kelseyhightower/envconfig"
 	"gopkg.in/yaml.v2"
 )
@@ -69,36 +68,42 @@ type ShelleyGenesisConfig struct {
 	SlotsPerKESPeriod uint64 `yaml:"slotsPerKESPeriod" envconfig:"SHELLEY_SLOTS_PER_KES_PERIOD"`
 }
 
-// Singleton config instance with default values
-var globalConfig = &Config{
-	App: AppConfig{
-		NodeName: "Cardano Node",
-		Network:  "",
-		Refresh:  1,
-		Retries:  3,
-	},
-	Node: NodeConfig{
-		Binary:            "cardano-node",
-		Network:           "mainnet",
-		Port:              3001,
-		ShelleyTransEpoch: -1,
-	},
-	Prometheus: PrometheusConfig{
-		Host:    "127.0.0.1",
-		Port:    12798,
-		Refresh: 3,
-		Timeout: 3,
-	},
+// getDefaultConfig returns a new Config instance with default values
+func getDefaultConfig() *Config {
+	return &Config{
+		App: AppConfig{
+			NodeName: "Cardano Node",
+			Network:  "",
+			Refresh:  1,
+			Retries:  3,
+		},
+		Node: NodeConfig{
+			Binary:            "cardano-node",
+			Network:           "mainnet",
+			Port:              3001,
+			ShelleyTransEpoch: -1,
+		},
+		Prometheus: PrometheusConfig{
+			Host:    "127.0.0.1",
+			Port:    12798,
+			Refresh: 3,
+			Timeout: 3,
+		},
+	}
 }
 
+// Singleton config instance with default values
+var globalConfig = getDefaultConfig()
+
 func LoadConfig(configFile string) (*Config, error) {
+	cfg := getDefaultConfig()
 	// Load config file as YAML if provided
 	if configFile != "" {
 		buf, err := os.ReadFile(configFile)
 		if err != nil {
 			return nil, fmt.Errorf("error reading config file: %w", err)
 		}
-		err = yaml.Unmarshal(buf, globalConfig)
+		err = yaml.Unmarshal(buf, cfg)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing config file: %w", err)
 		}
@@ -106,27 +111,29 @@ func LoadConfig(configFile string) (*Config, error) {
 	// Load config values from environment variables
 	// We use "dummy" as the app name here to (mostly) prevent picking up env
 	// vars that we hadn't explicitly specified in annotations above
-	err := envconfig.Process("dummy", globalConfig)
+	err := envconfig.Process("dummy", cfg)
 	if err != nil {
 		return nil, fmt.Errorf("error processing environment: %w", err)
 	}
 	// Populate NetworkMagic from named networks
-	if err := globalConfig.populateNetworkMagic(); err != nil {
+	if err := cfg.populateNetworkMagic(); err != nil {
 		return nil, err
 	}
 	// Populate ByronGenesis from named networks
-	if err := globalConfig.populateByronGenesis(); err != nil {
+	if err := cfg.populateByronGenesis(); err != nil {
 		return nil, err
 	}
 	// Populate ShelleyGenesis from named networks
-	if err := globalConfig.populateShelleyGenesis(); err != nil {
+	if err := cfg.populateShelleyGenesis(); err != nil {
 		return nil, err
 	}
 	// Populate ShelleyTransEpoch from named networks
-	if err := globalConfig.populateShelleyTransEpoch(); err != nil {
+	if err := cfg.populateShelleyTransEpoch(); err != nil {
 		return nil, err
 	}
-	return globalConfig, nil
+	// Update global config for singleton access
+	globalConfig = cfg
+	return cfg, nil
 }
 
 // GetConfig returns the global config instance
@@ -138,24 +145,36 @@ func GetConfig() *Config {
 func (c *Config) populateNetworkMagic() error {
 	if c.Node.NetworkMagic == 0 {
 		if c.App.Network != "" {
-			network, ok := ouroboros.NetworkByName(c.App.Network)
-			if !ok {
-				return fmt.Errorf("unknown network: %s", c.App.Network)
+			switch c.App.Network {
+			case "mainnet":
+				c.Node.NetworkMagic = 764824073
+			case "preprod":
+				c.Node.NetworkMagic = 1
+			case "preview":
+				c.Node.NetworkMagic = 2
+			default:
+				return errors.New("unknown network")
 			}
-			// Set Node's network, networkMagic, port, and socketPath
-			c.Node.Network = c.App.Network
-			c.Node.NetworkMagic = uint32(network.NetworkMagic)
-			c.Node.Port = uint32(3001)
+			c.Node.Port = 3001
 			return nil
 		} else if c.Node.Network != "" {
-			network, ok := ouroboros.NetworkByName(c.Node.Network)
-			if !ok {
-				return fmt.Errorf("unknown network: %s", c.Node.Network)
+			switch c.Node.Network {
+			case "mainnet":
+				c.Node.NetworkMagic = 764824073
+			case "preprod":
+				c.Node.NetworkMagic = 1
+			case "preview":
+				c.Node.NetworkMagic = 2
+			default:
+				return errors.New("unknown network")
 			}
-			c.Node.NetworkMagic = uint32(network.NetworkMagic)
 			return nil
 		} else {
-			return errors.New("unable to set network magic")
+			// Default to mainnet if no network specified
+			c.Node.Network = "mainnet"
+			c.Node.NetworkMagic = 764824073
+			c.Node.Port = 3001
+			return nil
 		}
 	}
 	return nil
