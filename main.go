@@ -24,6 +24,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/blinklabs-io/nview/internal/config"
@@ -38,9 +39,8 @@ import (
 )
 
 const (
-	AMARU_BINARY        = "amaru"
-	CARDANO_NODE_BINARY = "cardano-node"
-	DINGO_BINARY        = "dingo"
+	AMARU_BINARY = "amaru"
+	DINGO_BINARY = "dingo"
 )
 
 // Global command line flags
@@ -117,7 +117,7 @@ var blockText, chainText, coreText, connectionText, nodeText, peerText, resource
 var processMetrics *process.Process
 
 // Track our failures
-var failCount uint32 = 0
+var failCount atomic.Uint32
 
 func main() {
 	// Check if any command line flags are given
@@ -137,7 +137,8 @@ func main() {
 	}
 
 	// Create a background context
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Exit if NODE_NAME is > 19 characters
 	if len([]rune(cfg.App.NodeName)) > 19 {
@@ -161,27 +162,49 @@ func main() {
 	// Fetch data from Prometheus
 	go func() {
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			prom, err := getPromMetrics(ctx)
 			if err != nil && prom != nil {
-				failCount++
-				time.Sleep(time.Second * time.Duration(cfg.Prometheus.Refresh))
+				failCount.Add(1)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second * time.Duration(cfg.Prometheus.Refresh)):
+				}
 				continue
 			} else if prom == nil {
 				if promMetrics == nil {
 					promMetrics = &PromMetrics{}
 				}
-				failCount++
-				time.Sleep(time.Second * time.Duration(cfg.Prometheus.Refresh))
+				failCount.Add(1)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second * time.Duration(cfg.Prometheus.Refresh)):
+				}
 				continue
 			}
 			promMetrics = prom
-			time.Sleep(time.Second * time.Duration(cfg.Prometheus.Refresh))
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second * time.Duration(cfg.Prometheus.Refresh)):
+			}
 		}
 	}()
 
 	// Set Epoch
 	go func() {
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			setCurrentEpoch()
 			if currentEpoch != 0 {
 				time.Sleep(time.Second * 20)
@@ -192,20 +215,38 @@ func main() {
 	// Update Process metrics
 	go func() {
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			proc, err := getProcessMetrics(ctx)
 			if err != nil {
-				failCount++
-				time.Sleep(time.Second * 1)
+				failCount.Add(1)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second * 1):
+				}
 				continue
 			}
 			processMetrics = proc
-			time.Sleep(time.Second * 1)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second * 1):
+			}
 		}
 	}()
 
 	// Set uptimes
 	go func() {
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			uptime := getUptimes(ctx, processMetrics)
 			if uptime != 0 {
 				uptimes = uptime
@@ -217,26 +258,52 @@ func main() {
 	// Filter peers
 	go func() {
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			err := filterPeers(ctx)
 			if err != nil {
-				failCount++
-				time.Sleep(time.Second * 1)
+				failCount.Add(1)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second * 1):
+				}
 				continue
 			}
-			time.Sleep(time.Second * 1)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second * 1):
+			}
 		}
 	}()
 
 	// Ping peers
 	go func() {
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			err := pingPeers(ctx)
 			if err != nil {
-				failCount++
-				time.Sleep(time.Second * 10)
+				failCount.Add(1)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second * 10):
+				}
 				continue
 			}
-			time.Sleep(time.Second * 10)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second * 10):
+			}
 		}
 	}()
 
@@ -417,11 +484,16 @@ func main() {
 	// Start our background refresh timer
 	go func() {
 		for {
-			if failCount >= cfg.App.Retries {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			if failCount.Load() >= cfg.App.Retries {
 				panic(
 					fmt.Errorf(
 						"COULD NOT CONNECT TO A RUNNING INSTANCE, %d FAILED ATTEMPTS IN A ROW",
-						failCount,
+						failCount.Load(),
 					),
 				)
 			}
@@ -480,7 +552,11 @@ func main() {
 					peerTextView.ScrollToBeginning()
 				}
 			}
-			time.Sleep(time.Second * time.Duration(cfg.App.Refresh))
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second * time.Duration(cfg.App.Refresh)):
+			}
 		}
 	}()
 
@@ -519,13 +595,21 @@ func getEpochProgress() float32 {
 		epochProgress = float32(0.0)
 		// #nosec G115
 	} else if promMetrics.EpochNum >= uint64(cfg.Node.ShelleyTransEpoch) {
-		epochProgress = float32(
-			(float32(promMetrics.SlotInEpoch) / float32(cfg.Node.ShelleyGenesis.EpochLength)) * 100,
-		)
+		if cfg.Node.ShelleyGenesis.EpochLength == 0 {
+			epochProgress = 0.0
+		} else {
+			epochProgress = float32(
+				(float32(promMetrics.SlotInEpoch) / float32(cfg.Node.ShelleyGenesis.EpochLength)) * 100,
+			)
+		}
 	} else {
-		epochProgress = float32(
-			(float32(promMetrics.SlotInEpoch) / float32(cfg.Node.ByronGenesis.EpochLength)) * 100,
-		)
+		if cfg.Node.ByronGenesis.EpochLength == 0 {
+			epochProgress = 0.0
+		} else {
+			epochProgress = float32(
+				(float32(promMetrics.SlotInEpoch) / float32(cfg.Node.ByronGenesis.EpochLength)) * 100,
+			)
+		}
 	}
 	return epochProgress
 }
@@ -590,7 +674,12 @@ func getChainText(ctx context.Context) string {
 		len(strconv.FormatUint(mempoolTxKBytes, 10)))
 
 	tipRef := getSlotTipRef()
-	tipDiff := (tipRef - promMetrics.SlotNum)
+	var tipDiff uint64
+	if tipRef < promMetrics.SlotNum {
+		tipDiff = 0
+	} else {
+		tipDiff = tipRef - promMetrics.SlotNum
+	}
 
 	// Row 1
 	sb.WriteString(fmt.Sprintf(
@@ -628,7 +717,12 @@ func getChainText(ctx context.Context) string {
 			strconv.FormatUint(tipDiff, 10)+" 😐",
 		))
 	} else {
-		syncProgress := float32((float32(promMetrics.SlotNum) / float32(tipRef)) * 100)
+		var syncProgress float32
+		if tipRef == 0 {
+			syncProgress = 0.0
+		} else {
+			syncProgress = float32((float32(promMetrics.SlotNum) / float32(tipRef)) * 100)
+		}
 		sb.WriteString(fmt.Sprintf(
 			" Syncing    : [yellow]%-"+strconv.Itoa(10)+"s[green]",
 			fmt.Sprintf("%2.1f", syncProgress),
@@ -787,7 +881,7 @@ func getCoreText(ctx context.Context) string {
 			"N/A",
 		))
 	}
-	failCount = 0
+	failCount.Store(0)
 	return sb.String()
 }
 
@@ -802,7 +896,7 @@ func getBlockText(ctx context.Context) string {
 	// Get our terminal size
 	tcols, tlines, err := terminal.GetSize(int(os.Stdout.Fd()))
 	if err != nil {
-		failCount++
+		failCount.Add(1)
 		return fmt.Sprintf("ERROR: %v", err)
 	}
 	// Validate size
@@ -877,7 +971,7 @@ func getBlockText(ctx context.Context) string {
 		),
 	)
 
-	failCount = 0
+	failCount.Store(0)
 	return sb.String()
 }
 
@@ -1115,7 +1209,7 @@ func getPeerText(ctx context.Context) string {
 	}
 	sb.WriteString("[white]\n")
 
-	failCount = 0
+	failCount.Store(0)
 	return sb.String()
 }
 
@@ -1133,12 +1227,12 @@ func getResourceText(ctx context.Context) string {
 	if processMetrics != nil && processMetrics.Pid != 0 {
 		cpuPercent, err = processMetrics.CPUPercentWithContext(ctx)
 		if err != nil {
-			failCount++
+			failCount.Add(1)
 			return fmt.Sprintf("cannot parse CPU usage: %s", err)
 		}
 		processMemory, err = processMetrics.MemoryInfoWithContext(ctx)
 		if err != nil {
-			failCount++
+			failCount.Add(1)
 			return fmt.Sprintf("cannot parse memory usage: %s", err)
 		}
 		rss = processMemory.RSS
@@ -1320,6 +1414,7 @@ func tcpinfoRtt(address string) int {
 	if conn == nil {
 		return result
 	}
+	defer conn.Close()
 	tc, err := tcp.NewConn(conn)
 	if err != nil {
 		return result
@@ -1336,7 +1431,8 @@ func tcpinfoRtt(address string) int {
 	}
 	q := &tcpinfo.Info{}
 	if err := json.Unmarshal(txt, &q); err != nil {
-		result = int(q.RTT.Seconds() * 1000)
+		return result
 	}
+	result = int(q.RTT.Seconds() * 1000)
 	return result
 }

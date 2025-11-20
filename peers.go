@@ -83,7 +83,7 @@ func filterPeers(ctx context.Context) error {
 
 	// Skip everything if we have no peers
 	if len(peersIn) == 0 && len(peersOut) == 0 {
-		failCount = 0
+		failCount.Store(0)
 		return nil
 	}
 
@@ -295,7 +295,7 @@ func pingPeers(ctx context.Context) error {
 			scrollPeers = true
 		}
 	}
-	failCount = 0
+	failCount.Store(0)
 	return nil
 }
 
