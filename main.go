@@ -207,7 +207,11 @@ func main() {
 			}
 			setCurrentEpoch()
 			if currentEpoch != 0 {
-				time.Sleep(time.Second * 20)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second * 20):
+				}
 			}
 		}
 	}()
@@ -251,7 +255,11 @@ func main() {
 			if uptime != 0 {
 				uptimes = uptime
 			}
-			time.Sleep(time.Second * 1)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second * 1):
+			}
 		}
 	}()
 
