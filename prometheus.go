@@ -129,10 +129,8 @@ func prom2json(prom []byte) ([]byte, error) {
 				dto.MetricType_HISTOGRAM,
 				dto.MetricType_GAUGE_HISTOGRAM:
 				// Skip unsupported metric types
-				break
 			default:
 				// Skip unknown types
-				break
 			}
 		}
 	}

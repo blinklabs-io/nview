@@ -1383,27 +1383,6 @@ func getProcessMetricsByNameAndPort(
 	return r, nil
 }
 
-//nolint:unused
-func createRemoteClientConnection(address string) net.Conn {
-	var err error
-	var conn net.Conn
-	var dialProto string
-	var dialAddress string
-	if address != "" {
-		dialProto = "tcp"
-		dialAddress = address
-	} else {
-		return conn
-	}
-
-	conn, err = net.DialTimeout(dialProto, dialAddress, 10*time.Second)
-	if err != nil {
-		fmt.Printf("ERROR: %s\n", err)
-		os.Exit(1)
-	}
-	return conn
-}
-
 func tcpinfoRtt(address string) int {
 	result := 99999
 	// Get a connection and setup our error channels
