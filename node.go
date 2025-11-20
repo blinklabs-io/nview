@@ -44,6 +44,13 @@ func setRole() {
 
 func getP2P(ctx context.Context, processMetrics *process.Process) bool {
 	cfg := config.GetConfig()
+
+	// Dingo and Amaru are always P2P
+	bin := getEffectiveNodeBinary()
+	if bin == DINGO_BINARY || bin == AMARU_BINARY {
+		return true
+	}
+
 	if cfg.Node.Network == "mainnet" {
 		if processMetrics == nil {
 			return p2p

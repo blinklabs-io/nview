@@ -39,8 +39,34 @@ import (
 )
 
 const (
-	AMARU_BINARY = "amaru"
-	DINGO_BINARY = "dingo"
+	AMARU_BINARY   = "amaru"
+	DINGO_BINARY   = "dingo"
+	CARDANO_BINARY = "cardano-node"
+
+	// Default node names
+	DefaultNodeName = "Cardano Node"
+	DingoNodeName   = "Dingo"
+	AmaruNodeName   = "Amaru"
+
+	// Conversion constants
+	BytesInGigabyte       = 1073741824
+	MillisecondsToSeconds = 1000
+
+	// RTT thresholds in milliseconds
+	RTTThreshold1 = 50  // 0-50ms: good
+	RTTThreshold2 = 100 // 50-100ms: acceptable
+	RTTThreshold3 = 200 // 100-200ms: slow
+
+	// Sync status thresholds (slot difference)
+	SyncThresholdGood = 20  // Within 20 slots: good sync
+	SyncThresholdSlow = 600 // Within 600 slots: slow sync
+
+	// Peer RTT sentinel values
+	RTTUnreachable = 99999 // Sentinel value for unreachable peers
+
+	// UI layout constants
+	TerminalWidthDefault   = 71
+	ProgressBarGranularity = 68
 )
 
 // Global command line flags
@@ -141,7 +167,7 @@ func main() {
 	defer cancel()
 
 	// Exit if NODE_NAME is > 19 characters
-	if len([]rune(cfg.App.NodeName)) > 19 {
+	if len([]rune(getEffectiveNodeName())) > 19 {
 		fmt.Println(
 			"Please keep node name at or below 19 characters in length!",
 		)
@@ -577,8 +603,14 @@ func getUptimes(ctx context.Context, processMetrics *process.Process) uint64 {
 		return uptimes
 	}
 	// createTime is milliseconds since UNIX epoch, convert to seconds
-	// #nosec G115
-	uptimes = uint64(time.Now().Unix() - (createTime / 1000))
+	createTimeSeconds := createTime / MillisecondsToSeconds
+	currentTimeSeconds := time.Now().Unix()
+	if currentTimeSeconds > createTimeSeconds {
+		// #nosec G115 - Safe subtraction: currentTimeSeconds > createTimeSeconds prevents negative result
+		uptimes = uint64(currentTimeSeconds - createTimeSeconds)
+	} else {
+		uptimes = 0 // Handle clock skew by showing 0 uptime
+	}
 	return uptimes
 }
 
@@ -639,7 +671,7 @@ func getEpochText(ctx context.Context) string {
 
 	// Epoch progress bar
 	var epochBar strings.Builder
-	granularity := 68
+	granularity := ProgressBarGranularity
 	var charMarked string
 	var charUnmarked string
 	// TODO: legacy mode vs new
@@ -718,12 +750,12 @@ func getChainText(ctx context.Context) string {
 			)+"s[green]",
 			"starting",
 		))
-	} else if tipDiff <= 20 {
+	} else if tipDiff <= SyncThresholdGood {
 		sb.WriteString(fmt.Sprintf(
 			" Tip (diff) : [white]%-"+strconv.Itoa(9)+"s[green]",
 			strconv.FormatUint(tipDiff, 10)+" 😀",
 		))
-	} else if tipDiff <= 600 {
+	} else if tipDiff <= SyncThresholdSlow {
 		sb.WriteString(fmt.Sprintf(
 			" Tip (diff) : [yellow]%-"+strconv.Itoa(9)+"s[green]",
 			strconv.FormatUint(tipDiff, 10)+" 😐",
@@ -915,7 +947,7 @@ func getBlockText(ctx context.Context) string {
 	}
 
 	// Style / UI
-	width := 71
+	width := TerminalWidthDefault
 
 	// Get our terminal size
 	tcols, tlines, err := terminal.GetSize(int(os.Stdout.Fd()))
@@ -1016,7 +1048,7 @@ func getNodeText(ctx context.Context) string {
 	nodeVersion, nodeRevision, _ := getNodeVersion()
 	var sb strings.Builder
 	sb.WriteString(
-		fmt.Sprintf(" [green]Name       : [white]%s\n", cfg.App.NodeName),
+		fmt.Sprintf(" [green]Name       : [white]%s\n", getEffectiveNodeName()),
 	)
 	sb.WriteString(fmt.Sprintf(" [green]Role       : [white]%s\n", role))
 	sb.WriteString(fmt.Sprintf(" [green]Network    : [white]%s\n", network))
@@ -1028,6 +1060,12 @@ func getNodeText(ctx context.Context) string {
 			nodeRevision,
 		),
 	))
+	sb.WriteString(
+		fmt.Sprintf(
+			" [green]Binary     : [white]%s\n",
+			getEffectiveNodeBinary(),
+		),
+	)
 	if publicIP != nil {
 		sb.WriteString(
 			fmt.Sprintf(" [green]Public IP  : [white]%s\n", publicIP),
@@ -1054,7 +1092,7 @@ func getPeerText(ctx context.Context) string {
 	var sb strings.Builder
 
 	// Style / UI
-	width := 71
+	width := TerminalWidthDefault
 
 	var charMarked string
 	var charUnmarked string
@@ -1066,7 +1104,7 @@ func getPeerText(ctx context.Context) string {
 		charMarked = string('▌')
 		charUnmarked = string('▖')
 	}
-	granularity := 68
+	granularity := ProgressBarGranularity
 	granularitySmall := granularity / 2
 	if checkPeers {
 		peerCount := len(peersFiltered)
@@ -1167,16 +1205,16 @@ func getPeerText(ctx context.Context) string {
 		sb.WriteString(fmt.Sprintf("[fuchsia]%d[white]", peerStats.CNT0))
 	}
 	// TODO: figure out spacing here
-	if peerStats.RTTAVG >= 200 {
+	if peerStats.RTTAVG >= RTTThreshold3 {
 		sb.WriteString(
 			fmt.Sprintf(
 				" Average RTT : [fuchsia]%d[white] ms\n",
 				peerStats.RTTAVG,
 			),
 		)
-	} else if peerStats.RTTAVG >= 100 {
+	} else if peerStats.RTTAVG >= RTTThreshold2 {
 		sb.WriteString(fmt.Sprintf(" Average RTT : [red]%d[white] ms\n", peerStats.RTTAVG))
-	} else if peerStats.RTTAVG >= 50 {
+	} else if peerStats.RTTAVG >= RTTThreshold1 {
 		sb.WriteString(fmt.Sprintf(" Average RTT : [yellow]%d[white] ms\n", peerStats.RTTAVG))
 	} else if peerStats.RTTAVG >= 0 {
 		sb.WriteString(fmt.Sprintf(" Average RTT : [green]%d[white] ms\n", peerStats.RTTAVG))
@@ -1214,14 +1252,14 @@ func getPeerText(ctx context.Context) string {
 
 		// Set color
 		color := "fuchsia"
-		if peerRTT < 50 {
+		if peerRTT < RTTThreshold1 {
 			color = "green"
-		} else if peerRTT < 100 {
+		} else if peerRTT < RTTThreshold2 {
 			color = "yellow"
-		} else if peerRTT < 200 {
+		} else if peerRTT < RTTThreshold3 {
 			color = "red"
 		}
-		if peerRTT < 99999 {
+		if peerRTT < RTTUnreachable {
 			sb.WriteString(fmt.Sprintf(
 				" %3d %19s:%-5d %-3s ["+color+"]%-5d[white] %s\n",
 				peerNbr,
@@ -1274,15 +1312,22 @@ func getResourceText(ctx context.Context) string {
 		rss = processMemory.RSS
 	}
 
-	memRss := fmt.Sprintf("%.1f", float64(rss)/float64(1073741824))
-	memLive := fmt.Sprintf(
-		"%.1f",
-		float64(promMetrics.MemLive)/float64(1073741824),
-	)
-	memHeap := fmt.Sprintf(
-		"%.1f",
-		float64(promMetrics.MemHeap)/float64(1073741824),
-	)
+	memRss := fmt.Sprintf("%.1f", float64(rss)/float64(BytesInGigabyte))
+
+	var memLiveStr, memHeapStr string
+	if getEffectiveNodeBinary() == DINGO_BINARY {
+		memLiveStr = fmt.Sprintf(
+			"%.1f",
+			float64(promMetrics.GoHeapInuse)/float64(BytesInGigabyte),
+		)
+		memHeapStr = fmt.Sprintf(
+			"%.1f",
+			float64(promMetrics.GoHeapSys)/float64(BytesInGigabyte),
+		)
+	} else {
+		memLiveStr = fmt.Sprintf("%.1f", float64(promMetrics.MemLive)/float64(BytesInGigabyte))
+		memHeapStr = fmt.Sprintf("%.1f", float64(promMetrics.MemHeap)/float64(BytesInGigabyte))
+	}
 
 	sb.WriteString(
 		fmt.Sprintf(
@@ -1291,24 +1336,33 @@ func getResourceText(ctx context.Context) string {
 		),
 	)
 	sb.WriteString(
-		fmt.Sprintf(" [green]Mem (Live) : [white]%s[blue]G\n", memLive),
+		fmt.Sprintf(" [green]Mem (Live) : [white]%s[blue]G\n", memLiveStr),
 	)
 	sb.WriteString(
 		fmt.Sprintf(" [green]Mem (RSS)  : [white]%s[blue]G\n", memRss),
 	)
 	sb.WriteString(
-		fmt.Sprintf(" [green]Mem (Heap) : [white]%s[blue]G\n", memHeap),
+		fmt.Sprintf(" [green]Mem (Heap) : [white]%s[blue]G\n", memHeapStr),
 	)
+	var gcMinor, gcMajor uint64
+	if getEffectiveNodeBinary() == DINGO_BINARY {
+		gcMinor = 0
+		gcMajor = promMetrics.GoGcCount
+	} else {
+		gcMinor = promMetrics.GcMinor
+		gcMajor = promMetrics.GcMajor
+	}
+
 	sb.WriteString(
 		fmt.Sprintf(
 			" [green]GC Minor   : [white]%s\n",
-			strconv.FormatUint(promMetrics.GcMinor, 10),
+			strconv.FormatUint(gcMinor, 10),
 		),
 	)
 	sb.WriteString(
 		fmt.Sprintf(
 			" [green]GC Major   : [white]%s\n",
-			strconv.FormatUint(promMetrics.GcMajor, 10),
+			strconv.FormatUint(gcMajor, 10),
 		),
 	)
 	return sb.String()
@@ -1317,10 +1371,11 @@ func getResourceText(ctx context.Context) string {
 func getProcessMetrics(ctx context.Context) (*process.Process, error) {
 	cfg := config.GetConfig()
 
-	switch cfg.Node.Binary {
+	switch getEffectiveNodeBinary() {
 	case AMARU_BINARY:
 		return getProcessMetricsByPidFile(ctx, cfg)
 	case DINGO_BINARY:
+		// Dingo is assumed to run as PID 1 in containerized environments
 		return getProcessMetricsByPid(ctx, 1)
 	default:
 		return getProcessMetricsByNameAndPort(ctx, cfg)
@@ -1416,7 +1471,7 @@ func getProcessMetricsByNameAndPort(
 			continue
 		}
 
-		if strings.Contains(n, cfg.Node.Binary) &&
+		if strings.Contains(n, getEffectiveNodeBinary()) &&
 			strings.Contains(c, strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
 			r = p
 		}
@@ -1426,7 +1481,7 @@ func getProcessMetricsByNameAndPort(
 }
 
 func tcpinfoRtt(address string) int {
-	result := 99999
+	result := RTTUnreachable
 	// Get a connection and setup our error channels
 	conn, err := net.DialTimeout("tcp", address, 3*time.Second)
 	if err != nil {

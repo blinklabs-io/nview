@@ -24,20 +24,38 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blinklabs-io/nview/internal/config"
 	"github.com/oschwald/geoip2-golang"
 )
 
 func getNodeVersion() (version string, revision string, err error) {
-	cfg := config.GetConfig()
-	cmd := exec.Command(cfg.Node.Binary, "version") // #nosec G204
+	cmd := exec.Command(getEffectiveNodeBinary(), "version") // #nosec G204
 	stdout, err := cmd.Output()
 	if err != nil {
 		return "N/A", "N/A", err
 	}
-	strArray := strings.Split(string(stdout), string(' '))
-	if strArray == nil {
-		return "N/A", "N/A", errors.New("error")
+	output := strings.TrimSpace(string(stdout))
+
+	// Handle Dingo format: "devel (commit 80ae952)" or "v0.17.0 (commit 1f54020)"
+	if strings.Contains(output, "(commit ") {
+		parts := strings.Split(output, " ")
+		if len(parts) >= 3 {
+			version = parts[0]
+			// Extract commit hash from "(commit XXXXXXX)"
+			commitPart := parts[2]
+			if strings.HasPrefix(commitPart, "(commit") && len(commitPart) > 7 {
+				revision = commitPart[7 : len(commitPart)-1] // Remove "(commit" and ")"
+				if len(revision) > 8 {
+					revision = revision[0:8]
+				}
+				return version, revision, nil
+			}
+		}
+	}
+
+	// Handle cardano-node format (fallback)
+	strArray := strings.Split(output, " ")
+	if len(strArray) < 8 {
+		return "N/A", "N/A", errors.New("unexpected version format")
 	}
 	version = strArray[1]
 	revision = strArray[7]
