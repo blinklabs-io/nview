@@ -78,6 +78,12 @@ func getPublicIP(ctx context.Context) (net.IP, error) {
 var MaxmindDB []byte
 
 func getGeoIP(ctx context.Context, address string) string {
+	select {
+	case <-ctx.Done():
+		return "---"
+	default:
+	}
+
 	db, err := geoip2.FromBytes(MaxmindDB)
 	if err != nil {
 		return "---"

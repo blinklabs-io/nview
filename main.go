@@ -615,6 +615,12 @@ func getEpochProgress() float32 {
 }
 
 func getEpochText(ctx context.Context) string {
+	select {
+	case <-ctx.Done():
+		return ""
+	default:
+	}
+
 	var sb strings.Builder
 
 	epochProgress := getEpochProgress()
@@ -661,6 +667,12 @@ func getEpochText(ctx context.Context) string {
 }
 
 func getChainText(ctx context.Context) string {
+	select {
+	case <-ctx.Done():
+		return ""
+	default:
+	}
+
 	if promMetrics == nil {
 		return chainText
 	}
@@ -826,6 +838,12 @@ func getConnectionText(ctx context.Context) string {
 }
 
 func getCoreText(ctx context.Context) string {
+	select {
+	case <-ctx.Done():
+		return ""
+	default:
+	}
+
 	if promMetrics == nil {
 		return coreText
 	}
@@ -886,6 +904,12 @@ func getCoreText(ctx context.Context) string {
 }
 
 func getBlockText(ctx context.Context) string {
+	select {
+	case <-ctx.Done():
+		return ""
+	default:
+	}
+
 	if promMetrics == nil {
 		return blockText
 	}
@@ -976,6 +1000,12 @@ func getBlockText(ctx context.Context) string {
 }
 
 func getNodeText(ctx context.Context) string {
+	select {
+	case <-ctx.Done():
+		return ""
+	default:
+	}
+
 	cfg := config.GetConfig()
 	var network string
 	if cfg.App.Network != "" {
@@ -1012,6 +1042,12 @@ func getNodeText(ctx context.Context) string {
 }
 
 func getPeerText(ctx context.Context) string {
+	select {
+	case <-ctx.Done():
+		return ""
+	default:
+	}
+
 	if processMetrics == nil {
 		return peerText
 	}
@@ -1320,6 +1356,12 @@ func getProcessMetricsByPidFile(
 	ctx context.Context,
 	cfg *config.Config,
 ) (*process.Process, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	data, err := os.ReadFile(cfg.Node.PidFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read pid file: %w", err)
