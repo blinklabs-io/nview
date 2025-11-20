@@ -180,16 +180,16 @@ func pingPeers(ctx context.Context) error {
 	if checkPeers {
 		// counters, etc.
 		peerCount := len(peersFiltered)
-		var peerRTT int
 		var wg sync.WaitGroup
+		var mu sync.Mutex
 		for _, v := range peersFiltered {
 			// increment waitgroup counter
 			wg.Add(1)
 
-			go func() {
+			go func(v string) {
 				defer wg.Done()
 				peerArr := strings.Split(v, ";")
-				if peerArr == nil {
+				if len(peerArr) < 3 {
 					return
 				}
 				peerIP := peerArr[0]
@@ -199,7 +199,9 @@ func pingPeers(ctx context.Context) error {
 				// Return early if we've been checked recently
 				now := time.Now()
 				expire := now.Add(-600 * time.Second)
+				mu.Lock()
 				existing, ok := peerStats.RTTresultsMap[peerIP]
+				mu.Unlock()
 				if ok {
 					if existing.UpdatedAt.After(expire) && existing.RTT != 0 {
 						return
@@ -208,31 +210,18 @@ func pingPeers(ctx context.Context) error {
 						return
 					}
 				}
+				mu.Lock()
 				if len(peerStats.RTTresultsMap) == 0 {
 					peerStats.RTTresultsMap = make(
 						peerRTTresultsMap,
 						len(peersFiltered),
 					)
 				}
+				mu.Unlock()
 
 				// Start RTT loop
 				// for tool in ... return peerRTT
-				peerRTT = tcpinfoRtt(fmt.Sprintf("%s:%s", peerIP, peerPORT))
-				if peerRTT != 99999 {
-					peerStats.RTTSUM = peerStats.RTTSUM + peerRTT
-				}
-				// Update counters
-				if peerRTT < 50 {
-					peerStats.CNT1 = peerStats.CNT1 + 1
-				} else if peerRTT < 100 {
-					peerStats.CNT2 = peerStats.CNT2 + 1
-				} else if peerRTT < 200 {
-					peerStats.CNT3 = peerStats.CNT3 + 1
-				} else if peerRTT < 99999 {
-					peerStats.CNT4 = peerStats.CNT4 + 1
-				} else {
-					peerStats.CNT0 = peerStats.CNT0 + 1
-				}
+				peerRTT := tcpinfoRtt(fmt.Sprintf("%s:%s", peerIP, peerPORT))
 				peerPort, err := strconv.Atoi(peerPORT)
 				if err != nil {
 					peerPort = 0
@@ -246,15 +235,32 @@ func pingPeers(ctx context.Context) error {
 					Location:  peerLocation,
 					UpdatedAt: time.Now(),
 				}
+				mu.Lock()
+				if peerRTT != 99999 {
+					peerStats.RTTSUM += peerRTT
+				}
+				// Update counters
+				if peerRTT < 50 {
+					peerStats.CNT1++
+				} else if peerRTT < 100 {
+					peerStats.CNT2++
+				} else if peerRTT < 200 {
+					peerStats.CNT3++
+				} else if peerRTT < 99999 {
+					peerStats.CNT4++
+				} else {
+					peerStats.CNT0++
+				}
 				peerStats.RTTresultsMap[peerIP] = peer
 				peerStats.RTTresultsSlice = append(
 					peerStats.RTTresultsSlice,
 					peer,
 				)
 				sort.Sort(peerStats.RTTresultsSlice)
-			}()
-			wg.Wait()
+				mu.Unlock()
+			}(v)
 		}
+		wg.Wait()
 		peerCNTreachable := peerCount - peerStats.CNT0
 		if peerCNTreachable > 0 {
 			peerStats.RTTAVG = peerStats.RTTSUM / peerCNTreachable
