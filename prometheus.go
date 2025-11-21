@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync/atomic"
 
+	"github.com/blinklabs-io/nview/internal/config"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
@@ -28,6 +30,9 @@ import (
 
 // Track current epoch
 var currentEpoch uint64 = 0
+
+// Thread-safe node type detection
+var detectedNodeBinary atomic.Value // stores string
 
 func setCurrentEpoch() {
 	if promMetrics != nil {
@@ -72,6 +77,12 @@ type PromMetrics struct {
 	ConnUniDir          uint64  `json:"cardano_node_metrics_connectionManager_unidirectionalConns"`
 	ConnBiDir           uint64  `json:"cardano_node_metrics_connectionManager_duplexConns"`
 	ConnDuplex          uint64  `json:"cardano_node_metrics_connectionManager_prunableConns"`
+	// Go runtime metrics for Dingo
+	GoMemAlloc  uint64 `json:"go_memstats_alloc_bytes"`
+	GoHeapIdle  uint64 `json:"go_memstats_heap_idle_bytes"`
+	GoHeapInuse uint64 `json:"go_memstats_heap_inuse_bytes"`
+	GoHeapSys   uint64 `json:"go_memstats_heap_sys_bytes"`
+	GoGcCount   uint64 `json:"go_gc_duration_seconds_count"`
 }
 
 // Gets metrics from prometheus and return a PromMetrics instance
@@ -99,12 +110,58 @@ func getPromMetrics(ctx context.Context) (*PromMetrics, error) {
 		return metrics, fmt.Errorf("failed JSON unmarshal: %w", err)
 	}
 
+	// Detect node type based on metrics
+	detectNodeType(metrics)
+
 	// panic(string(b))
 	failCount.Store(0)
 	return metrics, nil
 }
 
-// Converts a prometheus http response byte array into a JSON byte array
+// detectNodeType determines the node binary from metrics (honoring
+// cfg.Node.Binary) and stores the result in detectedNodeBinary
+func detectNodeType(metrics *PromMetrics) {
+	if metrics == nil {
+		return
+	}
+
+	cfg := config.GetConfig()
+	// Don't override if user has already set a binary
+	if cfg.Node.Binary != "" {
+		detectedNodeBinary.Store(cfg.Node.Binary)
+		return
+	}
+
+	if metrics.GoMemAlloc > 0 && metrics.MemLive == 0 {
+		detectedNodeBinary.Store(DINGO_BINARY)
+	} else {
+		detectedNodeBinary.Store(CARDANO_BINARY)
+	}
+}
+
+// getEffectiveNodeBinary returns the detected node binary if available, otherwise the configured one
+func getEffectiveNodeBinary() string {
+	if val := detectedNodeBinary.Load(); val != nil {
+		if s, ok := val.(string); ok && s != "" {
+			return s
+		}
+	}
+	cfg := config.GetConfig()
+	return cfg.Node.Binary
+}
+
+// getEffectiveNodeName returns the appropriate node name based on the detected binary
+func getEffectiveNodeName() string {
+	binary := getEffectiveNodeBinary()
+	cfg := config.GetConfig()
+	if binary == DINGO_BINARY && cfg.App.NodeName == DefaultNodeName {
+		return DingoNodeName
+	}
+	if binary == AMARU_BINARY && cfg.App.NodeName == DefaultNodeName {
+		return AmaruNodeName
+	}
+	return cfg.App.NodeName
+} // Converts a prometheus http response byte array into a JSON byte array
 func prom2json(prom []byte) ([]byte, error) {
 	// {"name": 0}
 	out := make(map[string]any)
@@ -125,8 +182,10 @@ func prom2json(prom []byte) ([]byte, error) {
 				out[val.GetName()] = m.GetGauge().GetValue()
 			case dto.MetricType_UNTYPED:
 				out[val.GetName()] = m.GetUntyped().GetValue()
-			case dto.MetricType_SUMMARY,
-				dto.MetricType_HISTOGRAM,
+			case dto.MetricType_SUMMARY:
+				// Extract count from SUMMARY metrics (e.g. go_gc_duration_seconds_count)
+				out[val.GetName()+"_count"] = m.GetSummary().GetSampleCount()
+			case dto.MetricType_HISTOGRAM,
 				dto.MetricType_GAUGE_HISTOGRAM:
 				// Skip unsupported metric types
 			default:
