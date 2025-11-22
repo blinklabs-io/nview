@@ -892,7 +892,6 @@ func getCoreText(ctx context.Context) string {
 
 	// Core section
 	if role == "Core" {
-		// TODO: block log functionality
 		adoptedFmt := "white"
 		invalidFmt := "white"
 		if promMetrics.IsLeader != promMetrics.Adopted {
@@ -972,7 +971,7 @@ func getBlockText(ctx context.Context) string {
 			width-tcols+1,
 		)
 	}
-	// TODO: populate lines
+	// Track the number of lines drawn, using left column as reference
 	line := 10
 	if line >= (tlines - 1) {
 		footerTextView.Clear()
@@ -1212,7 +1211,6 @@ func getPeerText(ctx context.Context) string {
 	} else {
 		sb.WriteString(fmt.Sprintf("[fuchsia]%d[white]", peerStats.CNT0))
 	}
-	// TODO: figure out spacing here
 	if peerStats.RTTAVG >= RTTThreshold3 {
 		sb.WriteString(
 			fmt.Sprintf(
