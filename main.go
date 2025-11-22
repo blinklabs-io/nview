@@ -19,11 +19,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log/slog"
 	"math"
 	"net"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -68,6 +70,58 @@ const (
 	TerminalWidthDefault   = 71
 	ProgressBarGranularity = 68
 )
+
+var (
+	logBuffer []string
+	logMutex  sync.Mutex
+)
+
+type bufferHandler struct {
+	handler slog.Handler
+}
+
+func (h *bufferHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return h.handler.Enabled(ctx, level)
+}
+
+func (h *bufferHandler) Handle(ctx context.Context, r slog.Record) error {
+	logMutex.Lock()
+	defer logMutex.Unlock()
+	var buf strings.Builder
+	if err := h.handler.Handle(ctx, r); err != nil {
+		return err
+	}
+	// Also append to buffer
+	buf.WriteString(r.Time.Format(time.RFC3339))
+	buf.WriteString(" ")
+	buf.WriteString(r.Level.String())
+	buf.WriteString(" ")
+	buf.WriteString(r.Message)
+	r.Attrs(func(a slog.Attr) bool {
+		buf.WriteString(" ")
+		buf.WriteString(a.Key)
+		buf.WriteString("=")
+		buf.WriteString(a.Value.String())
+		return true
+	})
+	buf.WriteString("\n")
+	logBuffer = append(logBuffer, buf.String())
+	cfg := config.GetConfig()
+	if len(logBuffer) > int(cfg.App.LogBufferSize) {
+		logBuffer = logBuffer[1:] // Remove oldest
+	}
+	return nil
+}
+
+func (h *bufferHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &bufferHandler{handler: h.handler.WithAttrs(attrs)}
+}
+
+func (h *bufferHandler) WithGroup(name string) slog.Handler {
+	return &bufferHandler{handler: h.handler.WithGroup(name)}
+}
+
+var logger *slog.Logger
 
 // Global command line flags
 var cmdlineFlags struct {
@@ -158,9 +212,17 @@ func main() {
 	// Load config
 	cfg, err := config.LoadConfig(cmdlineFlags.configFile)
 	if err != nil {
-		fmt.Printf("Failed to load config: %s", err)
+		fmt.Printf("Failed to load config: %s\n", err)
 		os.Exit(1)
 	}
+
+	// Initialize logger with buffer
+	baseHandler := slog.NewTextHandler(
+		os.Stderr,
+		&slog.HandlerOptions{Level: slog.LevelInfo},
+	)
+	bufferedHandler := &bufferHandler{handler: baseHandler}
+	logger = slog.New(bufferedHandler)
 
 	// Create a background context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -195,6 +257,7 @@ func main() {
 			}
 			prom, err := getPromMetrics(ctx)
 			if err != nil && prom != nil {
+				logger.Warn("Failed to fetch Prometheus metrics", "error", err)
 				failCount.Add(1)
 				select {
 				case <-ctx.Done():
@@ -299,6 +362,7 @@ func main() {
 			}
 			err := filterPeers(ctx)
 			if err != nil {
+				logger.Warn("Failed to filter peers", "error", err)
 				failCount.Add(1)
 				select {
 				case <-ctx.Done():
@@ -325,6 +389,7 @@ func main() {
 			}
 			err := pingPeers(ctx)
 			if err != nil {
+				logger.Warn("Failed to ping peers", "error", err)
 				failCount.Add(1)
 				select {
 				case <-ctx.Done():
@@ -507,6 +572,14 @@ func main() {
 			scrollPeers = false
 		}
 		if event.Rune() == 113 || event.Key() == tcell.KeyEscape { // q
+			logMutex.Lock()
+			if len(logBuffer) > 0 {
+				fmt.Println("\n--- Application Logs ---")
+				for _, log := range logBuffer {
+					fmt.Print(log)
+				}
+			}
+			logMutex.Unlock()
 			app.Stop()
 		}
 		return event
