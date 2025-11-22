@@ -6,7 +6,7 @@ on:
     paths: ['Dockerfile','*.go','go.*','.github/workflows/ci-docker.yml']
 
 env:
-  GHCR_IMAGE_NAME: ghcr.io/blinklabs-io/snek
+  GHCR_IMAGE_NAME: ghcr.io/blinklabs-io/nview
 
 permissions:
   contents: read

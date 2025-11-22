@@ -144,7 +144,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VERSION=${{ env.RELEASE_TAG }}
+            VERSION=${{ github.ref_type == 'tag' && github.ref_name || '' }}
             COMMIT_HASH=${{ github.sha }}
       - name: Attest Docker Hub image
         uses: actions/attest-build-provenance@v3
