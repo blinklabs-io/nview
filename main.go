@@ -682,14 +682,8 @@ func getEpochText(ctx context.Context) string {
 	granularity := ProgressBarGranularity
 	var charMarked string
 	var charUnmarked string
-	// TODO: legacy mode vs new
-	if false {
-		charMarked = string('#')
-		charUnmarked = string('.')
-	} else {
-		charMarked = string('▌')
-		charUnmarked = string('▖')
-	}
+	charMarked = string('▌')
+	charUnmarked = string('▖')
 
 	epochItems := int(epochProgress) * granularity / 100
 	if epochItems != epochItemsLast {
@@ -1104,14 +1098,8 @@ func getPeerText(ctx context.Context) string {
 
 	var charMarked string
 	var charUnmarked string
-	// TODO: legacy mode vs new
-	if false {
-		charMarked = string('#')
-		charUnmarked = string('.')
-	} else {
-		charMarked = string('▌')
-		charUnmarked = string('▖')
-	}
+	charMarked = string('▌')
+	charUnmarked = string('▖')
 	granularity := ProgressBarGranularity
 	granularitySmall := granularity / 2
 	if checkPeers {
