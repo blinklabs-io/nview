@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -43,7 +44,7 @@ func filterPeers(ctx context.Context) error {
 	}
 
 	if processMetrics == nil {
-		return nil // TODO: what to do here
+		return errors.New("process metrics not available for peer filtering")
 	}
 	cfg := config.GetConfig()
 
@@ -166,8 +167,7 @@ func filterPeers(ctx context.Context) error {
 			}
 		}
 	}
-	// TODO: do this better than just a length check
-	if len(peers) != len(peersFiltered) {
+	if !slices.Equal(peers, peersFiltered) {
 		peersFiltered = peers
 	}
 	return nil
