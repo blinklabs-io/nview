@@ -32,17 +32,14 @@ import (
 var peersFiltered []string
 
 var (
-	checkPeers  bool = true
-	scrollPeers bool = false
+	checkPeers      bool = true
+	scrollPeers     bool = false
+	peersFilteredMu sync.RWMutex
+	peerStatsMu     sync.Mutex
 )
 
 func filterPeers(ctx context.Context) error {
 	var peers []string
-	if len(peerStats.RTTresultsSlice) != 0 &&
-		len(peerStats.RTTresultsSlice) == len(peersFiltered) {
-		return nil
-	}
-
 	if processMetrics == nil {
 		return errors.New("process metrics not available for peer filtering")
 	}
@@ -167,9 +164,21 @@ func filterPeers(ctx context.Context) error {
 			}
 		}
 	}
-	if !slices.Equal(peers, peersFiltered) {
-		peersFiltered = peers
+
+	// Early return if peers haven't changed
+	peersFilteredMu.Lock()
+	equal := slices.Equal(peers, peersFiltered)
+	peerStatsMu.Lock()
+	hasResults := len(peerStats.RTTresultsSlice) != 0
+	peerStatsMu.Unlock()
+	if equal && hasResults {
+		peersFilteredMu.Unlock()
+		return nil
 	}
+
+	// Update peersFiltered if changed
+	peersFiltered = peers
+	peersFilteredMu.Unlock()
 	return nil
 }
 
@@ -179,9 +188,9 @@ func pingPeers(ctx context.Context) error {
 	granularitySmall := granularity / 2
 	if checkPeers {
 		// counters, etc.
-		peerCount := len(peersFiltered)
 		var wg sync.WaitGroup
-		var mu sync.Mutex
+		peersFilteredMu.RLock()
+		peerCount := len(peersFiltered)
 		for _, v := range peersFiltered {
 			// increment waitgroup counter
 			wg.Add(1)
@@ -199,9 +208,9 @@ func pingPeers(ctx context.Context) error {
 				// Return early if we've been checked recently
 				now := time.Now()
 				expire := now.Add(-600 * time.Second)
-				mu.Lock()
+				peerStatsMu.Lock()
 				existing, ok := peerStats.RTTresultsMap[peerIP]
-				mu.Unlock()
+				peerStatsMu.Unlock()
 				if ok {
 					if existing.UpdatedAt.After(expire) && existing.RTT != 0 {
 						return
@@ -210,14 +219,14 @@ func pingPeers(ctx context.Context) error {
 						return
 					}
 				}
-				mu.Lock()
+				peerStatsMu.Lock()
 				if len(peerStats.RTTresultsMap) == 0 {
 					peerStats.RTTresultsMap = make(
 						peerRTTresultsMap,
-						len(peersFiltered),
+						peerCount,
 					)
 				}
-				mu.Unlock()
+				peerStatsMu.Unlock()
 
 				// Start RTT loop
 				// for tool in ... return peerRTT
@@ -235,7 +244,7 @@ func pingPeers(ctx context.Context) error {
 					Location:  peerLocation,
 					UpdatedAt: time.Now(),
 				}
-				mu.Lock()
+				peerStatsMu.Lock()
 				if peerRTT != 99999 {
 					peerStats.RTTSUM += peerRTT
 				}
@@ -257,9 +266,10 @@ func pingPeers(ctx context.Context) error {
 					peer,
 				)
 				sort.Sort(peerStats.RTTresultsSlice)
-				mu.Unlock()
+				peerStatsMu.Unlock()
 			}(v)
 		}
+		peersFilteredMu.RUnlock()
 		wg.Wait()
 		peerCNTreachable := peerCount - peerStats.CNT0
 		if peerCNTreachable > 0 {
@@ -300,6 +310,9 @@ func pingPeers(ctx context.Context) error {
 }
 
 func resetPeers() {
+	peerStatsMu.Lock()
+	defer peerStatsMu.Unlock()
+
 	peerStats.CNT0 = 0
 	peerStats.CNT1 = 0
 	peerStats.CNT2 = 0
@@ -310,7 +323,10 @@ func resetPeers() {
 	for _, peerIP := range peerStats.RTTresultsMap {
 		peerIP.RTT = 0
 	}
+
+	peersFilteredMu.Lock()
 	peersFiltered = []string{}
+	peersFilteredMu.Unlock()
 }
 
 var peerStats PeerStats
