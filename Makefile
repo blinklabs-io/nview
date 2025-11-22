@@ -10,8 +10,10 @@ BINARIES=nview
 # Extract Go module name from go.mod
 GOMODULE=$(shell grep ^module $(ROOT_DIR)/go.mod | awk '{ print $$2 }')
 
-# Set version strings based on git tag and current ref
-GO_LDFLAGS=-ldflags "-s -w -X '$(GOMODULE)/internal/version.Version=$(shell git describe --tags --exact-match 2>/dev/null)' -X '$(GOMODULE)/internal/version.CommitHash=$(shell git rev-parse --short HEAD)'"
+# Set version strings: use env vars if set, else git
+VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null)
+COMMIT_HASH ?= $(shell git rev-parse --short HEAD)
+GO_LDFLAGS=-ldflags "-s -w -X '$(GOMODULE)/internal/version.Version=$(VERSION)' -X '$(GOMODULE)/internal/version.CommitHash=$(COMMIT_HASH)'"
 
 .PHONY: build mod-tidy clean test
 

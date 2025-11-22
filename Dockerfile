@@ -1,5 +1,10 @@
 FROM ghcr.io/blinklabs-io/go:1.25.4-1 AS build
 
+ARG VERSION
+ARG COMMIT_HASH
+ENV VERSION=${VERSION}
+ENV COMMIT_HASH=${COMMIT_HASH}
+
 WORKDIR /code
 COPY . .
 RUN make build
