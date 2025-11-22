@@ -17,7 +17,6 @@ package main
 import (
 	"context"
 	_ "embed"
-	"errors"
 	"fmt"
 	"net"
 	"os/exec"
@@ -31,7 +30,11 @@ func getNodeVersion() (version string, revision string, err error) {
 	cmd := exec.Command(getEffectiveNodeBinary(), "version") // #nosec G204
 	stdout, err := cmd.Output()
 	if err != nil {
-		return "N/A", "N/A", err
+		return "N/A", "N/A", fmt.Errorf(
+			"failed to execute %s version command: %w",
+			getEffectiveNodeBinary(),
+			err,
+		)
 	}
 	output := strings.TrimSpace(string(stdout))
 
@@ -55,7 +58,11 @@ func getNodeVersion() (version string, revision string, err error) {
 	// Handle cardano-node format (fallback)
 	strArray := strings.Split(output, " ")
 	if len(strArray) < 8 {
-		return "N/A", "N/A", errors.New("unexpected version format")
+		return "N/A", "N/A", fmt.Errorf(
+			"unexpected version format from %s: output has %d parts, expected at least 8",
+			getEffectiveNodeBinary(),
+			len(strArray),
+		)
 	}
 	version = strArray[1]
 	revision = strArray[7]

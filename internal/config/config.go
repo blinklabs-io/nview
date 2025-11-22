@@ -30,10 +30,11 @@ type Config struct {
 }
 
 type AppConfig struct {
-	NodeName string `yaml:"nodeName" envconfig:"NODE_NAME"`
-	Network  string `yaml:"network"  envconfig:"NETWORK"`
-	Refresh  uint32 `yaml:"refresh"  envconfig:"REFRESH"`
-	Retries  uint32 `yaml:"retries"  envconfig:"RETRIES"`
+	NodeName      string `yaml:"nodeName"      envconfig:"NODE_NAME"`
+	Network       string `yaml:"network"       envconfig:"NETWORK"`
+	Refresh       uint32 `yaml:"refresh"       envconfig:"REFRESH"`
+	Retries       uint32 `yaml:"retries"       envconfig:"RETRIES"`
+	LogBufferSize uint32 `yaml:"logBufferSize" envconfig:"LOG_BUFFER_SIZE"`
 }
 
 type NodeConfig struct {
@@ -72,10 +73,11 @@ type ShelleyGenesisConfig struct {
 func getDefaultConfig() *Config {
 	return &Config{
 		App: AppConfig{
-			NodeName: "Cardano Node",
-			Network:  "",
-			Refresh:  1,
-			Retries:  3,
+			NodeName:      "Cardano Node",
+			Network:       "",
+			Refresh:       1,
+			Retries:       3,
+			LogBufferSize: 1000,
 		},
 		Node: NodeConfig{
 			Binary:            "cardano-node",
