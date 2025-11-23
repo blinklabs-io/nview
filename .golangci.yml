@@ -20,6 +20,7 @@ linters:
     - gomodguard
     - gosec
     - gosmopolitan
+    - ineffassign
     - loggercheck
     - makezero
     - musttag

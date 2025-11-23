@@ -21,3 +21,10 @@ jobs:
           go-version: 1.25.x
       - name: golangci-lint
         uses: golangci/golangci-lint-action@0a35821d5c230e903fcfe077583637dea1b27b47 # v9.0.0 https://github.com/golangci/golangci-lint-action/releases/tag/v9.0.0
+      - name: Check formatting
+        run: |
+          if golangci-lint fmt --diff | grep -q .; then
+            echo "Code is not formatted"
+            golangci-lint fmt --diff
+            exit 1
+          fi
