@@ -1134,12 +1134,6 @@ func getNodeText(ctx context.Context) string {
 			nodeRevision,
 		),
 	))
-	sb.WriteString(
-		fmt.Sprintf(
-			" [green]Binary     : [white]%s\n",
-			getEffectiveNodeBinary(),
-		),
-	)
 	if publicIP != nil {
 		sb.WriteString(
 			fmt.Sprintf(" [green]Public IP  : [white]%s\n", publicIP),
