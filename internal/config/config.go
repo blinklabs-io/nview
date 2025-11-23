@@ -44,6 +44,7 @@ type AppConfig struct {
 type NodeConfig struct {
 	ByronGenesis      ByronGenesisConfig   `yaml:"byron"`
 	Binary            string               `yaml:"binary"           envconfig:"CARDANO_NODE_BINARY"`
+	Pid               int32                `yaml:"pid"              envconfig:"CARDANO_NODE_PID"`
 	PidFile           string               `yaml:"pidFile"          envconfig:"CARDANO_NODE_PID_FILE"`
 	Network           string               `yaml:"network"          envconfig:"CARDANO_NETWORK"`
 	NetworkMagic      uint32               `yaml:"networkMagic"     envconfig:"CARDANO_NODE_NETWORK_MAGIC"`
