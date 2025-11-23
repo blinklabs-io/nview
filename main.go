@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -1441,8 +1442,16 @@ func getProcessMetrics(ctx context.Context) (*process.Process, error) {
 	case AMARU_BINARY:
 		return getProcessMetricsByPidFile(ctx, cfg)
 	case DINGO_BINARY:
-		// Dingo is assumed to run as PID 1 in containerized environments
-		return getProcessMetricsByPid(ctx, 1)
+		// Use configured PID, defaulting to 1 if not set
+		pid := cfg.Node.Pid
+		if pid == 0 {
+			pid = 1
+		}
+		if proc, err := getProcessMetricsByPid(ctx, pid); err == nil {
+			return proc, nil
+		}
+		// Fall back to name-based search
+		return getProcessMetricsByName(ctx, cfg)
 	default:
 		return getProcessMetricsByNameAndPort(ctx, cfg)
 	}
@@ -1515,6 +1524,47 @@ func getProcessMetricsByPidFile(
 	}
 
 	return proc, nil
+}
+
+func getProcessMetricsByName(
+	ctx context.Context,
+	cfg *config.Config,
+) (*process.Process, error) {
+	r, _ := process.NewProcessWithContext(ctx, 0)
+	processes, err := process.ProcessesWithContext(ctx)
+	if err != nil {
+		return r, fmt.Errorf("failed to get processes: %w", err)
+	}
+	for _, p := range processes {
+		n, err := p.NameWithContext(ctx)
+		if err != nil {
+			continue
+		}
+
+		if strings.Contains(n, getEffectiveNodeBinary()) {
+			r = p
+			break
+		}
+	}
+
+	// Check if we found a process
+	if r == nil || r.Pid == 0 {
+		return r, fmt.Errorf(
+			"no process found with name containing %s",
+			getEffectiveNodeBinary(),
+		)
+	}
+
+	exists, err := r.IsRunning()
+	if err != nil {
+		return r, fmt.Errorf("failed to check if process is running: %w", err)
+	}
+
+	if !exists {
+		return r, errors.New("process is not running")
+	}
+
+	return r, nil
 }
 
 func getProcessMetricsByNameAndPort(
