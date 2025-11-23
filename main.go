@@ -1438,6 +1438,11 @@ func getResourceText(ctx context.Context) string {
 func getProcessMetrics(ctx context.Context) (*process.Process, error) {
 	cfg := config.GetConfig()
 
+	// If CARDANO_NODE_PID is specified, use it directly for all node types
+	if cfg.Node.Pid > 0 {
+		return getProcessMetricsByPid(ctx, cfg.Node.Pid)
+	}
+
 	switch getEffectiveNodeBinary() {
 	case AMARU_BINARY:
 		return getProcessMetricsByPidFile(ctx, cfg)

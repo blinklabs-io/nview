@@ -60,6 +60,18 @@ node:
   # This can also be set via the CARDANO_NODE_PID_FILE environment variable
   pidFile:
 
+  # PID for the node process
+  #
+  # When set to a non-zero value, this bypasses all automatic PID detection
+  # mechanisms and directly uses the specified PID for process metrics.
+  #
+  # - For cardano-node: Bypasses name/port-based detection
+  # - For Dingo: Overrides the default PID 1 (when set to non-zero)
+  # - For Amaru: Skips reading from pidFile and uses this PID directly
+  #
+  # This can also be set via the CARDANO_NODE_PID environment variable
+  pid: 0
+
 prometheus:
   # host/port for the node Prometheus metrics
   #
@@ -79,11 +91,30 @@ prometheus:
 #   binary: dingo
 #   network: mainnet
 #
+# For Dingo with custom PID:
+# node:
+#   binary: dingo
+#   network: mainnet
+#   pid: 1234  # Override default PID 1
+#
 # For Amaru:
 # node:
 #   binary: amaru
 #   network: mainnet
 #   pidFile: /path/to/amaru.pid  # Required for Amaru
+#
+# For Amaru with direct PID (skips pidFile):
+# node:
+#   binary: amaru
+#   network: mainnet
+#   pid: 5678  # Use this PID directly, ignore pidFile
+#
+# For cardano-node with direct PID:
+# node:
+#   binary: cardano-node
+#   network: mainnet
+#   port: 3001
+#   pid: 9999  # Bypass name/port detection
 #
 # For custom Prometheus port:
 # prometheus:
