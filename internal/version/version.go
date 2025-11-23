@@ -24,6 +24,8 @@ var (
 	CommitHash string
 )
 
+// GetVersionString returns a formatted version string including the commit hash.
+// If Version is not set (development builds), it returns "devel" with the commit hash.
 func GetVersionString() string {
 	if Version != "" {
 		return fmt.Sprintf("%s (commit %s)", Version, CommitHash)

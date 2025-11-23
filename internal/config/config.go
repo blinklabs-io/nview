@@ -23,12 +23,15 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// Config represents the complete configuration structure for nview.
+// It contains application settings, node configuration, and Prometheus settings.
 type Config struct {
 	App        AppConfig        `yaml:"app"`
 	Node       NodeConfig       `yaml:"node"`
 	Prometheus PrometheusConfig `yaml:"prometheus"`
 }
 
+// AppConfig contains application-level configuration options.
 type AppConfig struct {
 	NodeName      string `yaml:"nodeName"      envconfig:"NODE_NAME"`
 	Network       string `yaml:"network"       envconfig:"NETWORK"`
@@ -37,6 +40,7 @@ type AppConfig struct {
 	LogBufferSize uint32 `yaml:"logBufferSize" envconfig:"LOG_BUFFER_SIZE"`
 }
 
+// NodeConfig contains configuration specific to the Cardano node being monitored.
 type NodeConfig struct {
 	ByronGenesis      ByronGenesisConfig   `yaml:"byron"`
 	Binary            string               `yaml:"binary"           envconfig:"CARDANO_NODE_BINARY"`
@@ -49,6 +53,7 @@ type NodeConfig struct {
 	BlockProducer     bool                 `yaml:"blockProducer"    envconfig:"CARDANO_BLOCK_PRODUCER"`
 }
 
+// PrometheusConfig contains settings for connecting to the node's Prometheus metrics endpoint.
 type PrometheusConfig struct {
 	Host    string `yaml:"host"    envconfig:"PROM_HOST"`
 	Port    uint32 `yaml:"port"    envconfig:"PROM_PORT"`
@@ -56,6 +61,7 @@ type PrometheusConfig struct {
 	Timeout uint32 `yaml:"timeout" envconfig:"PROM_TIMEOUT"`
 }
 
+// ByronGenesisConfig contains Byron-era genesis parameters.
 type ByronGenesisConfig struct {
 	StartTime   uint64 `yaml:"startTime"   envconfig:"BYRON_GENESIS_START_SEC"`
 	EpochLength uint64 `yaml:"epochLength" envconfig:"BYRON_EPOCH_LENGTH"`
@@ -63,6 +69,7 @@ type ByronGenesisConfig struct {
 	SlotLength  uint64 `yaml:"slotLength"  envconfig:"BYRON_SLOT_LENGTH"`
 }
 
+// ShelleyGenesisConfig contains Shelley-era genesis parameters.
 type ShelleyGenesisConfig struct {
 	EpochLength       uint64 `yaml:"epochLength"       envconfig:"SHELLEY_EPOCH_LENGTH"`
 	SlotLength        uint64 `yaml:"slotLength"        envconfig:"SHELLEY_SLOT_LENGTH"`
@@ -97,6 +104,9 @@ func getDefaultConfig() *Config {
 // Singleton config instance with default values
 var globalConfig = getDefaultConfig()
 
+// LoadConfig loads configuration from a YAML file and environment variables.
+// Environment variables take precedence over file values. If configFile is empty,
+// only environment variables and defaults are used.
 func LoadConfig(configFile string) (*Config, error) {
 	cfg := getDefaultConfig()
 	// Load config file as YAML if provided
@@ -138,7 +148,8 @@ func LoadConfig(configFile string) (*Config, error) {
 	return cfg, nil
 }
 
-// GetConfig returns the global config instance
+// GetConfig returns the global config instance.
+// This is a singleton accessor for the loaded configuration.
 func GetConfig() *Config {
 	return globalConfig
 }

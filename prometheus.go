@@ -42,6 +42,9 @@ func setCurrentEpoch() {
 
 var promMetrics *PromMetrics
 
+// PromMetrics holds all the Prometheus metrics collected from a Cardano node.
+// It includes metrics for blocks, epochs, slots, memory, connections, and more.
+// The struct fields are tagged with JSON names corresponding to Prometheus metric names.
 type PromMetrics struct {
 	BlockNum            uint64  `json:"cardano_node_metrics_blockNum_int"`
 	EpochNum            uint64  `json:"cardano_node_metrics_epoch_int"`
