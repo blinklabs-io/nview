@@ -71,3 +71,22 @@ prometheus:
   #
   # This can also be set via the PROM_TIMEOUT environment variable
   timeout: 3
+
+# Example configurations for different node implementations:
+#
+# For Dingo:
+# node:
+#   binary: dingo
+#   network: mainnet
+#
+# For Amaru:
+# node:
+#   binary: amaru
+#   network: mainnet
+#   pidFile: /path/to/amaru.pid  # Required for Amaru
+#
+# For custom Prometheus port:
+# prometheus:
+#   host: 127.0.0.1
+#   port: 9090
+#   timeout: 5
