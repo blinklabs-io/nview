@@ -96,7 +96,11 @@ func TestGetEpochProgress(t *testing.T) {
 
 			result := getEpochProgress()
 			if result != tt.expected {
-				t.Errorf("getEpochProgress() = %v, expected %v", result, tt.expected)
+				t.Errorf(
+					"getEpochProgress() = %v, expected %v",
+					result,
+					tt.expected,
+				)
 			}
 		})
 	}
@@ -104,9 +108,9 @@ func TestGetEpochProgress(t *testing.T) {
 
 func TestGetEpochText(t *testing.T) {
 	tests := []struct {
-		name        string
-		promMetrics *PromMetrics
-		currentEpoch uint64
+		name          string
+		promMetrics   *PromMetrics
+		currentEpoch  uint64
 		checkContains string
 	}{
 		{
@@ -115,13 +119,13 @@ func TestGetEpochText(t *testing.T) {
 				EpochNum:    100,
 				SlotInEpoch: 216000,
 			},
-			currentEpoch: 100,
+			currentEpoch:  100,
 			checkContains: "100",
 		},
 		{
-			name:         "nil promMetrics",
-			promMetrics:  nil,
-			currentEpoch: 100,
+			name:          "nil promMetrics",
+			promMetrics:   nil,
+			currentEpoch:  100,
 			checkContains: "100",
 		},
 	}
@@ -147,7 +151,11 @@ func TestGetEpochText(t *testing.T) {
 			ctx := context.Background()
 			result := getEpochText(ctx)
 			if !strings.Contains(result, tt.checkContains) {
-				t.Errorf("getEpochText() = %q, expected to contain %q", result, tt.checkContains)
+				t.Errorf(
+					"getEpochText() = %q, expected to contain %q",
+					result,
+					tt.checkContains,
+				)
 			}
 		})
 	}
@@ -175,7 +183,12 @@ func TestTcpinfoRtt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tcpinfoRtt(tt.address)
 			if result != tt.expected {
-				t.Errorf("tcpinfoRtt(%q) = %v, expected %v", tt.address, result, tt.expected)
+				t.Errorf(
+					"tcpinfoRtt(%q) = %v, expected %v",
+					tt.address,
+					result,
+					tt.expected,
+				)
 			}
 		})
 	}
@@ -206,7 +219,10 @@ func TestBufferHandler_Handle(t *testing.T) {
 	cfg.App.LogBufferSize = 10
 
 	// Create a bufferHandler with a text handler
-	textHandler := slog.NewTextHandler(&strings.Builder{}, &slog.HandlerOptions{})
+	textHandler := slog.NewTextHandler(
+		&strings.Builder{},
+		&slog.HandlerOptions{},
+	)
 	bh := &bufferHandler{handler: textHandler}
 
 	// Create a test record
@@ -238,7 +254,11 @@ func TestBufferHandler_Handle(t *testing.T) {
 		expectedParts := []string{"INFO", "test message", "key=value"}
 		for _, part := range expectedParts {
 			if !strings.Contains(logBuffer[0], part) {
-				t.Errorf("logBuffer[0] does not contain %q: %q", part, logBuffer[0])
+				t.Errorf(
+					"logBuffer[0] does not contain %q: %q",
+					part,
+					logBuffer[0],
+				)
 			}
 		}
 	}
@@ -246,7 +266,10 @@ func TestBufferHandler_Handle(t *testing.T) {
 
 func TestBufferHandler_Enabled(t *testing.T) {
 	// Create a bufferHandler with a text handler
-	textHandler := slog.NewTextHandler(&strings.Builder{}, &slog.HandlerOptions{Level: slog.LevelInfo})
+	textHandler := slog.NewTextHandler(
+		&strings.Builder{},
+		&slog.HandlerOptions{Level: slog.LevelInfo},
+	)
 	bh := &bufferHandler{handler: textHandler}
 
 	// Test enabled level
@@ -263,7 +286,10 @@ func TestBufferHandler_Enabled(t *testing.T) {
 
 func TestBufferHandler_WithAttrs(t *testing.T) {
 	// Create a bufferHandler with a text handler
-	textHandler := slog.NewTextHandler(&strings.Builder{}, &slog.HandlerOptions{})
+	textHandler := slog.NewTextHandler(
+		&strings.Builder{},
+		&slog.HandlerOptions{},
+	)
 	bh := &bufferHandler{handler: textHandler}
 
 	// Call WithAttrs
@@ -284,7 +310,10 @@ func TestBufferHandler_WithAttrs(t *testing.T) {
 
 func TestBufferHandler_WithGroup(t *testing.T) {
 	// Create a bufferHandler with a text handler
-	textHandler := slog.NewTextHandler(&strings.Builder{}, &slog.HandlerOptions{})
+	textHandler := slog.NewTextHandler(
+		&strings.Builder{},
+		&slog.HandlerOptions{},
+	)
 	bh := &bufferHandler{handler: textHandler}
 
 	// Call WithGroup
@@ -304,9 +333,9 @@ func TestBufferHandler_WithGroup(t *testing.T) {
 
 func TestGetConnectionText(t *testing.T) {
 	tests := []struct {
-		name     string
-		p2p      bool
-		promMetrics *PromMetrics
+		name          string
+		p2p           bool
+		promMetrics   *PromMetrics
 		checkContains string
 	}{
 		{
@@ -325,9 +354,9 @@ func TestGetConnectionText(t *testing.T) {
 			checkContains: "P2P        : enabled",
 		},
 		{
-			name:     "P2P enabled nil metrics",
-			p2p:      true,
-			promMetrics: nil,
+			name:          "P2P enabled nil metrics",
+			p2p:           true,
+			promMetrics:   nil,
 			checkContains: "", // returns connectionText, but since it's global, hard to test
 		},
 	}
@@ -346,8 +375,13 @@ func TestGetConnectionText(t *testing.T) {
 
 			ctx := context.Background()
 			result := getConnectionText(ctx)
-			if tt.checkContains != "" && !strings.Contains(result, tt.checkContains) {
-				t.Errorf("getConnectionText() = %q, expected to contain %q", result, tt.checkContains)
+			if tt.checkContains != "" &&
+				!strings.Contains(result, tt.checkContains) {
+				t.Errorf(
+					"getConnectionText() = %q, expected to contain %q",
+					result,
+					tt.checkContains,
+				)
 			}
 		})
 	}
@@ -355,9 +389,9 @@ func TestGetConnectionText(t *testing.T) {
 
 func TestGetCoreText(t *testing.T) {
 	tests := []struct {
-		name     string
-		role     string
-		promMetrics *PromMetrics
+		name          string
+		role          string
+		promMetrics   *PromMetrics
 		checkContains string
 	}{
 		{
@@ -371,9 +405,9 @@ func TestGetCoreText(t *testing.T) {
 			checkContains: "Leader",
 		},
 		{
-			name:     "Non-core role",
-			role:     "Relay",
-			promMetrics: &PromMetrics{},
+			name:          "Non-core role",
+			role:          "Relay",
+			promMetrics:   &PromMetrics{},
 			checkContains: "N/A",
 		},
 	}
@@ -393,7 +427,11 @@ func TestGetCoreText(t *testing.T) {
 			ctx := context.Background()
 			result := getCoreText(ctx)
 			if !strings.Contains(result, tt.checkContains) {
-				t.Errorf("getCoreText() = %q, expected to contain %q", result, tt.checkContains)
+				t.Errorf(
+					"getCoreText() = %q, expected to contain %q",
+					result,
+					tt.checkContains,
+				)
 			}
 		})
 	}

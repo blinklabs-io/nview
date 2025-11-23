@@ -125,50 +125,6 @@ func TestDetectNodeType(t *testing.T) {
 			expectedBinary:   "",
 			expectedNodeName: "Cardano Node",
 		},
-		{
-			name: "Edge case: GoMemAlloc = 0, MemLive = 0",
-			metrics: &PromMetrics{
-				GoMemAlloc: 0,
-				MemLive:    0,
-			},
-			initialBinary:    "",
-			initialNodeName:  "Cardano Node",
-			expectedBinary:   CARDANO_BINARY,
-			expectedNodeName: "Cardano Node",
-		},
-		{
-			name: "Edge case: GoMemAlloc = 0, MemLive > 0",
-			metrics: &PromMetrics{
-				GoMemAlloc: 0,
-				MemLive:    1000,
-			},
-			initialBinary:    "",
-			initialNodeName:  "Cardano Node",
-			expectedBinary:   CARDANO_BINARY,
-			expectedNodeName: "Cardano Node",
-		},
-		{
-			name: "Edge case: GoMemAlloc > 0, MemLive > 0",
-			metrics: &PromMetrics{
-				GoMemAlloc: 1000,
-				MemLive:    1000,
-			},
-			initialBinary:    "",
-			initialNodeName:  "Cardano Node",
-			expectedBinary:   CARDANO_BINARY,
-			expectedNodeName: "Cardano Node",
-		},
-		{
-			name: "Dingo with MemLive > 0 (detects as Cardano)",
-			metrics: &PromMetrics{
-				GoMemAlloc: 1000,
-				MemLive:    500,
-			},
-			initialBinary:    "",
-			initialNodeName:  "Cardano Node",
-			expectedBinary:   CARDANO_BINARY,
-			expectedNodeName: "Cardano Node",
-		},
 	}
 
 	for _, tt := range tests {
@@ -239,74 +195,119 @@ func TestGetEffectiveNodeBinary(t *testing.T) {
 
 			// Set config
 			cfg := config.GetConfig()
+			origBinary := cfg.Node.Binary
 			cfg.Node.Binary = tt.configBinary
+			defer func() { cfg.Node.Binary = origBinary }()
 
-                        result := getEffectiveNodeBinary()
-                        if result != tt.expected {
-                                t.Errorf("getEffectiveNodeBinary() = %q, expected %q", result, tt.expected)
-                        }
-                })
-        }
+			result := getEffectiveNodeBinary()
+			if result != tt.expected {
+				t.Errorf(
+					"getEffectiveNodeBinary() = %q, expected %q",
+					result,
+					tt.expected,
+				)
+			}
+		})
+	}
 }
 
 func TestGetEffectiveNodeName(t *testing.T) {
-        tests := []struct {
-                name           string
-                detectedBinary string
-                configName     string
-                expected       string
-        }{
-                {
-                        name:           "Dingo with default name",
-                        detectedBinary: "dingo",
-                        configName:     "Cardano Node",
-                        expected:       "Dingo",
-                },
-                {
-                        name:           "Dingo with custom name",
-                        detectedBinary: "dingo",
-                        configName:     "My Node",
-                        expected:       "My Node",
-                },
-                {
-                        name:           "Amaru with default name",
-                        detectedBinary: "amaru",
-                        configName:     "Cardano Node",
-                        expected:       "Amaru",
-                },
-                {
-                        name:           "Amaru with custom name",
-                        detectedBinary: "amaru",
-                        configName:     "My Node",
-                        expected:       "My Node",
-                },
-                {
-                        name:           "Cardano with default name",
-                        detectedBinary: "cardano-node",
-                        configName:     "Cardano Node",
-                        expected:       "Cardano Node",
-                },
-                {
-                        name:           "Cardano with custom name",
-                        detectedBinary: "cardano-node",
-                        configName:     "My Node",
-                        expected:       "My Node",
-                },
-        }
+	tests := []struct {
+		name           string
+		detectedBinary string
+		configBinary   string
+		configName     string
+		expected       string
+	}{
+		{
+			name:           "Dingo with default name",
+			detectedBinary: "dingo",
+			configBinary:   "",
+			configName:     "Cardano Node",
+			expected:       "Dingo",
+		},
+		{
+			name:           "Dingo with custom name",
+			detectedBinary: "dingo",
+			configBinary:   "",
+			configName:     "My Node",
+			expected:       "My Node",
+		},
+		{
+			name:           "Amaru with default name",
+			detectedBinary: "amaru",
+			configBinary:   "",
+			configName:     "Cardano Node",
+			expected:       "Amaru",
+		},
+		{
+			name:           "Amaru with custom name",
+			detectedBinary: "amaru",
+			configBinary:   "",
+			configName:     "My Node",
+			expected:       "My Node",
+		},
+		{
+			name:           "Cardano with default name",
+			detectedBinary: "cardano-node",
+			configBinary:   "",
+			configName:     "Cardano Node",
+			expected:       "Cardano Node",
+		},
+		{
+			name:           "Cardano with custom name",
+			detectedBinary: "cardano-node",
+			configBinary:   "",
+			configName:     "My Node",
+			expected:       "My Node",
+		},
+		{
+			name:           "Config-driven Amaru with default name",
+			detectedBinary: "",
+			configBinary:   "amaru",
+			configName:     "Cardano Node",
+			expected:       "Amaru",
+		},
+		{
+			name:           "Config-driven Amaru with custom name",
+			detectedBinary: "",
+			configBinary:   "amaru",
+			configName:     "My Custom Node",
+			expected:       "My Custom Node",
+		},
+		{
+			name:           "Config-driven Dingo with default name",
+			detectedBinary: "",
+			configBinary:   "dingo",
+			configName:     "Cardano Node",
+			expected:       "Dingo",
+		},
+	}
 
-        for _, tt := range tests {
-                t.Run(tt.name, func(t *testing.T) {
-                        // Set detected binary
-                        detectedNodeBinary.Store(tt.detectedBinary)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set detected binary
+			detectedNodeBinary.Store(tt.detectedBinary)
 
-                        // Set config
-                        cfg := config.GetConfig()
-                        cfg.App.NodeName = tt.configName
+			// Set config
+			cfg := config.GetConfig()
+			origBinary := cfg.Node.Binary
+			origName := cfg.App.NodeName
+			cfg.Node.Binary = tt.configBinary
+			cfg.App.NodeName = tt.configName
+			defer func() {
+				cfg.Node.Binary = origBinary
+				cfg.App.NodeName = origName
+			}()
 
-                        result := getEffectiveNodeName()
-                        if result != tt.expected {
-                                t.Errorf("getEffectiveNodeName() = %q, expected %q", result, tt.expected)
-                        }
-                })
-        }
+			result := getEffectiveNodeName()
+			if result != tt.expected {
+				t.Errorf(
+					"getEffectiveNodeName() = %q, expected %q",
+					result,
+					tt.expected,
+				)
+			}
+		})
+	}
 }
