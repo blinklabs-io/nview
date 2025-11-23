@@ -190,8 +190,15 @@ var resourceTextView = tview.NewTextView().
 		app.Draw()
 	})
 
+var statusTextView = tview.NewTextView().
+	SetDynamicColors(true).
+	SetTextColor(tcell.ColorGreen).
+	SetChangedFunc(func() {
+		app.Draw()
+	})
+
 // Text strings
-var blockText, chainText, coreText, connectionText, nodeText, peerText, resourceText string
+var blockText, chainText, coreText, connectionText, nodeText, peerText, resourceText, statusText string
 
 // Metrics variables
 var processMetrics *process.Process
@@ -418,6 +425,9 @@ func main() {
 		SetTitle("Connections").
 		SetBorder(true)
 
+	statusText = getStatusText(ctx)
+	statusTextView.SetText(statusText).SetTitle("Status").SetBorder(true)
+
 	coreText = getCoreText(ctx)
 	coreTextView.SetText(coreText).SetTitle("Core").SetBorder(true)
 
@@ -463,6 +473,11 @@ func main() {
 				// Connections
 				AddItem(connectionTextView,
 					11,
+					0,
+					false).
+				// Status
+				AddItem(statusTextView,
+					6,
 					0,
 					false),
 				37,
@@ -530,6 +545,12 @@ func main() {
 				connectionText = tmpText
 				connectionTextView.Clear()
 				connectionTextView.SetText(connectionText)
+			}
+			tmpText = getStatusText(ctx)
+			if tmpText != "" && tmpText != statusText {
+				statusText = tmpText
+				statusTextView.Clear()
+				statusTextView.SetText(statusText)
 			}
 			tmpText = getCoreText(ctx)
 			if tmpText != "" && tmpText != coreText {
@@ -625,6 +646,12 @@ func main() {
 				connectionText = tmpText
 				connectionTextView.Clear()
 				connectionTextView.SetText(connectionText)
+			}
+			tmpText = getStatusText(ctx)
+			if tmpText != "" && tmpText != statusText {
+				statusText = tmpText
+				statusTextView.Clear()
+				statusTextView.SetText(statusText)
 			}
 			tmpText = getCoreText(ctx)
 			if tmpText != "" && tmpText != coreText {
@@ -1432,6 +1459,42 @@ func getResourceText(ctx context.Context) string {
 			strconv.FormatUint(gcMajor, 10),
 		),
 	)
+	return sb.String()
+}
+
+func getStatusText(ctx context.Context) string {
+	select {
+	case <-ctx.Done():
+		return ""
+	default:
+	}
+
+	var sb strings.Builder
+
+	if promMetrics == nil {
+		sb.WriteString(" [yellow]Status     : [white]Initializing\n")
+		sb.WriteString(fmt.Sprintf(" [green]Uptime     : [white]%s\n", timeFromSeconds(uptimes)))
+		return sb.String()
+	}
+
+	// Show sync status and basic health indicators
+	tipRef := getSlotTipRef()
+	var tipDiff uint64
+	if tipRef < promMetrics.SlotNum {
+		tipDiff = 0
+	} else {
+		tipDiff = tipRef - promMetrics.SlotNum
+	}
+
+	if tipDiff <= 100 { // Arbitrary threshold for "synced"
+		sb.WriteString(" [green]Status     : [white]Synced ✓\n")
+	} else {
+		sb.WriteString(" [yellow]Status     : [white]Syncing\n")
+	}
+
+	// Show last update time or basic health
+	sb.WriteString(fmt.Sprintf(" [green]Uptime     : [white]%s\n", timeFromSeconds(uptimes)))
+
 	return sb.String()
 }
 
