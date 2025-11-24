@@ -1528,7 +1528,7 @@ func getProcessMetricsByPidFile(
 
 func getProcessMetricsByName(
 	ctx context.Context,
-	cfg *config.Config,
+	_ *config.Config,
 ) (*process.Process, error) {
 	r, _ := process.NewProcessWithContext(ctx, 0)
 	processes, err := process.ProcessesWithContext(ctx)

@@ -191,6 +191,9 @@ func pingPeers(ctx context.Context) error {
 		var wg sync.WaitGroup
 		peersFilteredMu.RLock()
 		peerCount := len(peersFiltered)
+		if peerCount == 0 {
+			return errors.New("no peers to ping")
+		}
 		for _, v := range peersFiltered {
 			// increment waitgroup counter
 			wg.Add(1)
