@@ -740,16 +740,9 @@ func getEpochText(ctx context.Context) string {
 	epochProgress := getEpochProgress()
 	epochProgress1dec := fmt.Sprintf("%.1f", epochProgress)
 
-	sb.WriteString(
-		fmt.Sprintf(
-			// `" Epoch [blue]%d[white] [[blue]%s%%[white]], [blue]%s[white] %-12s\n",
-			" [green]Epoch: [white]%d[blue] [[white]%s%%[blue]]\n",
-			currentEpoch,
-			epochProgress1dec,
-			// epochTimeLeft,
-			// "remaining",
-		),
-	)
+	fmt.Fprintf(&sb, " [green]Epoch: [white]%d[blue] [[white]%s%%[blue]]\n",
+		currentEpoch,
+		epochProgress1dec)
 
 	// Epoch progress bar
 	var epochBar strings.Builder
@@ -770,7 +763,7 @@ func getEpochText(ctx context.Context) string {
 			}
 		}
 	}
-	sb.WriteString(fmt.Sprintf(" [blue]%s[green]\n", epochBar.String()))
+	fmt.Fprintf(&sb, " [blue]%s[green]\n", epochBar.String())
 	return sb.String()
 }
 
@@ -802,40 +795,26 @@ func getChainText(ctx context.Context) string {
 	}
 
 	// Row 1
-	sb.WriteString(fmt.Sprintf(
-		" Block      : [white]%-"+strconv.Itoa(10)+"s[green]",
-		strconv.FormatUint(promMetrics.BlockNum, 10),
-	))
-	sb.WriteString(fmt.Sprintf(
-		" Tip (ref)  : [white]%-"+strconv.Itoa(10)+"s[green]",
-		strconv.FormatUint(tipRef, 10),
-	))
-	sb.WriteString(fmt.Sprintf(
-		" Forks      : [white]%-"+strconv.Itoa(10)+"s[green]\n",
-		strconv.FormatUint(promMetrics.Forks, 10),
-	))
+	fmt.Fprintf(&sb, " Block      : [white]%-"+strconv.Itoa(10)+"s[green]",
+		strconv.FormatUint(promMetrics.BlockNum, 10))
+	fmt.Fprintf(&sb, " Tip (ref)  : [white]%-"+strconv.Itoa(10)+"s[green]",
+		strconv.FormatUint(tipRef, 10))
+	fmt.Fprintf(&sb, " Forks      : [white]%-"+strconv.Itoa(10)+"s[green]\n",
+		strconv.FormatUint(promMetrics.Forks, 10))
 	// Row 2
-	sb.WriteString(fmt.Sprintf(
-		" Slot       : [white]%-"+strconv.Itoa(10)+"s[green]",
-		strconv.FormatUint(promMetrics.SlotNum, 10),
-	))
+	fmt.Fprintf(&sb, " Slot       : [white]%-"+strconv.Itoa(10)+"s[green]",
+		strconv.FormatUint(promMetrics.SlotNum, 10))
 	if promMetrics.SlotNum == 0 {
-		sb.WriteString(fmt.Sprintf(
-			" Status     : [white]%-"+strconv.Itoa(
-				10,
-			)+"s[green]",
-			"starting",
-		))
+		fmt.Fprintf(&sb, " Status     : [white]%-"+strconv.Itoa(
+			10,
+		)+"s[green]",
+			"starting")
 	} else if tipDiff <= SyncThresholdGood {
-		sb.WriteString(fmt.Sprintf(
-			" Tip (diff) : [white]%-"+strconv.Itoa(9)+"s[green]",
-			strconv.FormatUint(tipDiff, 10)+" 😀",
-		))
+		fmt.Fprintf(&sb, " Tip (diff) : [white]%-"+strconv.Itoa(9)+"s[green]",
+			strconv.FormatUint(tipDiff, 10)+" 😀")
 	} else if tipDiff <= SyncThresholdSlow {
-		sb.WriteString(fmt.Sprintf(
-			" Tip (diff) : [yellow]%-"+strconv.Itoa(9)+"s[green]",
-			strconv.FormatUint(tipDiff, 10)+" 😐",
-		))
+		fmt.Fprintf(&sb, " Tip (diff) : [yellow]%-"+strconv.Itoa(9)+"s[green]",
+			strconv.FormatUint(tipDiff, 10)+" 😐")
 	} else {
 		var syncProgress float32
 		if tipRef == 0 {
@@ -843,30 +822,20 @@ func getChainText(ctx context.Context) string {
 		} else {
 			syncProgress = float32((float32(promMetrics.SlotNum) / float32(tipRef)) * 100)
 		}
-		sb.WriteString(fmt.Sprintf(
-			" Syncing    : [yellow]%-"+strconv.Itoa(10)+"s[green]",
-			fmt.Sprintf("%2.1f", syncProgress),
-		))
+		fmt.Fprintf(&sb, " Syncing    : [yellow]%-"+strconv.Itoa(10)+"s[green]",
+			fmt.Sprintf("%2.1f", syncProgress))
 	}
-	sb.WriteString(fmt.Sprintf(
-		" Total Tx   : [white]%-"+strconv.Itoa(10)+"s[green]\n",
-		strconv.FormatUint(promMetrics.TxProcessed, 10),
-	))
+	fmt.Fprintf(&sb, " Total Tx   : [white]%-"+strconv.Itoa(10)+"s[green]\n",
+		strconv.FormatUint(promMetrics.TxProcessed, 10))
 	// Row 3
-	sb.WriteString(fmt.Sprintf(
-		" Slot epoch : [white]%-"+strconv.Itoa(10)+"s[green]",
-		strconv.FormatUint(promMetrics.SlotInEpoch, 10),
-	))
-	sb.WriteString(fmt.Sprintf(
-		" Density    : [white]%-"+strconv.Itoa(10)+"s[green]",
-		fmt.Sprintf("%3.5f", promMetrics.Density*100/1),
-	))
-	sb.WriteString(fmt.Sprintf(
-		" Pending Tx : [white]%d[blue]/[white]%d[blue]%-"+kWidth+"s\n",
+	fmt.Fprintf(&sb, " Slot epoch : [white]%-"+strconv.Itoa(10)+"s[green]",
+		strconv.FormatUint(promMetrics.SlotInEpoch, 10))
+	fmt.Fprintf(&sb, " Density    : [white]%-"+strconv.Itoa(10)+"s[green]",
+		fmt.Sprintf("%3.5f", promMetrics.Density*100/1))
+	fmt.Fprintf(&sb, " Pending Tx : [white]%d[blue]/[white]%d[blue]%-"+kWidth+"s\n",
 		promMetrics.MempoolTx,
 		mempoolTxKBytes,
-		"K",
-	))
+		"K")
 	return sb.String()
 }
 
@@ -878,33 +847,24 @@ func getConnectionText(ctx context.Context) string {
 		if promMetrics == nil {
 			return connectionText
 		}
-		sb.WriteString(fmt.Sprintf(" [green]P2P        : %s\n",
-			"enabled",
-		))
-		sb.WriteString(fmt.Sprintf(" [green]Incoming   : [white]%s\n",
-			strconv.FormatUint(promMetrics.ConnIncoming, 10),
-		))
-		sb.WriteString(fmt.Sprintf(" [green]Outgoing   : [white]%s\n",
-			strconv.FormatUint(promMetrics.ConnOutgoing, 10),
-		))
-		sb.WriteString(fmt.Sprintf(" [green]Cold Peers : [white]%s\n",
-			strconv.FormatUint(promMetrics.PeersCold, 10),
-		))
-		sb.WriteString(fmt.Sprintf(" [green]Warm Peers : [white]%s\n",
-			strconv.FormatUint(promMetrics.PeersWarm, 10),
-		))
-		sb.WriteString(fmt.Sprintf(" [green]Hot Peers  : [white]%s\n",
-			strconv.FormatUint(promMetrics.PeersHot, 10),
-		))
-		sb.WriteString(fmt.Sprintf(" [green]Uni-Dir    : [white]%s\n",
-			strconv.FormatUint(promMetrics.ConnUniDir, 10),
-		))
-		sb.WriteString(fmt.Sprintf(" [green]Bi-Dir     : [white]%s\n",
-			strconv.FormatUint(promMetrics.ConnBiDir, 10),
-		))
-		sb.WriteString(fmt.Sprintf(" [green]Duplex     : [white]%s\n",
-			strconv.FormatUint(promMetrics.ConnDuplex, 10),
-		))
+		fmt.Fprintf(&sb, " [green]P2P        : %s\n",
+			"enabled")
+		fmt.Fprintf(&sb, " [green]Incoming   : [white]%s\n",
+			strconv.FormatUint(promMetrics.ConnIncoming, 10))
+		fmt.Fprintf(&sb, " [green]Outgoing   : [white]%s\n",
+			strconv.FormatUint(promMetrics.ConnOutgoing, 10))
+		fmt.Fprintf(&sb, " [green]Cold Peers : [white]%s\n",
+			strconv.FormatUint(promMetrics.PeersCold, 10))
+		fmt.Fprintf(&sb, " [green]Warm Peers : [white]%s\n",
+			strconv.FormatUint(promMetrics.PeersWarm, 10))
+		fmt.Fprintf(&sb, " [green]Hot Peers  : [white]%s\n",
+			strconv.FormatUint(promMetrics.PeersHot, 10))
+		fmt.Fprintf(&sb, " [green]Uni-Dir    : [white]%s\n",
+			strconv.FormatUint(promMetrics.ConnUniDir, 10))
+		fmt.Fprintf(&sb, " [green]Bi-Dir     : [white]%s\n",
+			strconv.FormatUint(promMetrics.ConnBiDir, 10))
+		fmt.Fprintf(&sb, " [green]Duplex     : [white]%s\n",
+			strconv.FormatUint(promMetrics.ConnDuplex, 10))
 	} else {
 		if processMetrics == nil {
 			return connectionText
@@ -912,7 +872,7 @@ func getConnectionText(ctx context.Context) string {
 		// Get process in/out connections
 		connections, err := netutil.ConnectionsPidWithContext(ctx, "tcp", processMetrics.Pid)
 		if err != nil {
-			sb.WriteString(fmt.Sprintf("Failed to get processes: %v", err))
+			fmt.Fprintf(&sb, "Failed to get processes: %v", err)
 		}
 
 		var peersIn []string
@@ -932,15 +892,12 @@ func getConnectionText(ctx context.Context) string {
 			}
 		}
 
-		sb.WriteString(fmt.Sprintf(" [green]P2P        : [yellow]%s\n",
-			"disabled",
-		))
-		sb.WriteString(fmt.Sprintf(" [green]Incoming   : [white]%s\n",
-			strconv.Itoa(len(peersIn)),
-		))
-		sb.WriteString(fmt.Sprintf(" [green]Outgoing   : [white]%s\n",
-			strconv.Itoa(len(peersOut)),
-		))
+		fmt.Fprintf(&sb, " [green]P2P        : [yellow]%s\n",
+			"disabled")
+		fmt.Fprintf(&sb, " [green]Incoming   : [white]%s\n",
+			strconv.Itoa(len(peersIn)))
+		fmt.Fprintf(&sb, " [green]Outgoing   : [white]%s\n",
+			strconv.Itoa(len(peersOut)))
 	}
 	return sb.String()
 }
@@ -969,17 +926,14 @@ func getCoreText(ctx context.Context) string {
 			invalidFmt = "red"
 		}
 		leader := strconv.FormatUint(promMetrics.IsLeader, 10)
-		sb.WriteString(fmt.Sprintf(" [green]Leader     : [white]%s\n",
-			leader,
-		))
+		fmt.Fprintf(&sb, " [green]Leader     : [white]%s\n",
+			leader)
 		adopted := strconv.FormatUint(promMetrics.Adopted, 10)
-		sb.WriteString(fmt.Sprintf(" [green]Adopted    : ["+adoptedFmt+"]%s\n",
-			adopted,
-		))
+		fmt.Fprintf(&sb, " [green]Adopted    : ["+adoptedFmt+"]%s\n",
+			adopted)
 		invalid := strconv.FormatUint(promMetrics.DidntAdopt, 10)
-		sb.WriteString(fmt.Sprintf(" [green]Invalid    : ["+invalidFmt+"]%s\n",
-			invalid,
-		))
+		fmt.Fprintf(&sb, " [green]Invalid    : ["+invalidFmt+"]%s\n",
+			invalid)
 		sb.WriteString(" [green]Missed     : ")
 		var missedSlotsPct float32
 		if promMetrics.AboutToLead > 0 {
@@ -987,24 +941,20 @@ func getCoreText(ctx context.Context) string {
 				promMetrics.MissedSlots,
 			) / (float32(promMetrics.AboutToLead + promMetrics.MissedSlots)) * 100
 		}
-		sb.WriteString(fmt.Sprintf("[white]%s [blue]([white]%s %%[blue])\n",
+		fmt.Fprintf(&sb, "[white]%s [blue]([white]%s %%[blue])\n",
 			strconv.FormatUint(promMetrics.MissedSlots, 10),
-			fmt.Sprintf("%.2f", missedSlotsPct),
-		))
+			fmt.Sprintf("%.2f", missedSlotsPct))
 
 		sb.WriteString("\n")
 
 		// KES
-		sb.WriteString(fmt.Sprintf(" [green]KES period : [white]%d\n",
-			promMetrics.KesPeriod,
-		))
-		sb.WriteString(fmt.Sprintf(" [green]KES remain : [white]%d\n",
-			promMetrics.RemainingKesPeriods,
-		))
+		fmt.Fprintf(&sb, " [green]KES period : [white]%d\n",
+			promMetrics.KesPeriod)
+		fmt.Fprintf(&sb, " [green]KES remain : [white]%d\n",
+			promMetrics.RemainingKesPeriods)
 	} else {
-		sb.WriteString(fmt.Sprintf("%18s\n",
-			"N/A",
-		))
+		fmt.Fprintf(&sb, "%18s\n",
+			"N/A")
 	}
 	failCount.Store(0)
 	return sb.String()
@@ -1025,7 +975,12 @@ func getBlockText(ctx context.Context) string {
 	width := TerminalWidthDefault
 
 	// Get our terminal size
-	tcols, tlines, err := terminal.GetSize(int(os.Stdout.Fd()))
+	fd := os.Stdout.Fd()
+	if fd > math.MaxInt {
+		failCount.Add(1)
+		return "ERROR: invalid file descriptor"
+	}
+	tcols, tlines, err := terminal.GetSize(int(fd)) //nolint:gosec // fd validated above
 	if err != nil {
 		failCount.Add(1)
 		return fmt.Sprintf("ERROR: %v", err)
@@ -1058,49 +1013,27 @@ func getBlockText(ctx context.Context) string {
 	delay := fmt.Sprintf("%.2f", promMetrics.BlockDelay)
 
 	// Row 1
-	sb.WriteString(
-		fmt.Sprintf(
-			" [green]Last Delay : [white]%s[blue]%-"+strconv.Itoa(
-				10-len(delay),
-			)+"s",
-			delay,
-			"s",
-		),
-	)
-	sb.WriteString(
-		fmt.Sprintf(" [green]Served     : [white]%-"+strconv.Itoa(10)+"s",
-			strconv.FormatUint(promMetrics.BlocksServed, 10),
-		),
-	)
-	sb.WriteString(
-		fmt.Sprintf(" [green]Late (>5s) : [white]%-"+strconv.Itoa(10)+"s\n",
-			strconv.FormatUint(promMetrics.BlocksLate, 10),
-		),
-	)
+	fmt.Fprintf(&sb, " [green]Last Delay : [white]%s[blue]%-"+strconv.Itoa(
+		10-len(delay),
+	)+"s",
+		delay,
+		"s")
+	fmt.Fprintf(&sb, " [green]Served     : [white]%-"+strconv.Itoa(10)+"s",
+		strconv.FormatUint(promMetrics.BlocksServed, 10))
+	fmt.Fprintf(&sb, " [green]Late (>5s) : [white]%-"+strconv.Itoa(10)+"s\n",
+		strconv.FormatUint(promMetrics.BlocksLate, 10))
 	// Row 2
-	sb.WriteString(
-		fmt.Sprintf(
-			" [green]Within 1s  : [white]%s%-"+strconv.Itoa(10-len(blk1s))+"s",
-			blk1s,
-			"%",
-		),
-	)
-	sb.WriteString(
-		fmt.Sprintf(
-			" [green]Within 3s  : [white]%s%-"+strconv.Itoa(10-len(blk3s))+"s",
-			blk3s,
-			"%",
-		),
-	)
-	sb.WriteString(
-		fmt.Sprintf(
-			" [green]Within 5s  : [white]%s%-"+strconv.Itoa(
-				10-len(blk5s),
-			)+"s\n",
-			blk5s,
-			"%",
-		),
-	)
+	fmt.Fprintf(&sb, " [green]Within 1s  : [white]%s%-"+strconv.Itoa(10-len(blk1s))+"s",
+		blk1s,
+		"%")
+	fmt.Fprintf(&sb, " [green]Within 3s  : [white]%s%-"+strconv.Itoa(10-len(blk3s))+"s",
+		blk3s,
+		"%")
+	fmt.Fprintf(&sb, " [green]Within 5s  : [white]%s%-"+strconv.Itoa(
+		10-len(blk5s),
+	)+"s\n",
+		blk5s,
+		"%")
 
 	failCount.Store(0)
 	return sb.String()
@@ -1122,29 +1055,22 @@ func getNodeText(ctx context.Context) string {
 	}
 	nodeVersion, nodeRevision, _ := getNodeVersion()
 	var sb strings.Builder
-	sb.WriteString(
-		fmt.Sprintf(" [green]Name       : [white]%s\n", getEffectiveNodeName()),
-	)
-	sb.WriteString(fmt.Sprintf(" [green]Role       : [white]%s\n", role))
-	sb.WriteString(fmt.Sprintf(" [green]Network    : [white]%s\n", network))
-	sb.WriteString(fmt.Sprintf(
-		" [green]Version    : [white]%s\n",
+	fmt.Fprintf(&sb, " [green]Name       : [white]%s\n", getEffectiveNodeName())
+	fmt.Fprintf(&sb, " [green]Role       : [white]%s\n", role)
+	fmt.Fprintf(&sb, " [green]Network    : [white]%s\n", network)
+	fmt.Fprintf(&sb, " [green]Version    : [white]%s\n",
 		fmt.Sprintf(
 			"[white]%s[blue] [[white]%s[blue]]",
 			nodeVersion,
 			nodeRevision,
-		),
-	))
+		))
 	if publicIP != nil {
-		sb.WriteString(
-			fmt.Sprintf(" [green]Public IP  : [white]%s\n", publicIP),
-		)
+		fmt.Fprintf(&sb, " [green]Public IP  : [white]%s\n", publicIP)
 	} else {
-		sb.WriteString(fmt.Sprintln())
+		fmt.Fprintln(&sb)
 	}
-	sb.WriteString(fmt.Sprintf(" [green]Uptime     : [white]%s\n",
-		timeFromSeconds(uptimes),
-	))
+	fmt.Fprintf(&sb, " [green]Uptime     : [white]%s\n",
+		timeFromSeconds(uptimes))
 	return sb.String()
 }
 
@@ -1171,28 +1097,21 @@ func getPeerText(ctx context.Context) string {
 	granularitySmall := granularity / 2
 	if checkPeers {
 		peerCount := len(peersFiltered)
-		sb.WriteString(
-			fmt.Sprintf(" [yellow]%s [blue]%d[white]/[green]%d[white]\n",
-				"Peer analysis started... please wait!",
-				len(peerStats.RTTresultsSlice),
-				peerCount,
-			),
-		)
+		fmt.Fprintf(&sb, " [yellow]%s [blue]%d[white]/[green]%d[white]\n",
+			"Peer analysis started... please wait!",
+			len(peerStats.RTTresultsSlice),
+			peerCount)
 		scrollPeers = false
 		return sb.String()
 	}
 
 	peerCount := len(peersFiltered)
 	sb.WriteString("       [green]RTT : Peers / Percent\n")
-	sb.WriteString(fmt.Sprintf(
-		"    [green]0-50ms : [white]%5s   %.f%%",
+	fmt.Fprintf(&sb, "    [green]0-50ms : [white]%5s   %.f%%",
 		strconv.Itoa(peerStats.CNT1),
-		peerStats.PCT1,
-	))
-	sb.WriteString(fmt.Sprintf(
-		"%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT1)))+"s",
-		" ",
-	))
+		peerStats.PCT1)
+	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT1)))+"s",
+		" ")
 	for i := range granularitySmall {
 		if i < int(peerStats.PCT1) {
 			sb.WriteString("[green]" + charMarked)
@@ -1201,15 +1120,11 @@ func getPeerText(ctx context.Context) string {
 		}
 	}
 	sb.WriteString("[white]\n") // closeRow
-	sb.WriteString(fmt.Sprintf(
-		"  [green]50-100ms : [white]%5s   %.f%%",
+	fmt.Fprintf(&sb, "  [green]50-100ms : [white]%5s   %.f%%",
 		strconv.Itoa(peerStats.CNT2),
-		peerStats.PCT2,
-	))
-	sb.WriteString(fmt.Sprintf(
-		"%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT2)))+"s",
-		"",
-	))
+		peerStats.PCT2)
+	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT2)))+"s",
+		"")
 	for i := range granularitySmall {
 		if i < int(peerStats.PCT2) {
 			sb.WriteString("[yellow]" + charMarked)
@@ -1218,15 +1133,11 @@ func getPeerText(ctx context.Context) string {
 		}
 	}
 	sb.WriteString("[white]\n") // closeRow
-	sb.WriteString(fmt.Sprintf(
-		" [green]100-200ms : [white]%5s   %.f%%",
+	fmt.Fprintf(&sb, " [green]100-200ms : [white]%5s   %.f%%",
 		strconv.Itoa(peerStats.CNT3),
-		peerStats.PCT3,
-	))
-	sb.WriteString(fmt.Sprintf(
-		"%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT3)))+"s",
-		"",
-	))
+		peerStats.PCT3)
+	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT3)))+"s",
+		"")
 	for i := range granularitySmall {
 		if i < int(peerStats.PCT3) {
 			sb.WriteString("[red]" + charMarked)
@@ -1235,15 +1146,11 @@ func getPeerText(ctx context.Context) string {
 		}
 	}
 	sb.WriteString("[white]\n") // closeRow
-	sb.WriteString(fmt.Sprintf(
-		"   [green]200ms < : [white]%5s   %.f%%",
+	fmt.Fprintf(&sb, "   [green]200ms < : [white]%5s   %.f%%",
 		strconv.Itoa(peerStats.CNT4),
-		peerStats.PCT4,
-	))
-	sb.WriteString(fmt.Sprintf(
-		"%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT4)))+"s",
-		"",
-	))
+		peerStats.PCT4)
+	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT4)))+"s",
+		"")
 	for i := range granularitySmall {
 		if i < int(peerStats.PCT4) {
 			sb.WriteString("[fuchsia]" + charMarked)
@@ -1256,40 +1163,30 @@ func getPeerText(ctx context.Context) string {
 	// Divider
 	sb.WriteString(strings.Repeat("-", width-1) + "\n")
 
-	sb.WriteString(
-		fmt.Sprintf(
-			" [green]Total / Undetermined : [white]%d[white] / ",
-			peerCount,
-		),
-	)
+	fmt.Fprintf(&sb, " [green]Total / Undetermined : [white]%d[white] / ",
+		peerCount)
 	if peerStats.CNT0 == 0 {
 		sb.WriteString("[blue]0[white]")
 	} else {
-		sb.WriteString(fmt.Sprintf("[fuchsia]%d[white]", peerStats.CNT0))
+		fmt.Fprintf(&sb, "[fuchsia]%d[white]", peerStats.CNT0)
 	}
 	if peerStats.RTTAVG >= RTTThreshold3 {
-		sb.WriteString(
-			fmt.Sprintf(
-				" Average RTT : [fuchsia]%d[white] ms\n",
-				peerStats.RTTAVG,
-			),
-		)
+		fmt.Fprintf(&sb, " Average RTT : [fuchsia]%d[white] ms\n",
+			peerStats.RTTAVG)
 	} else if peerStats.RTTAVG >= RTTThreshold2 {
-		sb.WriteString(fmt.Sprintf(" Average RTT : [red]%d[white] ms\n", peerStats.RTTAVG))
+		fmt.Fprintf(&sb, " Average RTT : [red]%d[white] ms\n", peerStats.RTTAVG)
 	} else if peerStats.RTTAVG >= RTTThreshold1 {
-		sb.WriteString(fmt.Sprintf(" Average RTT : [yellow]%d[white] ms\n", peerStats.RTTAVG))
+		fmt.Fprintf(&sb, " Average RTT : [yellow]%d[white] ms\n", peerStats.RTTAVG)
 	} else if peerStats.RTTAVG >= 0 {
-		sb.WriteString(fmt.Sprintf(" Average RTT : [green]%d[white] ms\n", peerStats.RTTAVG))
+		fmt.Fprintf(&sb, " Average RTT : [green]%d[white] ms\n", peerStats.RTTAVG)
 	} else {
-		sb.WriteString(fmt.Sprintf(" Average RTT : [red]%s[white] ms\n", "---"))
+		fmt.Fprintf(&sb, " Average RTT : [red]%s[white] ms\n", "---")
 	}
 
 	// Divider
 	sb.WriteString(strings.Repeat("-", width-1) + "\n")
 
-	sb.WriteString(
-		fmt.Sprintf("   [green]# %24s  I/O RTT   Geolocation\n", "REMOTE PEER"),
-	)
+	fmt.Fprintf(&sb, "   [green]# %24s  I/O RTT   Geolocation\n", "REMOTE PEER")
 	// peerLocationWidth := width - 41
 	for peerNbr, peer := range peerStats.RTTresultsSlice {
 		peerNbr++
@@ -1322,25 +1219,21 @@ func getPeerText(ctx context.Context) string {
 			color = "red"
 		}
 		if peerRTT < RTTUnreachable {
-			sb.WriteString(fmt.Sprintf(
-				" %3d %19s:%-5d %-3s ["+color+"]%-5d[white] %s\n",
+			fmt.Fprintf(&sb, " %3d %19s:%-5d %-3s ["+color+"]%-5d[white] %s\n",
 				peerNbr,
 				peerIP,
 				peerPORT,
 				peerDIR,
 				peerRTT,
-				peerLocationFmt,
-			))
+				peerLocationFmt)
 		} else {
-			sb.WriteString(fmt.Sprintf(
-				" %3d %19s:%-5d %-3s [fuchsia]%-5s[white] %s\n",
+			fmt.Fprintf(&sb, " %3d %19s:%-5d %-3s [fuchsia]%-5s[white] %s\n",
 				peerNbr,
 				peerIP,
 				peerPORT,
 				peerDIR,
 				"---",
-				peerLocationFmt,
-			))
+				peerLocationFmt)
 		}
 	}
 	sb.WriteString("[white]\n")
@@ -1391,21 +1284,11 @@ func getResourceText(ctx context.Context) string {
 		memHeapStr = fmt.Sprintf("%.1f", float64(promMetrics.MemHeap)/float64(BytesInGigabyte))
 	}
 
-	sb.WriteString(
-		fmt.Sprintf(
-			" [green]CPU (sys)  : [white]%s%%\n",
-			fmt.Sprintf("%.2f", cpuPercent),
-		),
-	)
-	sb.WriteString(
-		fmt.Sprintf(" [green]Mem (Live) : [white]%s[blue]G\n", memLiveStr),
-	)
-	sb.WriteString(
-		fmt.Sprintf(" [green]Mem (RSS)  : [white]%s[blue]G\n", memRss),
-	)
-	sb.WriteString(
-		fmt.Sprintf(" [green]Mem (Heap) : [white]%s[blue]G\n", memHeapStr),
-	)
+	fmt.Fprintf(&sb, " [green]CPU (sys)  : [white]%s%%\n",
+		fmt.Sprintf("%.2f", cpuPercent))
+	fmt.Fprintf(&sb, " [green]Mem (Live) : [white]%s[blue]G\n", memLiveStr)
+	fmt.Fprintf(&sb, " [green]Mem (RSS)  : [white]%s[blue]G\n", memRss)
+	fmt.Fprintf(&sb, " [green]Mem (Heap) : [white]%s[blue]G\n", memHeapStr)
 	var gcMinor, gcMajor uint64
 	if getEffectiveNodeBinary() == DINGO_BINARY {
 		gcMinor = 0
@@ -1415,18 +1298,10 @@ func getResourceText(ctx context.Context) string {
 		gcMajor = promMetrics.GcMajor
 	}
 
-	sb.WriteString(
-		fmt.Sprintf(
-			" [green]GC Minor   : [white]%s\n",
-			strconv.FormatUint(gcMinor, 10),
-		),
-	)
-	sb.WriteString(
-		fmt.Sprintf(
-			" [green]GC Major   : [white]%s\n",
-			strconv.FormatUint(gcMajor, 10),
-		),
-	)
+	fmt.Fprintf(&sb, " [green]GC Minor   : [white]%s\n",
+		strconv.FormatUint(gcMinor, 10))
+	fmt.Fprintf(&sb, " [green]GC Major   : [white]%s\n",
+		strconv.FormatUint(gcMajor, 10))
 	return sb.String()
 }
 
