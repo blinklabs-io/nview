@@ -137,7 +137,7 @@ jobs:
         env:
           MAXMIND_API_CREDENTIALS: ${{ secrets.MAXMIND_API_CREDENTIALS }}
       - name: Build images
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         id: push
         with:
           outputs: "type=registry,push=true"
