@@ -696,9 +696,6 @@ func getUptimes(ctx context.Context, processMetrics *process.Process) uint64 {
 	return uptimes
 }
 
-// Track size of epoch items
-var epochItemsLast = 0
-
 func getEpochProgress() float32 {
 	cfg := config.GetConfig()
 	if cfg.Node.ShelleyTransEpoch < 0 {
@@ -747,20 +744,15 @@ func getEpochText(ctx context.Context) string {
 	// Epoch progress bar
 	var epochBar strings.Builder
 	granularity := ProgressBarGranularity
-	var charMarked string
-	var charUnmarked string
-	charMarked = string('▌')
-	charUnmarked = string('▖')
+	charMarked := string('▌')
+	charUnmarked := string('▖')
 
 	epochItems := int(epochProgress) * granularity / 100
-	if epochItems != epochItemsLast {
-		epochItemsLast = epochItems
-		for i := 0; i <= granularity-1; i++ {
-			if i < epochItems {
-				epochBar.WriteString("[blue]" + charMarked)
-			} else {
-				epochBar.WriteString("[white]" + charUnmarked)
-			}
+	for i := 0; i <= granularity-1; i++ {
+		if i < epochItems {
+			epochBar.WriteString("[blue]" + charMarked)
+		} else {
+			epochBar.WriteString("[white]" + charUnmarked)
 		}
 	}
 	fmt.Fprintf(&sb, " [blue]%s[green]\n", epochBar.String())
@@ -872,7 +864,8 @@ func getConnectionText(ctx context.Context) string {
 		// Get process in/out connections
 		connections, err := netutil.ConnectionsPidWithContext(ctx, "tcp", processMetrics.Pid)
 		if err != nil {
-			fmt.Fprintf(&sb, "Failed to get processes: %v", err)
+			fmt.Fprintf(os.Stderr, "Failed to get processes: %v\n", err)
+			return connectionText
 		}
 
 		var peersIn []string
