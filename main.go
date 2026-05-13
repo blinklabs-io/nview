@@ -855,8 +855,8 @@ func getConnectionText(ctx context.Context) string {
 			strconv.FormatUint(promMetrics.ConnUniDir, 10))
 		fmt.Fprintf(&sb, " [green]Bi-Dir     : [white]%s\n",
 			strconv.FormatUint(promMetrics.ConnBiDir, 10))
-		fmt.Fprintf(&sb, " [green]Duplex     : [white]%s\n",
-			strconv.FormatUint(promMetrics.ConnDuplex, 10))
+		fmt.Fprintf(&sb, " [green]FullDuplex : [white]%s\n",
+			strconv.FormatUint(promMetrics.ConnFullDuplex, 10))
 	} else {
 		if processMetrics == nil {
 			return connectionText

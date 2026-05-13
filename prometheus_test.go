@@ -15,6 +15,7 @@
 package main
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/blinklabs-io/nview/internal/config"
@@ -155,6 +156,63 @@ func TestDetectNodeType(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPromMetricsConnectionManagerGauges(t *testing.T) {
+	prom := []byte(`
+cardano_node_metrics_connectionManager_unidirectionalConns 4
+cardano_node_metrics_connectionManager_duplexConns 6
+cardano_node_metrics_connectionManager_fullDuplexConns 8
+cardano_node_metrics_connectionManager_prunableConns 2
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	if metrics.ConnUniDir != 4 {
+		t.Errorf("ConnUniDir = %d, expected 4", metrics.ConnUniDir)
+	}
+	if metrics.ConnBiDir != 6 {
+		t.Errorf("ConnBiDir = %d, expected 6", metrics.ConnBiDir)
+	}
+	if metrics.ConnFullDuplex != 8 {
+		t.Errorf("ConnFullDuplex = %d, expected 8", metrics.ConnFullDuplex)
+	}
+	if metrics.ConnPrunable != 2 {
+		t.Errorf("ConnPrunable = %d, expected 2", metrics.ConnPrunable)
+	}
+}
+
+func TestPromMetricsMissingFullDuplexConns(t *testing.T) {
+	prom := []byte(`
+cardano_node_metrics_connectionManager_unidirectionalConns 4
+cardano_node_metrics_connectionManager_duplexConns 6
+cardano_node_metrics_connectionManager_prunableConns 2
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	if metrics.ConnFullDuplex != 0 {
+		t.Errorf("ConnFullDuplex = %d, expected 0", metrics.ConnFullDuplex)
+	}
+	if metrics.ConnPrunable != 2 {
+		t.Errorf("ConnPrunable = %d, expected 2", metrics.ConnPrunable)
+	}
+}
+
+func decodePromMetrics(t *testing.T, prom []byte) PromMetrics {
+	t.Helper()
+
+	b, err := prom2json(prom)
+	if err != nil {
+		t.Fatalf("prom2json() error = %v", err)
+	}
+
+	var metrics PromMetrics
+	if err := json.Unmarshal(b, &metrics); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	return metrics
 }
 
 func TestGetEffectiveNodeBinary(t *testing.T) {
