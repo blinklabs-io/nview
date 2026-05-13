@@ -79,7 +79,8 @@ type PromMetrics struct {
 	ConnOutgoing        uint64  `json:"cardano_node_metrics_connectionManager_outgoingConns"`
 	ConnUniDir          uint64  `json:"cardano_node_metrics_connectionManager_unidirectionalConns"`
 	ConnBiDir           uint64  `json:"cardano_node_metrics_connectionManager_duplexConns"`
-	ConnDuplex          uint64  `json:"cardano_node_metrics_connectionManager_prunableConns"`
+	ConnFullDuplex      uint64  `json:"cardano_node_metrics_connectionManager_fullDuplexConns"`
+	ConnPrunable        uint64  `json:"cardano_node_metrics_connectionManager_prunableConns"`
 	// Go runtime metrics for Dingo
 	GoMemAlloc  uint64 `json:"go_memstats_alloc_bytes"`
 	GoHeapIdle  uint64 `json:"go_memstats_heap_idle_bytes"`
