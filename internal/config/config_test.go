@@ -257,18 +257,18 @@ func TestApplyDingoGenesisOverride(t *testing.T) {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	if !ApplyDingoGenesisOverride(1700000000, 1000) {
+	if !ApplyDingoGenesisOverride(1666656000, 86400) {
 		t.Fatal("Expected Dingo genesis override to apply")
 	}
-	if cfg.Node.ByronGenesis.StartTime != 1700000000 {
+	if cfg.Node.ByronGenesis.StartTime != 1666656000 {
 		t.Errorf(
-			"Expected Byron start time 1700000000, got %d",
+			"Expected Byron start time 1666656000, got %d",
 			cfg.Node.ByronGenesis.StartTime,
 		)
 	}
-	if cfg.Node.ShelleyGenesis.EpochLength != 1000 {
+	if cfg.Node.ShelleyGenesis.EpochLength != 86400 {
 		t.Errorf(
-			"Expected Shelley epoch length 1000, got %d",
+			"Expected Shelley epoch length 86400, got %d",
 			cfg.Node.ShelleyGenesis.EpochLength,
 		)
 	}
@@ -278,7 +278,7 @@ func TestApplyDingoGenesisOverride(t *testing.T) {
 			cfg.Node.ShelleyTransEpoch,
 		)
 	}
-	if ApplyDingoGenesisOverride(1700000000, 1000) {
+	if ApplyDingoGenesisOverride(1666656000, 86400) {
 		t.Fatal("Expected second Dingo genesis override to be skipped")
 	}
 }
@@ -290,8 +290,8 @@ func TestApplyDingoGenesisOverrideZeroMetrics(t *testing.T) {
 		shelleyStart  uint64
 		epochLenSlots uint64
 	}{
-		{"zero Shelley start", 0, 1000},
-		{"zero epoch length", 1700000000, 0},
+		{"zero Shelley start", 0, 86400},
+		{"zero epoch length", 1666656000, 0},
 	}
 
 	for _, tt := range tests {
@@ -357,7 +357,7 @@ func TestApplyDingoGenesisOverrideSkipsPinnedGenesisValues(t *testing.T) {
 			shelleySlotLen := cfg.Node.ShelleyGenesis.SlotLength
 			transEpoch := cfg.Node.ShelleyTransEpoch
 
-			if ApplyDingoGenesisOverride(1700000000, 1000) {
+			if ApplyDingoGenesisOverride(1666656000, 86400) {
 				t.Fatal("Expected Dingo genesis override to be skipped")
 			}
 			if cfg.Node.ByronGenesis.StartTime != start ||
