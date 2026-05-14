@@ -103,8 +103,10 @@ func getDefaultConfig() *Config {
 }
 
 // Singleton config instance with default values
-var globalConfig = getDefaultConfig()
-var defaultsForCurrentNetwork = getDefaultConfig()
+var (
+	globalConfig              = getDefaultConfig()
+	defaultsForCurrentNetwork = getDefaultConfig()
+)
 
 // LoadConfig loads configuration from a YAML file and environment variables.
 // Environment variables take precedence over file values. If configFile is empty,
