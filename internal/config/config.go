@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync/atomic"
 
 	"github.com/kelseyhightower/envconfig"
 	"gopkg.in/yaml.v2"
@@ -104,9 +105,13 @@ func getDefaultConfig() *Config {
 
 // Singleton config instance with default values
 var (
-	globalConfig              = getDefaultConfig()
-	defaultsForCurrentNetwork = getDefaultConfig()
+	globalConfig              atomic.Pointer[Config]
+	defaultsForCurrentNetwork atomic.Pointer[Config]
 )
+
+func init() {
+	globalConfig.Store(getDefaultConfig())
+}
 
 // LoadConfig loads configuration from a YAML file and environment variables.
 // Environment variables take precedence over file values. If configFile is empty,
@@ -152,15 +157,19 @@ func LoadConfig(configFile string) (*Config, error) {
 		return nil, err
 	}
 	// Update global config for singleton access
-	globalConfig = cfg
-	defaultsForCurrentNetwork = defaults
+	globalConfig.Store(cfg)
+	defaultsForCurrentNetwork.Store(defaults)
 	return cfg, nil
 }
 
 // GetConfig returns the global config instance.
 // This is a singleton accessor for the loaded configuration.
 func GetConfig() *Config {
-	return globalConfig
+	cfg := globalConfig.Load()
+	if cfg == nil {
+		return getDefaultConfig()
+	}
+	return cfg
 }
 
 func (c *Config) defaultConfigForCurrentNetwork() (*Config, error) {
@@ -202,18 +211,19 @@ func ApplyDingoGenesisOverride(shelleyStart, epochLenSlots uint64) bool {
 		return false
 	}
 	// Nothing to compare against if config has not been loaded yet.
-	if defaultsForCurrentNetwork == nil || globalConfig == nil {
+	cfg := globalConfig.Load()
+	defaults := defaultsForCurrentNetwork.Load()
+	if defaults == nil || cfg == nil {
 		return false
 	}
 
-	cfg := globalConfig
-	defaults := defaultsForCurrentNetwork
 	// Only override values that still match the network-table defaults.
 	if cfg.Node.ByronGenesis.StartTime != defaults.Node.ByronGenesis.StartTime ||
 		cfg.Node.ByronGenesis.EpochLength != defaults.Node.ByronGenesis.EpochLength ||
 		cfg.Node.ByronGenesis.SlotLength != defaults.Node.ByronGenesis.SlotLength ||
 		cfg.Node.ShelleyGenesis.EpochLength != defaults.Node.ShelleyGenesis.EpochLength ||
-		cfg.Node.ShelleyGenesis.SlotLength != defaults.Node.ShelleyGenesis.SlotLength {
+		cfg.Node.ShelleyGenesis.SlotLength != defaults.Node.ShelleyGenesis.SlotLength ||
+		cfg.Node.ShelleyTransEpoch != defaults.Node.ShelleyTransEpoch {
 		return false
 	}
 
@@ -221,9 +231,11 @@ func ApplyDingoGenesisOverride(shelleyStart, epochLenSlots uint64) bool {
 		cfg.Node.ShelleyGenesis.EpochLength != epochLenSlots ||
 		cfg.Node.ShelleyTransEpoch != 0
 
-	cfg.Node.ByronGenesis.StartTime = shelleyStart
-	cfg.Node.ShelleyGenesis.EpochLength = epochLenSlots
-	cfg.Node.ShelleyTransEpoch = 0
+	updated := *cfg
+	updated.Node.ByronGenesis.StartTime = shelleyStart
+	updated.Node.ShelleyGenesis.EpochLength = epochLenSlots
+	updated.Node.ShelleyTransEpoch = 0
+	globalConfig.Store(&updated)
 	return changed
 }
 
@@ -299,8 +311,10 @@ func (c *Config) populateByronGenesis() error {
 		c.Node.ByronGenesis.SlotLength = 20000
 	}
 	// Our K is 2160, except preview, which we'll override below
+	kWasDefaulted := false
 	if c.Node.ByronGenesis.K == 0 {
 		c.Node.ByronGenesis.K = 2160
+		kWasDefaulted = true
 	}
 
 	network := c.Node.Network
@@ -313,7 +327,7 @@ func (c *Config) populateByronGenesis() error {
 
 	switch network {
 	case "preview":
-		if c.Node.ByronGenesis.K == 2160 {
+		if kWasDefaulted {
 			c.Node.ByronGenesis.K = 432
 		}
 		if c.Node.ByronGenesis.StartTime == 0 {
@@ -324,7 +338,7 @@ func (c *Config) populateByronGenesis() error {
 			c.Node.ByronGenesis.StartTime = 1654041600
 		}
 	case "sancho":
-		if c.Node.ByronGenesis.K == 2160 {
+		if kWasDefaulted {
 			c.Node.ByronGenesis.K = 432
 		}
 		if c.Node.ByronGenesis.StartTime == 0 {

@@ -9,7 +9,7 @@ func resetConfigEnv(t *testing.T) {
 	t.Helper()
 	envVars := []string{
 		"BYRON_GENESIS_START_SEC", "BYRON_EPOCH_LENGTH", "BYRON_SLOT_LENGTH",
-		"SHELLEY_EPOCH_LENGTH", "SHELLEY_SLOT_LENGTH",
+		"SHELLEY_EPOCH_LENGTH", "SHELLEY_SLOT_LENGTH", "SHELLEY_TRANS_EPOCH",
 		"DUMMY_NODE_NAME", "DUMMY_NETWORK", "DUMMY_REFRESH", "DUMMY_RETRIES",
 		"DUMMY_CARDANO_NODE_BINARY", "DUMMY_CARDANO_NODE_PID_FILE", "DUMMY_CARDANO_NETWORK",
 		"DUMMY_CARDANO_NODE_NETWORK_MAGIC", "DUMMY_CARDANO_PORT", "DUMMY_SHELLEY_TRANS_EPOCH",
@@ -22,8 +22,8 @@ func resetConfigEnv(t *testing.T) {
 		os.Unsetenv(v)
 	}
 	// Reset globalConfig to defaults
-	globalConfig = getDefaultConfig()
-	defaultsForCurrentNetwork = getDefaultConfig()
+	globalConfig.Store(getDefaultConfig())
+	defaultsForCurrentNetwork.Store(nil)
 }
 
 func TestLoadConfig(t *testing.T) {
@@ -130,6 +130,33 @@ func TestPopulateByronGenesis(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestPopulateByronGenesisPreservesPinnedK(t *testing.T) {
+	cfg := &Config{
+		App: AppConfig{
+			Network: "preview",
+		},
+		Node: NodeConfig{
+			ByronGenesis: ByronGenesisConfig{
+				K: 2160,
+			},
+		},
+	}
+
+	err := cfg.populateByronGenesis()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if cfg.Node.ByronGenesis.K != 2160 {
+		t.Errorf("Expected pinned K 2160, got %d", cfg.Node.ByronGenesis.K)
+	}
+	if cfg.Node.ByronGenesis.EpochLength != 21600 {
+		t.Errorf(
+			"Expected EpochLength 21600 from pinned K, got %d",
+			cfg.Node.ByronGenesis.EpochLength,
+		)
 	}
 }
 
@@ -252,7 +279,7 @@ node:
 func TestApplyDingoGenesisOverride(t *testing.T) {
 	resetConfigEnv(t)
 
-	cfg, err := LoadConfig("")
+	_, err := LoadConfig("")
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
@@ -260,6 +287,7 @@ func TestApplyDingoGenesisOverride(t *testing.T) {
 	if !ApplyDingoGenesisOverride(1666656000, 86400) {
 		t.Fatal("Expected Dingo genesis override to apply")
 	}
+	cfg := GetConfig()
 	if cfg.Node.ByronGenesis.StartTime != 1666656000 {
 		t.Errorf(
 			"Expected Byron start time 1666656000, got %d",
@@ -338,6 +366,7 @@ func TestApplyDingoGenesisOverrideSkipsPinnedGenesisValues(t *testing.T) {
 		{"Byron slot length pinned", "BYRON_SLOT_LENGTH", "999"},
 		{"Shelley epoch length pinned", "SHELLEY_EPOCH_LENGTH", "999"},
 		{"Shelley slot length pinned", "SHELLEY_SLOT_LENGTH", "2"},
+		{"Shelley transition epoch pinned", "SHELLEY_TRANS_EPOCH", "1"},
 	}
 
 	for _, tt := range tests {
