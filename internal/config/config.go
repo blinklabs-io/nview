@@ -104,6 +104,7 @@ func getDefaultConfig() *Config {
 
 // Singleton config instance with default values
 var globalConfig = getDefaultConfig()
+var defaultsForCurrentNetwork = getDefaultConfig()
 
 // LoadConfig loads configuration from a YAML file and environment variables.
 // Environment variables take precedence over file values. If configFile is empty,
@@ -144,8 +145,13 @@ func LoadConfig(configFile string) (*Config, error) {
 	if err := cfg.populateShelleyTransEpoch(); err != nil {
 		return nil, err
 	}
+	defaults, err := cfg.defaultConfigForCurrentNetwork()
+	if err != nil {
+		return nil, err
+	}
 	// Update global config for singleton access
 	globalConfig = cfg
+	defaultsForCurrentNetwork = defaults
 	return cfg, nil
 }
 
@@ -153,6 +159,70 @@ func LoadConfig(configFile string) (*Config, error) {
 // This is a singleton accessor for the loaded configuration.
 func GetConfig() *Config {
 	return globalConfig
+}
+
+func (c *Config) defaultConfigForCurrentNetwork() (*Config, error) {
+	defaults := getDefaultConfig()
+	defaults.App.Network = c.App.Network
+	defaults.Node.Network = c.Node.Network
+	defaults.Node.NetworkMagic = c.Node.NetworkMagic
+
+	if err := defaults.populateNetworkMagic(); err != nil {
+		return nil, err
+	}
+	if err := defaults.populateByronGenesis(); err != nil {
+		return nil, err
+	}
+	if err := defaults.populateShelleyGenesis(); err != nil {
+		return nil, err
+	}
+	if err := defaults.populateShelleyTransEpoch(); err != nil {
+		return nil, err
+	}
+	return defaults, nil
+}
+
+// ApplyDingoGenesisOverride mutates the singleton config when Dingo metrics
+// supersede the hardcoded network table. Dingo devnets usually have no Byron
+// era, so the Shelley start time is used as the effective Byron start time and
+// ShelleyTransEpoch is forced to 0. This makes existing slot math compute pure
+// Shelley-era slots for those networks.
+//
+// Only fires when:
+//   - both metric values are non-zero
+//   - the corresponding config fields still match the network-table defaults
+//     (i.e. the user did not pin them via env or YAML)
+//
+// Returns true if any field was changed.
+func ApplyDingoGenesisOverride(shelleyStart, epochLenSlots uint64) bool {
+	// Require both Dingo genesis metrics before touching slot math config.
+	if shelleyStart == 0 || epochLenSlots == 0 {
+		return false
+	}
+	// Nothing to compare against if config has not been loaded yet.
+	if defaultsForCurrentNetwork == nil || globalConfig == nil {
+		return false
+	}
+
+	cfg := globalConfig
+	defaults := defaultsForCurrentNetwork
+	// Only override values that still match the network-table defaults.
+	if cfg.Node.ByronGenesis.StartTime != defaults.Node.ByronGenesis.StartTime ||
+		cfg.Node.ByronGenesis.EpochLength != defaults.Node.ByronGenesis.EpochLength ||
+		cfg.Node.ByronGenesis.SlotLength != defaults.Node.ByronGenesis.SlotLength ||
+		cfg.Node.ShelleyGenesis.EpochLength != defaults.Node.ShelleyGenesis.EpochLength ||
+		cfg.Node.ShelleyGenesis.SlotLength != defaults.Node.ShelleyGenesis.SlotLength {
+		return false
+	}
+
+	changed := cfg.Node.ByronGenesis.StartTime != shelleyStart ||
+		cfg.Node.ShelleyGenesis.EpochLength != epochLenSlots ||
+		cfg.Node.ShelleyTransEpoch != 0
+
+	cfg.Node.ByronGenesis.StartTime = shelleyStart
+	cfg.Node.ShelleyGenesis.EpochLength = epochLenSlots
+	cfg.Node.ShelleyTransEpoch = 0
+	return changed
 }
 
 // Populates NetworkMagic from named networks
@@ -222,73 +292,85 @@ func (c *Config) populateShelleyTransEpoch() error {
 
 // Populates ByronGenesisConfig from named networks
 func (c *Config) populateByronGenesis() error {
-	if c.Node.ByronGenesis.StartTime != 0 {
-		return nil
-	}
 	// Our slot length is always 20000 in supported networks
-	c.Node.ByronGenesis.SlotLength = 20000
+	if c.Node.ByronGenesis.SlotLength == 0 {
+		c.Node.ByronGenesis.SlotLength = 20000
+	}
 	// Our K is 2160, except preview, which we'll override below
-	c.Node.ByronGenesis.K = 2160
+	if c.Node.ByronGenesis.K == 0 {
+		c.Node.ByronGenesis.K = 2160
+	}
+
+	network := c.Node.Network
 	if c.App.Network != "" {
-		switch c.App.Network {
-		case "preview":
-			c.Node.ByronGenesis.K = 432
-			c.Node.ByronGenesis.StartTime = 1666656000
-		case "preprod":
-			c.Node.ByronGenesis.StartTime = 1654041600
-		case "sancho":
-			c.Node.ByronGenesis.K = 432
-			c.Node.ByronGenesis.StartTime = 1686789000
-		case "mainnet":
-			c.Node.ByronGenesis.StartTime = 1506203091
-		}
-	} else if c.Node.Network != "" {
-		switch c.Node.Network {
-		case "preview":
-			c.Node.ByronGenesis.K = 432
-			c.Node.ByronGenesis.StartTime = 1666656000
-		case "preprod":
-			c.Node.ByronGenesis.StartTime = 1654041600
-		case "sancho":
-			c.Node.ByronGenesis.K = 432
-			c.Node.ByronGenesis.StartTime = 1686789000
-		case "mainnet":
-			c.Node.ByronGenesis.StartTime = 1506203091
-		}
-	} else {
+		network = c.App.Network
+	}
+	if network == "" {
 		return errors.New("unable to populate byron genesis config")
 	}
-	c.Node.ByronGenesis.EpochLength = (10 * c.Node.ByronGenesis.K)
+
+	switch network {
+	case "preview":
+		if c.Node.ByronGenesis.K == 2160 {
+			c.Node.ByronGenesis.K = 432
+		}
+		if c.Node.ByronGenesis.StartTime == 0 {
+			c.Node.ByronGenesis.StartTime = 1666656000
+		}
+	case "preprod":
+		if c.Node.ByronGenesis.StartTime == 0 {
+			c.Node.ByronGenesis.StartTime = 1654041600
+		}
+	case "sancho":
+		if c.Node.ByronGenesis.K == 2160 {
+			c.Node.ByronGenesis.K = 432
+		}
+		if c.Node.ByronGenesis.StartTime == 0 {
+			c.Node.ByronGenesis.StartTime = 1686789000
+		}
+	case "mainnet":
+		if c.Node.ByronGenesis.StartTime == 0 {
+			c.Node.ByronGenesis.StartTime = 1506203091
+		}
+	}
+	if c.Node.ByronGenesis.EpochLength == 0 {
+		c.Node.ByronGenesis.EpochLength = (10 * c.Node.ByronGenesis.K)
+		return nil
+	}
+	if c.Node.ByronGenesis.StartTime == 0 {
+		return nil
+	}
 	return nil
 }
 
 // Populates ShelleyGenesisConfig from named networks
 func (c *Config) populateShelleyGenesis() error {
-	if c.Node.ShelleyGenesis.EpochLength != 0 {
-		return nil
-	}
 	// Our slot length is always 1000 in supported networks
-	c.Node.ShelleyGenesis.SlotLength = 1000
+	if c.Node.ShelleyGenesis.SlotLength == 0 {
+		c.Node.ShelleyGenesis.SlotLength = 1000
+	}
 	// Our slots per KES period is always 129600 in supported networks
-	c.Node.ShelleyGenesis.SlotsPerKESPeriod = 129600
-	// Our epoch length is 432000, except sanchonet/preview
-	c.Node.ShelleyGenesis.EpochLength = 432000
+	if c.Node.ShelleyGenesis.SlotsPerKESPeriod == 0 {
+		c.Node.ShelleyGenesis.SlotsPerKESPeriod = 129600
+	}
+
+	network := c.Node.Network
 	if c.App.Network != "" {
-		switch c.App.Network {
-		case "sancho":
-			c.Node.ShelleyGenesis.EpochLength = 86400
-		case "preview":
-			c.Node.ShelleyGenesis.EpochLength = 86400
-		}
-	} else if c.Node.Network != "" {
-		switch c.Node.Network {
-		case "sancho":
-			c.Node.ShelleyGenesis.EpochLength = 86400
-		case "preview":
+		network = c.App.Network
+	}
+	if network == "" {
+		return errors.New("unable to populate shelley genesis config")
+	}
+
+	if c.Node.ShelleyGenesis.EpochLength == 0 {
+		// Our epoch length is 432000, except sanchonet/preview
+		c.Node.ShelleyGenesis.EpochLength = 432000
+		switch network {
+		case "sancho", "preview":
 			c.Node.ShelleyGenesis.EpochLength = 86400
 		}
 	} else {
-		return errors.New("unable to populate shelley genesis config")
+		return nil
 	}
 	return nil
 }

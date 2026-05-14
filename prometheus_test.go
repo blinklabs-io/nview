@@ -199,6 +199,28 @@ cardano_node_metrics_connectionManager_prunableConns 2
 	}
 }
 
+func TestPromMetricsDingoGenesisFields(t *testing.T) {
+	prom := []byte(`
+dingo_shelley_start_time 1700000000
+dingo_epoch_length_slots 1000
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	if metrics.DingoShelleyStartTime != 1700000000 {
+		t.Errorf(
+			"DingoShelleyStartTime = %d, expected 1700000000",
+			metrics.DingoShelleyStartTime,
+		)
+	}
+	if metrics.DingoEpochLengthSlots != 1000 {
+		t.Errorf(
+			"DingoEpochLengthSlots = %d, expected 1000",
+			metrics.DingoEpochLengthSlots,
+		)
+	}
+}
+
 func decodePromMetrics(t *testing.T, prom []byte) PromMetrics {
 	t.Helper()
 
