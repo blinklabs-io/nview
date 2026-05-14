@@ -278,6 +278,20 @@ func main() {
 				}
 				continue
 			}
+			if getEffectiveNodeBinary() == DINGO_BINARY && prom != nil {
+				if config.ApplyDingoGenesisOverride(
+					prom.DingoShelleyStartTime,
+					prom.DingoEpochLengthSlots,
+				) {
+					logger.Info(
+						"genesis params overridden from Dingo metrics",
+						"shelleyStart",
+						prom.DingoShelleyStartTime,
+						"epochLengthSlots",
+						prom.DingoEpochLengthSlots,
+					)
+				}
+			}
 			promMetrics = prom
 			select {
 			case <-ctx.Done():

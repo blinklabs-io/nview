@@ -82,11 +82,13 @@ type PromMetrics struct {
 	ConnFullDuplex      uint64  `json:"cardano_node_metrics_connectionManager_fullDuplexConns"`
 	ConnPrunable        uint64  `json:"cardano_node_metrics_connectionManager_prunableConns"`
 	// Go runtime metrics for Dingo
-	GoMemAlloc  uint64 `json:"go_memstats_alloc_bytes"`
-	GoHeapIdle  uint64 `json:"go_memstats_heap_idle_bytes"`
-	GoHeapInuse uint64 `json:"go_memstats_heap_inuse_bytes"`
-	GoHeapSys   uint64 `json:"go_memstats_heap_sys_bytes"`
-	GoGcCount   uint64 `json:"go_gc_duration_seconds_count"`
+	GoMemAlloc            uint64 `json:"go_memstats_alloc_bytes"`
+	GoHeapIdle            uint64 `json:"go_memstats_heap_idle_bytes"`
+	GoHeapInuse           uint64 `json:"go_memstats_heap_inuse_bytes"`
+	GoHeapSys             uint64 `json:"go_memstats_heap_sys_bytes"`
+	GoGcCount             uint64 `json:"go_gc_duration_seconds_count"`
+	DingoShelleyStartTime uint64 `json:"dingo_shelley_start_time"`
+	DingoEpochLengthSlots uint64 `json:"dingo_epoch_length_slots"`
 }
 
 // Gets metrics from prometheus and return a PromMetrics instance
