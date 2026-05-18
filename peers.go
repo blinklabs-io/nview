@@ -196,7 +196,7 @@ func pingPeers(ctx context.Context) error {
 	peerCount := len(peersFiltered)
 	if peerCount == 0 {
 		peersFilteredMu.RUnlock()
-		return errors.New("no peers to ping")
+		return nil
 	}
 	for _, v := range peersFiltered {
 		// increment waitgroup counter
@@ -219,10 +219,7 @@ func pingPeers(ctx context.Context) error {
 			existing, ok := peerStats.RTTresultsMap[peerIP]
 			peerStatsMu.Unlock()
 			if ok {
-				if existing.UpdatedAt.After(expire) && existing.RTT != 0 {
-					return
-				}
-				if existing.Location != "---" {
+				if existing.UpdatedAt.After(expire) && existing.RTT != 0 && existing.Location != "---" {
 					return
 				}
 			}

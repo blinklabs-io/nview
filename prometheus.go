@@ -205,16 +205,17 @@ func prom2json(prom []byte) ([]byte, error) {
 	}
 	for _, val := range families {
 		for _, m := range val.GetMetric() {
+			name := val.GetName()
 			switch val.GetType() {
 			case dto.MetricType_COUNTER:
-				out[val.GetName()] = m.GetCounter().GetValue()
+				setPromMetricValue(out, name, m.GetCounter().GetValue())
 			case dto.MetricType_GAUGE:
-				out[val.GetName()] = m.GetGauge().GetValue()
+				setPromMetricValue(out, name, m.GetGauge().GetValue())
 			case dto.MetricType_UNTYPED:
-				out[val.GetName()] = m.GetUntyped().GetValue()
+				setPromMetricValue(out, name, m.GetUntyped().GetValue())
 			case dto.MetricType_SUMMARY:
 				// Extract count from SUMMARY metrics (e.g. go_gc_duration_seconds_count)
-				out[val.GetName()+"_count"] = m.GetSummary().GetSampleCount()
+				out[name+"_count"] = m.GetSummary().GetSampleCount()
 			case dto.MetricType_HISTOGRAM,
 				dto.MetricType_GAUGE_HISTOGRAM:
 				// Skip unsupported metric types
@@ -228,4 +229,13 @@ func prom2json(prom []byte) ([]byte, error) {
 		return b, err
 	}
 	return b, nil
+}
+
+func setPromMetricValue(out map[string]any, name string, value float64) {
+	if strings.HasPrefix(name, "event_") {
+		if prev, ok := out[name].(float64); ok {
+			value += prev
+		}
+	}
+	out[name] = value
 }

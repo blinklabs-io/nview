@@ -25,6 +25,7 @@ import (
 	"math"
 	"net"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -881,37 +882,41 @@ func getDingoStats() string {
 	}
 	prev := lastDingoRateBase
 	prevAt := lastDingoRateBaseAt
+	currAt := lastDingoSampleAt
 	lastDingoSampleMu.Unlock()
 
 	prevMetrics := &PromMetrics{}
 	dt := time.Duration(0)
 	if prev != nil {
 		prevMetrics = prev
-		dt = now.Sub(prevAt)
+		dt = currAt.Sub(prevAt)
 	}
 
-	utxoRatio := formatDingoHitRatio(
-		curr.DingoCacheUtxoHotHits,
-		curr.DingoCacheUtxoHotMiss,
-		prevMetrics.DingoCacheUtxoHotHits,
-		prevMetrics.DingoCacheUtxoHotMiss,
-	)
-	txRatio := formatDingoHitRatio(
-		curr.DingoCacheTxHotHits,
-		curr.DingoCacheTxHotMiss,
-		prevMetrics.DingoCacheTxHotHits,
-		prevMetrics.DingoCacheTxHotMiss,
-	)
-	blockRatio := formatDingoHitRatio(
-		curr.DingoCacheBlockLruHits,
-		curr.DingoCacheBlockLruMiss,
-		prevMetrics.DingoCacheBlockLruHits,
-		prevMetrics.DingoCacheBlockLruMiss,
-	)
+	utxoRatio := "n/a"
+	txRatio := "n/a"
+	blockRatio := "n/a"
 	coldExtractRate := "n/a"
 	eventErrorRate := "n/a"
 	eventTimeoutRate := "n/a"
 	if prev != nil {
+		utxoRatio = formatDingoHitRatio(
+			curr.DingoCacheUtxoHotHits,
+			curr.DingoCacheUtxoHotMiss,
+			prevMetrics.DingoCacheUtxoHotHits,
+			prevMetrics.DingoCacheUtxoHotMiss,
+		)
+		txRatio = formatDingoHitRatio(
+			curr.DingoCacheTxHotHits,
+			curr.DingoCacheTxHotMiss,
+			prevMetrics.DingoCacheTxHotHits,
+			prevMetrics.DingoCacheTxHotMiss,
+		)
+		blockRatio = formatDingoHitRatio(
+			curr.DingoCacheBlockLruHits,
+			curr.DingoCacheBlockLruMiss,
+			prevMetrics.DingoCacheBlockLruHits,
+			prevMetrics.DingoCacheBlockLruMiss,
+		)
 		coldExtractRate = formatDingoRate(
 			curr.DingoCacheColdExtract,
 			prevMetrics.DingoCacheColdExtract,
@@ -1347,11 +1352,30 @@ func getPeerText(ctx context.Context) string {
 	charUnmarked = string('▖')
 	granularity := ProgressBarGranularity
 	granularitySmall := granularity / 2
+
+	peersFilteredMu.RLock()
 	peerCount := len(peersFiltered)
-	if peerCount == 0 || len(peerStats.RTTresultsSlice) < peerCount {
+	peersFilteredMu.RUnlock()
+
+	peerStatsMu.Lock()
+	rttCount := len(peerStats.RTTresultsSlice)
+	cnt0 := peerStats.CNT0
+	cnt1 := peerStats.CNT1
+	cnt2 := peerStats.CNT2
+	cnt3 := peerStats.CNT3
+	cnt4 := peerStats.CNT4
+	pct1 := peerStats.PCT1
+	pct2 := peerStats.PCT2
+	pct3 := peerStats.PCT3
+	pct4 := peerStats.PCT4
+	rttAvg := peerStats.RTTAVG
+	peers := slices.Clone(peerStats.RTTresultsSlice)
+	peerStatsMu.Unlock()
+
+	if peerCount == 0 || rttCount < peerCount {
 		fmt.Fprintf(&sb, " [yellow]%s [blue]%d[white]/[green]%d[white]\n",
 			"Peer analysis started... please wait!",
-			len(peerStats.RTTresultsSlice),
+			rttCount,
 			peerCount)
 		scrollPeers = false
 		return sb.String()
@@ -1359,12 +1383,12 @@ func getPeerText(ctx context.Context) string {
 
 	sb.WriteString("       [green]RTT : Peers / Percent\n")
 	fmt.Fprintf(&sb, "    [green]0-50ms : [white]%5s   %.f%%",
-		strconv.Itoa(peerStats.CNT1),
-		peerStats.PCT1)
-	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT1)))+"s",
+		strconv.Itoa(cnt1),
+		pct1)
+	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", pct1)))+"s",
 		" ")
 	for i := range granularitySmall {
-		if i < int(peerStats.PCT1) {
+		if i < int(pct1) {
 			sb.WriteString("[green]" + charMarked)
 		} else {
 			sb.WriteString("[white]" + charUnmarked)
@@ -1372,12 +1396,12 @@ func getPeerText(ctx context.Context) string {
 	}
 	sb.WriteString("[white]\n") // closeRow
 	fmt.Fprintf(&sb, "  [green]50-100ms : [white]%5s   %.f%%",
-		strconv.Itoa(peerStats.CNT2),
-		peerStats.PCT2)
-	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT2)))+"s",
+		strconv.Itoa(cnt2),
+		pct2)
+	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", pct2)))+"s",
 		"")
 	for i := range granularitySmall {
-		if i < int(peerStats.PCT2) {
+		if i < int(pct2) {
 			sb.WriteString("[yellow]" + charMarked)
 		} else {
 			sb.WriteString("[white]" + charUnmarked)
@@ -1385,12 +1409,12 @@ func getPeerText(ctx context.Context) string {
 	}
 	sb.WriteString("[white]\n") // closeRow
 	fmt.Fprintf(&sb, " [green]100-200ms : [white]%5s   %.f%%",
-		strconv.Itoa(peerStats.CNT3),
-		peerStats.PCT3)
-	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT3)))+"s",
+		strconv.Itoa(cnt3),
+		pct3)
+	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", pct3)))+"s",
 		"")
 	for i := range granularitySmall {
-		if i < int(peerStats.PCT3) {
+		if i < int(pct3) {
 			sb.WriteString("[red]" + charMarked)
 		} else {
 			sb.WriteString("[white]" + charUnmarked)
@@ -1398,12 +1422,12 @@ func getPeerText(ctx context.Context) string {
 	}
 	sb.WriteString("[white]\n") // closeRow
 	fmt.Fprintf(&sb, "   [green]200ms < : [white]%5s   %.f%%",
-		strconv.Itoa(peerStats.CNT4),
-		peerStats.PCT4)
-	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT4)))+"s",
+		strconv.Itoa(cnt4),
+		pct4)
+	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", pct4)))+"s",
 		"")
 	for i := range granularitySmall {
-		if i < int(peerStats.PCT4) {
+		if i < int(pct4) {
 			sb.WriteString("[fuchsia]" + charMarked)
 		} else {
 			sb.WriteString("[white]" + charUnmarked)
@@ -1416,20 +1440,20 @@ func getPeerText(ctx context.Context) string {
 
 	fmt.Fprintf(&sb, " [green]Total / Undetermined : [white]%d[white] / ",
 		peerCount)
-	if peerStats.CNT0 == 0 {
+	if cnt0 == 0 {
 		sb.WriteString("[blue]0[white]")
 	} else {
-		fmt.Fprintf(&sb, "[fuchsia]%d[white]", peerStats.CNT0)
+		fmt.Fprintf(&sb, "[fuchsia]%d[white]", cnt0)
 	}
-	if peerStats.RTTAVG >= RTTThreshold3 {
+	if rttAvg >= RTTThreshold3 {
 		fmt.Fprintf(&sb, " Average RTT : [fuchsia]%d[white] ms\n",
-			peerStats.RTTAVG)
-	} else if peerStats.RTTAVG >= RTTThreshold2 {
-		fmt.Fprintf(&sb, " Average RTT : [red]%d[white] ms\n", peerStats.RTTAVG)
-	} else if peerStats.RTTAVG >= RTTThreshold1 {
-		fmt.Fprintf(&sb, " Average RTT : [yellow]%d[white] ms\n", peerStats.RTTAVG)
-	} else if peerStats.RTTAVG >= 0 {
-		fmt.Fprintf(&sb, " Average RTT : [green]%d[white] ms\n", peerStats.RTTAVG)
+			rttAvg)
+	} else if rttAvg >= RTTThreshold2 {
+		fmt.Fprintf(&sb, " Average RTT : [red]%d[white] ms\n", rttAvg)
+	} else if rttAvg >= RTTThreshold1 {
+		fmt.Fprintf(&sb, " Average RTT : [yellow]%d[white] ms\n", rttAvg)
+	} else if rttAvg >= 0 {
+		fmt.Fprintf(&sb, " Average RTT : [green]%d[white] ms\n", rttAvg)
 	} else {
 		fmt.Fprintf(&sb, " Average RTT : [red]%s[white] ms\n", "---")
 	}
@@ -1439,7 +1463,7 @@ func getPeerText(ctx context.Context) string {
 
 	fmt.Fprintf(&sb, "   [green]# %24s  I/O RTT   Geolocation\n", "REMOTE PEER")
 	// peerLocationWidth := width - 41
-	for peerNbr, peer := range peerStats.RTTresultsSlice {
+	for peerNbr, peer := range peers {
 		peerNbr++
 		peerRTT := peer.RTT
 		peerPORT := peer.Port

@@ -954,6 +954,52 @@ func TestGetDingoStatsRendersDiagnostics(t *testing.T) {
 	}
 }
 
+func TestGetDingoStatsFirstSampleShowsUnavailableDeltas(t *testing.T) {
+	originalPromMetrics := promMetrics
+	originalLastDingoSample := lastDingoSample
+	originalLastDingoSampleAt := lastDingoSampleAt
+	originalLastDingoRateBase := lastDingoRateBase
+	originalLastDingoRateBaseAt := lastDingoRateBaseAt
+	originalLastDingoSampleSrc := lastDingoSampleSrc
+	defer func() {
+		promMetrics = originalPromMetrics
+		lastDingoSample = originalLastDingoSample
+		lastDingoSampleAt = originalLastDingoSampleAt
+		lastDingoRateBase = originalLastDingoRateBase
+		lastDingoRateBaseAt = originalLastDingoRateBaseAt
+		lastDingoSampleSrc = originalLastDingoSampleSrc
+	}()
+
+	lastDingoSample = nil
+	lastDingoSampleAt = time.Time{}
+	lastDingoRateBase = nil
+	lastDingoRateBaseAt = time.Time{}
+	lastDingoSampleSrc = nil
+	promMetrics = &PromMetrics{
+		DingoCacheUtxoHotHits:  100,
+		DingoCacheTxHotHits:    100,
+		DingoCacheBlockLruHits: 100,
+		DingoCacheColdExtract:  100,
+		EventDeliveryErrors:    100,
+		EventDeliveryTimeouts:  100,
+	}
+
+	result := getDingoStats()
+	expectedParts := []string{
+		"utxo n/a",
+		"tx n/a",
+		"blk n/a",
+		"Cold Extract : [white]n/a",
+		"err [white]n/a",
+		"timeout [white]n/a",
+	}
+	for _, part := range expectedParts {
+		if !strings.Contains(result, part) {
+			t.Errorf("getDingoStats() missing %q in:\n%s", part, result)
+		}
+	}
+}
+
 func BenchmarkGetEpochProgress(b *testing.B) {
 	// Set up config
 	cfg := config.GetConfig()

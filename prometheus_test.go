@@ -239,10 +239,14 @@ dingo_cbor_cache_tx_hot_misses_total 20
 dingo_cbor_cache_block_lru_hits_total 300
 dingo_cbor_cache_block_lru_misses_total 30
 dingo_cbor_cache_cold_extractions_total 40
-event_total 50
-event_subscribers 60
-event_delivery_errors_total 70
-event_delivery_timeouts_total 80
+event_total{type="block"} 20
+event_total{type="tx"} 30
+event_subscribers{topic="block"} 25
+event_subscribers{topic="tx"} 35
+event_delivery_errors_total{topic="block"} 30
+event_delivery_errors_total{topic="tx"} 40
+event_delivery_timeouts_total{topic="block"} 35
+event_delivery_timeouts_total{topic="tx"} 45
 `)
 
 	metrics := decodePromMetrics(t, prom)
