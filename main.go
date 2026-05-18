@@ -136,6 +136,12 @@ const (
 	viewDingo
 )
 
+const (
+	viewNoneValue  int32 = int32(viewNone)
+	viewPeersValue int32 = int32(viewPeers)
+	viewDingoValue int32 = int32(viewDingo)
+)
+
 var (
 	activeSecondary     atomic.Int32
 	secondaryDefaultSet atomic.Bool
@@ -229,7 +235,14 @@ func getActiveSecondaryView() secondaryView {
 }
 
 func setActiveSecondaryView(view secondaryView) {
-	activeSecondary.Store(int32(view))
+	switch view {
+	case viewNone:
+		activeSecondary.Store(viewNoneValue)
+	case viewPeers:
+		activeSecondary.Store(viewPeersValue)
+	case viewDingo:
+		activeSecondary.Store(viewDingoValue)
+	}
 }
 
 func applyDefaultSecondaryView() {
@@ -279,6 +292,8 @@ func getSecondaryViewText(ctx context.Context) (string, string) {
 		return "Peers", getPeerText(ctx)
 	case viewDingo:
 		return "Dingo Diagnostics", getDingoStats()
+	case viewNone:
+		return "Secondary", ""
 	default:
 		return "Secondary", ""
 	}
