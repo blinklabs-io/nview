@@ -20,6 +20,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
 	"net"
@@ -332,7 +333,7 @@ func main() {
 
 	// Initialize logger with buffer
 	baseHandler := slog.NewTextHandler(
-		os.Stderr,
+		io.Discard,
 		&slog.HandlerOptions{Level: slog.LevelInfo},
 	)
 	bufferedHandler := &bufferHandler{handler: baseHandler}
