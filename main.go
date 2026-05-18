@@ -516,17 +516,7 @@ func main() {
 				return
 			default:
 			}
-			err := pingPeers(ctx)
-			if err != nil {
-				logger.Warn("Failed to ping peers", "error", err)
-				failCount.Add(1)
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(time.Second * 10):
-				}
-				continue
-			}
+			pingPeers(ctx)
 			select {
 			case <-ctx.Done():
 				return

@@ -181,10 +181,10 @@ func filterPeers(ctx context.Context) error {
 	return nil
 }
 
-func pingPeers(ctx context.Context) error {
+func pingPeers(ctx context.Context) {
 	if getActiveSecondaryView() != viewPeers {
 		failCount.Store(0)
-		return nil
+		return
 	}
 
 	scrollPeers = false
@@ -196,7 +196,7 @@ func pingPeers(ctx context.Context) error {
 	peerCount := len(peersFiltered)
 	if peerCount == 0 {
 		peersFilteredMu.RUnlock()
-		return nil
+		return
 	}
 	for _, v := range peersFiltered {
 		// increment waitgroup counter
@@ -308,7 +308,6 @@ func pingPeers(ctx context.Context) error {
 		scrollPeers = true
 	}
 	failCount.Store(0)
-	return nil
 }
 
 func resetPeers() {
