@@ -32,7 +32,6 @@ import (
 var peersFiltered []string
 
 var (
-	checkPeers      bool = true
 	scrollPeers     bool = false
 	peersFilteredMu sync.RWMutex
 	peerStatsMu     sync.Mutex
@@ -183,131 +182,133 @@ func filterPeers(ctx context.Context) error {
 }
 
 func pingPeers(ctx context.Context) error {
+	if getActiveSecondaryView() != viewPeers {
+		failCount.Store(0)
+		return nil
+	}
+
 	scrollPeers = false
 	granularity := 68
 	granularitySmall := granularity / 2
-	if checkPeers {
-		// counters, etc.
-		var wg sync.WaitGroup
-		peersFilteredMu.RLock()
-		peerCount := len(peersFiltered)
-		if peerCount == 0 {
-			peersFilteredMu.RUnlock()
-			return errors.New("no peers to ping")
-		}
-		for _, v := range peersFiltered {
-			// increment waitgroup counter
-			wg.Add(1)
+	// counters, etc.
+	var wg sync.WaitGroup
+	peersFilteredMu.RLock()
+	peerCount := len(peersFiltered)
+	if peerCount == 0 {
+		peersFilteredMu.RUnlock()
+		return errors.New("no peers to ping")
+	}
+	for _, v := range peersFiltered {
+		// increment waitgroup counter
+		wg.Add(1)
 
-			go func(v string) {
-				defer wg.Done()
-				peerArr := strings.Split(v, ";")
-				if len(peerArr) < 3 {
+		go func(v string) {
+			defer wg.Done()
+			peerArr := strings.Split(v, ";")
+			if len(peerArr) < 3 {
+				return
+			}
+			peerIP := peerArr[0]
+			peerPORT := peerArr[1]
+			peerDIR := peerArr[2]
+
+			// Return early if we've been checked recently
+			now := time.Now()
+			expire := now.Add(-600 * time.Second)
+			peerStatsMu.Lock()
+			existing, ok := peerStats.RTTresultsMap[peerIP]
+			peerStatsMu.Unlock()
+			if ok {
+				if existing.UpdatedAt.After(expire) && existing.RTT != 0 {
 					return
 				}
-				peerIP := peerArr[0]
-				peerPORT := peerArr[1]
-				peerDIR := peerArr[2]
-
-				// Return early if we've been checked recently
-				now := time.Now()
-				expire := now.Add(-600 * time.Second)
-				peerStatsMu.Lock()
-				existing, ok := peerStats.RTTresultsMap[peerIP]
-				peerStatsMu.Unlock()
-				if ok {
-					if existing.UpdatedAt.After(expire) && existing.RTT != 0 {
-						return
-					}
-					if existing.Location != "---" {
-						return
-					}
+				if existing.Location != "---" {
+					return
 				}
-				peerStatsMu.Lock()
-				if len(peerStats.RTTresultsMap) == 0 {
-					peerStats.RTTresultsMap = make(
-						peerRTTresultsMap,
-						peerCount,
-					)
-				}
-				peerStatsMu.Unlock()
-
-				// Start RTT loop
-				// for tool in ... return peerRTT
-				peerRTT := tcpinfoRtt(fmt.Sprintf("%s:%s", peerIP, peerPORT))
-				peerPort, err := strconv.Atoi(peerPORT)
-				if err != nil {
-					peerPort = 0
-				}
-				peerLocation := getGeoIP(ctx, peerIP)
-				peer := &Peer{
-					IP:        peerIP,
-					Port:      peerPort,
-					Direction: peerDIR,
-					RTT:       peerRTT,
-					Location:  peerLocation,
-					UpdatedAt: time.Now(),
-				}
-				peerStatsMu.Lock()
-				if peerRTT != 99999 {
-					peerStats.RTTSUM += peerRTT
-				}
-				// Update counters
-				if peerRTT < 50 {
-					peerStats.CNT1++
-				} else if peerRTT < 100 {
-					peerStats.CNT2++
-				} else if peerRTT < 200 {
-					peerStats.CNT3++
-				} else if peerRTT < 99999 {
-					peerStats.CNT4++
-				} else {
-					peerStats.CNT0++
-				}
-				peerStats.RTTresultsMap[peerIP] = peer
-				peerStats.RTTresultsSlice = append(
-					peerStats.RTTresultsSlice,
-					peer,
+			}
+			peerStatsMu.Lock()
+			if len(peerStats.RTTresultsMap) == 0 {
+				peerStats.RTTresultsMap = make(
+					peerRTTresultsMap,
+					peerCount,
 				)
-				sort.Sort(peerStats.RTTresultsSlice)
-				peerStatsMu.Unlock()
-			}(v)
-		}
-		peersFilteredMu.RUnlock()
-		wg.Wait()
-		peerCNTreachable := peerCount - peerStats.CNT0
-		if peerCNTreachable > 0 {
-			peerStats.RTTAVG = peerStats.RTTSUM / peerCNTreachable
-			peerStats.PCT1 = float32(
-				peerStats.CNT1,
-			) / float32(
-				peerCNTreachable,
-			) * 100
-			peerStats.PCT1items = int(peerStats.PCT1) * granularitySmall / 100
-			peerStats.PCT2 = float32(
-				peerStats.CNT2,
-			) / float32(
-				peerCNTreachable,
-			) * 100
-			peerStats.PCT2items = int(peerStats.PCT2) * granularitySmall / 100
-			peerStats.PCT3 = float32(
-				peerStats.CNT3,
-			) / float32(
-				peerCNTreachable,
-			) * 100
-			peerStats.PCT3items = int(peerStats.PCT3) * granularitySmall / 100
-			peerStats.PCT4 = float32(
-				peerStats.CNT4,
-			) / float32(
-				peerCNTreachable,
-			) * 100
-			peerStats.PCT4items = int(peerStats.PCT4) * granularitySmall / 100
-		}
-		if len(peerStats.RTTresultsSlice) != 0 &&
-			len(peerStats.RTTresultsSlice) >= peerCount {
-			checkPeers = false
-			scrollPeers = true
-		}
+			}
+			peerStatsMu.Unlock()
+
+			// Start RTT loop
+			// for tool in ... return peerRTT
+			peerRTT := tcpinfoRtt(fmt.Sprintf("%s:%s", peerIP, peerPORT))
+			peerPort, err := strconv.Atoi(peerPORT)
+			if err != nil {
+				peerPort = 0
+			}
+			peerLocation := getGeoIP(ctx, peerIP)
+			peer := &Peer{
+				IP:        peerIP,
+				Port:      peerPort,
+				Direction: peerDIR,
+				RTT:       peerRTT,
+				Location:  peerLocation,
+				UpdatedAt: time.Now(),
+			}
+			peerStatsMu.Lock()
+			if peerRTT != 99999 {
+				peerStats.RTTSUM += peerRTT
+			}
+			// Update counters
+			if peerRTT < 50 {
+				peerStats.CNT1++
+			} else if peerRTT < 100 {
+				peerStats.CNT2++
+			} else if peerRTT < 200 {
+				peerStats.CNT3++
+			} else if peerRTT < 99999 {
+				peerStats.CNT4++
+			} else {
+				peerStats.CNT0++
+			}
+			peerStats.RTTresultsMap[peerIP] = peer
+			peerStats.RTTresultsSlice = append(
+				peerStats.RTTresultsSlice,
+				peer,
+			)
+			sort.Sort(peerStats.RTTresultsSlice)
+			peerStatsMu.Unlock()
+		}(v)
+	}
+	peersFilteredMu.RUnlock()
+	wg.Wait()
+	peerCNTreachable := peerCount - peerStats.CNT0
+	if peerCNTreachable > 0 {
+		peerStats.RTTAVG = peerStats.RTTSUM / peerCNTreachable
+		peerStats.PCT1 = float32(
+			peerStats.CNT1,
+		) / float32(
+			peerCNTreachable,
+		) * 100
+		peerStats.PCT1items = int(peerStats.PCT1) * granularitySmall / 100
+		peerStats.PCT2 = float32(
+			peerStats.CNT2,
+		) / float32(
+			peerCNTreachable,
+		) * 100
+		peerStats.PCT2items = int(peerStats.PCT2) * granularitySmall / 100
+		peerStats.PCT3 = float32(
+			peerStats.CNT3,
+		) / float32(
+			peerCNTreachable,
+		) * 100
+		peerStats.PCT3items = int(peerStats.PCT3) * granularitySmall / 100
+		peerStats.PCT4 = float32(
+			peerStats.CNT4,
+		) / float32(
+			peerCNTreachable,
+		) * 100
+		peerStats.PCT4items = int(peerStats.PCT4) * granularitySmall / 100
+	}
+	if len(peerStats.RTTresultsSlice) != 0 &&
+		len(peerStats.RTTresultsSlice) >= peerCount {
+		scrollPeers = true
 	}
 	failCount.Store(0)
 	return nil
