@@ -16,13 +16,365 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/blinklabs-io/nview/internal/config"
+	"github.com/shirou/gopsutil/v3/process"
 )
+
+// TestDingoProcessHelper is a subprocess target used by tests that need a real
+// process with readable cmdline and environment metadata.
+func TestDingoProcessHelper(t *testing.T) {
+	if os.Getenv("GO_WANT_DINGO_PROCESS_HELPER") != "1" {
+		return
+	}
+	time.Sleep(time.Minute)
+	os.Exit(0)
+}
+
+func startDingoProcessHelper(
+	t *testing.T,
+	env []string,
+	args ...string,
+) *process.Process {
+	t.Helper()
+
+	cmdArgs := append([]string{"-test.run=TestDingoProcessHelper", "--"}, args...)
+	cmd := exec.Command(os.Args[0], cmdArgs...)
+	cmd.Env = append(os.Environ(), "GO_WANT_DINGO_PROCESS_HELPER=1")
+	cmd.Env = append(cmd.Env, env...)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("failed to start helper process: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	})
+
+	proc, err := process.NewProcessWithContext(
+		context.Background(),
+		int32(cmd.Process.Pid),
+	)
+	if err != nil {
+		t.Fatalf("failed to inspect helper process: %v", err)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, err := proc.CmdlineSliceWithContext(context.Background()); err == nil {
+			return proc
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("helper process cmdline was not readable")
+	return nil
+}
+
+// TestFindDingoProcessUsesExplicitPID verifies that an operator-provided PID
+// wins before any automatic discovery is attempted.
+func TestFindDingoProcessUsesExplicitPID(t *testing.T) {
+	cfg := config.GetConfig()
+	originalNodePid := cfg.Node.Pid
+	defer func() {
+		cfg.Node.Pid = originalNodePid
+	}()
+
+	cfg.Node.Pid = int32(os.Getpid())
+
+	proc, err := findDingoProcess(context.Background(), cfg, procLookups{
+		socketOwner: func(context.Context, string, uint32) (int32, error) {
+			t.Fatal("socketOwner should not be called when explicit PID is set")
+			return 0, nil
+		},
+		listProcs: func(context.Context, string) ([]*process.Process, error) {
+			t.Fatal("listProcs should not be called when explicit PID is set")
+			return nil, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("findDingoProcess() returned error: %v", err)
+	}
+	if proc.Pid != cfg.Node.Pid {
+		t.Fatalf("findDingoProcess() returned pid %d, expected %d", proc.Pid, cfg.Node.Pid)
+	}
+}
+
+// TestFindDingoProcessUsesSocketOwnerBeforePID1Fallback verifies that the
+// process serving the Prometheus scrape socket wins over the PID 1 fallback.
+func TestFindDingoProcessUsesSocketOwnerBeforePID1Fallback(t *testing.T) {
+	cfg := config.GetConfig()
+	originalNodeBinary := cfg.Node.Binary
+	originalNodePid := cfg.Node.Pid
+	originalPromHost := cfg.Prometheus.Host
+	originalPromPort := cfg.Prometheus.Port
+	originalLogBufferSize := cfg.App.LogBufferSize
+	originalDetectedBinary := getEffectiveNodeBinary()
+	originalLogger := logger
+	originalSelectionLogged := dingoProcessSelectionLogged.Load()
+	defer func() {
+		cfg.Node.Binary = originalNodeBinary
+		cfg.Node.Pid = originalNodePid
+		cfg.Prometheus.Host = originalPromHost
+		cfg.Prometheus.Port = originalPromPort
+		cfg.App.LogBufferSize = originalLogBufferSize
+		detectedNodeBinary.Store(originalDetectedBinary)
+		logger = originalLogger
+		dingoProcessSelectionLogged.Store(originalSelectionLogged)
+		logMutex.Lock()
+		logBuffer = nil
+		logMutex.Unlock()
+	}()
+
+	cfg.Node.Binary = DINGO_BINARY
+	cfg.Node.Pid = 0
+	cfg.Prometheus.Host = "127.0.0.1"
+	cfg.Prometheus.Port = 12798
+	cfg.App.LogBufferSize = 10
+	detectedNodeBinary.Store(DINGO_BINARY)
+	dingoProcessSelectionLogged.Store(false)
+	logger = slog.New(&bufferHandler{
+		handler: slog.NewTextHandler(&strings.Builder{}, &slog.HandlerOptions{}),
+	})
+	logMutex.Lock()
+	logBuffer = nil
+	logMutex.Unlock()
+
+	socketOwnerPID := int32(os.Getpid())
+	proc, err := findDingoProcess(context.Background(), cfg, procLookups{
+		socketOwner: func(
+			_ context.Context,
+			host string,
+			port uint32,
+		) (int32, error) {
+			if host != cfg.Prometheus.Host {
+				t.Fatalf("socketOwner host = %q, expected %q", host, cfg.Prometheus.Host)
+			}
+			if port != cfg.Prometheus.Port {
+				t.Fatalf("socketOwner port = %d, expected %d", port, cfg.Prometheus.Port)
+			}
+			return socketOwnerPID, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("findDingoProcess() returned error: %v", err)
+	}
+
+	if proc.Pid != socketOwnerPID {
+		t.Fatalf("findDingoProcess() returned pid %d, expected socket owner pid %d", proc.Pid, socketOwnerPID)
+	}
+
+	logMutex.Lock()
+	defer logMutex.Unlock()
+	joinedLogs := strings.Join(logBuffer, "")
+	for _, expected := range []string{
+		"INFO",
+		"selected dingo process",
+		"pid=",
+		"method=socket-owner",
+	} {
+		if !strings.Contains(joinedLogs, expected) {
+			t.Fatalf("expected log buffer to contain %q, got %q", expected, joinedLogs)
+		}
+	}
+}
+
+// TestFindDingoProcessFallsBackFromSocketErrorToCmdlineMatch verifies that
+// socket lookup failures fall through to --metrics-port matching.
+func TestFindDingoProcessFallsBackFromSocketErrorToCmdlineMatch(t *testing.T) {
+	cfg := config.GetConfig()
+	originalNodePid := cfg.Node.Pid
+	originalPromPort := cfg.Prometheus.Port
+	defer func() {
+		cfg.Node.Pid = originalNodePid
+		cfg.Prometheus.Port = originalPromPort
+	}()
+
+	cfg.Node.Pid = 0
+	cfg.Prometheus.Port = 12798
+	matchingProc := startDingoProcessHelper(
+		t,
+		nil,
+		"--metrics-port=12798",
+		"--data-dir=/tmp/dingo-mainnet",
+	)
+
+	proc, err := findDingoProcess(context.Background(), cfg, procLookups{
+		socketOwner: func(context.Context, string, uint32) (int32, error) {
+			return 0, errors.New("permission denied")
+		},
+		listProcs: func(context.Context, string) ([]*process.Process, error) {
+			return []*process.Process{matchingProc}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("findDingoProcess() returned error: %v", err)
+	}
+	if proc.Pid != matchingProc.Pid {
+		t.Fatalf("findDingoProcess() returned pid %d, expected cmdline match pid %d", proc.Pid, matchingProc.Pid)
+	}
+}
+
+// TestFindDingoProcessUsesEnvMetricsPortMatch verifies that
+// DINGO_METRICS_PORT can identify the process serving the scrape port.
+func TestFindDingoProcessUsesEnvMetricsPortMatch(t *testing.T) {
+	cfg := config.GetConfig()
+	originalNodePid := cfg.Node.Pid
+	originalPromPort := cfg.Prometheus.Port
+	defer func() {
+		cfg.Node.Pid = originalNodePid
+		cfg.Prometheus.Port = originalPromPort
+	}()
+
+	cfg.Node.Pid = 0
+	cfg.Prometheus.Port = 12798
+	matchingProc := startDingoProcessHelper(
+		t,
+		[]string{"DINGO_METRICS_PORT=12798"},
+		"--data-dir",
+		"/tmp/dingo-mainnet",
+	)
+
+	proc, err := findDingoProcess(context.Background(), cfg, procLookups{
+		socketOwner: func(context.Context, string, uint32) (int32, error) {
+			return 0, errors.New("no socket owner")
+		},
+		listProcs: func(context.Context, string) ([]*process.Process, error) {
+			return []*process.Process{matchingProc}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("findDingoProcess() returned error: %v", err)
+	}
+	if proc.Pid != matchingProc.Pid {
+		t.Fatalf("findDingoProcess() returned pid %d, expected env match pid %d", proc.Pid, matchingProc.Pid)
+	}
+}
+
+// TestFindDingoProcessWarnsAndPicksLowestPIDForAmbiguousMultiMatch verifies
+// the deterministic fallback and visible warning for ambiguous multi-instance setups.
+func TestFindDingoProcessWarnsAndPicksLowestPIDForAmbiguousMultiMatch(t *testing.T) {
+	cfg := config.GetConfig()
+	originalNodePid := cfg.Node.Pid
+	originalPromPort := cfg.Prometheus.Port
+	originalLogBufferSize := cfg.App.LogBufferSize
+	originalLogger := logger
+	originalSelectionLogged := dingoProcessSelectionLogged.Load()
+	defer func() {
+		cfg.Node.Pid = originalNodePid
+		cfg.Prometheus.Port = originalPromPort
+		cfg.App.LogBufferSize = originalLogBufferSize
+		logger = originalLogger
+		dingoProcessSelectionLogged.Store(originalSelectionLogged)
+		logMutex.Lock()
+		logBuffer = nil
+		logMutex.Unlock()
+	}()
+
+	cfg.Node.Pid = 0
+	cfg.Prometheus.Port = 12798
+	cfg.App.LogBufferSize = 10
+	dingoProcessSelectionLogged.Store(false)
+	logger = slog.New(&bufferHandler{
+		handler: slog.NewTextHandler(&strings.Builder{}, &slog.HandlerOptions{}),
+	})
+	logMutex.Lock()
+	logBuffer = nil
+	logMutex.Unlock()
+
+	lowest := &process.Process{Pid: 12345}
+	highest := &process.Process{Pid: 23456}
+	proc, err := findDingoProcess(context.Background(), cfg, procLookups{
+		socketOwner: func(context.Context, string, uint32) (int32, error) {
+			return 0, errors.New("no socket owner")
+		},
+		listProcs: func(context.Context, string) ([]*process.Process, error) {
+			return []*process.Process{highest, lowest}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("findDingoProcess() returned error: %v", err)
+	}
+	if proc.Pid != lowest.Pid {
+		t.Fatalf("findDingoProcess() returned pid %d, expected lowest pid %d", proc.Pid, lowest.Pid)
+	}
+
+	logMutex.Lock()
+	defer logMutex.Unlock()
+	if len(logBuffer) == 0 {
+		t.Fatal("expected warning log entry in buffer")
+	}
+	joinedLogs := strings.Join(logBuffer, "")
+	for _, expected := range []string{
+		"WARN",
+		"multiple dingo processes found",
+		"picked-pid=12345",
+		"pid=12345 metrics-port=- data-dir=-",
+		"pid=23456 metrics-port=- data-dir=-",
+	} {
+		if !strings.Contains(joinedLogs, expected) {
+			t.Fatalf("expected log buffer to contain %q, got %q", expected, joinedLogs)
+		}
+	}
+}
+
+// TestFindDingoProcessUsesSingleNameMatchWhenCmdlineUnreadable verifies that a
+// lone Dingo process is used even when cmdline and env metadata cannot be read.
+func TestFindDingoProcessUsesSingleNameMatchWhenCmdlineUnreadable(t *testing.T) {
+	cfg := config.GetConfig()
+	originalNodePid := cfg.Node.Pid
+	defer func() {
+		cfg.Node.Pid = originalNodePid
+	}()
+
+	cfg.Node.Pid = 0
+	namedProc := &process.Process{Pid: 54321}
+	proc, err := findDingoProcess(context.Background(), cfg, procLookups{
+		socketOwner: func(context.Context, string, uint32) (int32, error) {
+			return 0, errors.New("no socket owner")
+		},
+		listProcs: func(context.Context, string) ([]*process.Process, error) {
+			return []*process.Process{namedProc}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("findDingoProcess() returned error: %v", err)
+	}
+	if proc.Pid != namedProc.Pid {
+		t.Fatalf("findDingoProcess() returned pid %d, expected single name match pid %d", proc.Pid, namedProc.Pid)
+	}
+}
+
+// TestFindDingoProcessFallsBackToPID1WhenNoNameMatches verifies that PID 1 is
+// only used after automatic discovery finds no Dingo process by name.
+func TestFindDingoProcessFallsBackToPID1WhenNoNameMatches(t *testing.T) {
+	cfg := config.GetConfig()
+	originalNodePid := cfg.Node.Pid
+	defer func() {
+		cfg.Node.Pid = originalNodePid
+	}()
+
+	cfg.Node.Pid = 0
+	proc, err := findDingoProcess(context.Background(), cfg, procLookups{
+		socketOwner: func(context.Context, string, uint32) (int32, error) {
+			return 0, errors.New("no socket owner")
+		},
+		listProcs: func(context.Context, string) ([]*process.Process, error) {
+			return nil, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("findDingoProcess() returned error: %v", err)
+	}
+	if proc.Pid != 1 {
+		t.Fatalf("findDingoProcess() returned pid %d, expected PID 1 fallback", proc.Pid)
+	}
+}
 
 func TestGetEpochProgress(t *testing.T) {
 	tests := []struct {
