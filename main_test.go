@@ -45,8 +45,12 @@ func startDingoProcessHelper(
 ) *process.Process {
 	t.Helper()
 
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatalf("failed to find test executable: %v", err)
+	}
 	cmdArgs := append([]string{"-test.run=TestDingoProcessHelper", "--"}, args...)
-	cmd := exec.Command(os.Args[0], cmdArgs...)
+	cmd := exec.Command(executable, cmdArgs...)
 	cmd.Env = append(os.Environ(), "GO_WANT_DINGO_PROCESS_HELPER=1")
 	cmd.Env = append(cmd.Env, env...)
 	if err := cmd.Start(); err != nil {

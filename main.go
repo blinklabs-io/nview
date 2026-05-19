@@ -17,7 +17,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -122,8 +121,10 @@ func (h *bufferHandler) WithGroup(name string) slog.Handler {
 	return &bufferHandler{handler: h.handler.WithGroup(name)}
 }
 
-var logger *slog.Logger
-var dingoProcessSelectionLogged atomic.Bool
+var (
+	logger                      *slog.Logger
+	dingoProcessSelectionLogged atomic.Bool
+)
 
 // Global command line flags
 var cmdlineFlags struct {
@@ -1677,47 +1678,6 @@ func getProcessMetricsByPidFile(
 	}
 
 	return proc, nil
-}
-
-func getProcessMetricsByName(
-	ctx context.Context,
-	_ *config.Config,
-) (*process.Process, error) {
-	r, _ := process.NewProcessWithContext(ctx, 0)
-	processes, err := process.ProcessesWithContext(ctx)
-	if err != nil {
-		return r, fmt.Errorf("failed to get processes: %w", err)
-	}
-	for _, p := range processes {
-		n, err := p.NameWithContext(ctx)
-		if err != nil {
-			continue
-		}
-
-		if strings.Contains(n, getEffectiveNodeBinary()) {
-			r = p
-			break
-		}
-	}
-
-	// Check if we found a process
-	if r == nil || r.Pid == 0 {
-		return r, fmt.Errorf(
-			"no process found with name containing %s",
-			getEffectiveNodeBinary(),
-		)
-	}
-
-	exists, err := r.IsRunning()
-	if err != nil {
-		return r, fmt.Errorf("failed to check if process is running: %w", err)
-	}
-
-	if !exists {
-		return r, errors.New("process is not running")
-	}
-
-	return r, nil
 }
 
 func getProcessMetricsByNameAndPort(
