@@ -121,6 +121,7 @@ func TestFindDingoProcessUsesSocketOwnerBeforePID1Fallback(t *testing.T) {
 	originalDetectedBinary, _ := detectedNodeBinary.Load().(string)
 	originalLogger := logger
 	originalSelectionLogged := dingoProcessSelectionLogged.Load()
+	originalAmbiguityLogged := dingoProcessAmbiguityLogged.Load()
 	defer func() {
 		cfg.Node.Binary = originalNodeBinary
 		cfg.Node.Pid = originalNodePid
@@ -130,6 +131,7 @@ func TestFindDingoProcessUsesSocketOwnerBeforePID1Fallback(t *testing.T) {
 		detectedNodeBinary.Store(originalDetectedBinary)
 		logger = originalLogger
 		dingoProcessSelectionLogged.Store(originalSelectionLogged)
+		dingoProcessAmbiguityLogged.Store(originalAmbiguityLogged)
 		logMutex.Lock()
 		logBuffer = nil
 		logMutex.Unlock()
@@ -142,6 +144,7 @@ func TestFindDingoProcessUsesSocketOwnerBeforePID1Fallback(t *testing.T) {
 	cfg.App.LogBufferSize = 10
 	detectedNodeBinary.Store(DINGO_BINARY)
 	dingoProcessSelectionLogged.Store(false)
+	dingoProcessAmbiguityLogged.Store(false)
 	logger = slog.New(&bufferHandler{
 		handler: slog.NewTextHandler(&strings.Builder{}, &slog.HandlerOptions{}),
 	})
@@ -269,12 +272,14 @@ func TestFindDingoProcessWarnsAndPicksLowestPIDForAmbiguousMultiMatch(t *testing
 	originalLogBufferSize := cfg.App.LogBufferSize
 	originalLogger := logger
 	originalSelectionLogged := dingoProcessSelectionLogged.Load()
+	originalAmbiguityLogged := dingoProcessAmbiguityLogged.Load()
 	defer func() {
 		cfg.Node.Pid = originalNodePid
 		cfg.Prometheus.Port = originalPromPort
 		cfg.App.LogBufferSize = originalLogBufferSize
 		logger = originalLogger
 		dingoProcessSelectionLogged.Store(originalSelectionLogged)
+		dingoProcessAmbiguityLogged.Store(originalAmbiguityLogged)
 		logMutex.Lock()
 		logBuffer = nil
 		logMutex.Unlock()
@@ -284,6 +289,7 @@ func TestFindDingoProcessWarnsAndPicksLowestPIDForAmbiguousMultiMatch(t *testing
 	cfg.Prometheus.Port = 12798
 	cfg.App.LogBufferSize = 10
 	dingoProcessSelectionLogged.Store(false)
+	dingoProcessAmbiguityLogged.Store(false)
 	logger = slog.New(&bufferHandler{
 		handler: slog.NewTextHandler(&strings.Builder{}, &slog.HandlerOptions{}),
 	})

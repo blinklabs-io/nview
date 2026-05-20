@@ -124,6 +124,7 @@ func (h *bufferHandler) WithGroup(name string) slog.Handler {
 var (
 	logger                      *slog.Logger
 	dingoProcessSelectionLogged atomic.Bool
+	dingoProcessAmbiguityLogged atomic.Bool
 )
 
 // Global command line flags
@@ -1515,6 +1516,9 @@ func logMultipleDingoCandidates(
 	port uint32,
 ) {
 	if logger == nil {
+		return
+	}
+	if !dingoProcessAmbiguityLogged.CompareAndSwap(false, true) {
 		return
 	}
 	logger.Warn(
