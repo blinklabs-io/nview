@@ -118,7 +118,7 @@ func TestFindDingoProcessUsesSocketOwnerBeforePID1Fallback(t *testing.T) {
 	originalPromHost := cfg.Prometheus.Host
 	originalPromPort := cfg.Prometheus.Port
 	originalLogBufferSize := cfg.App.LogBufferSize
-	originalDetectedBinary := getEffectiveNodeBinary()
+	originalDetectedBinary, _ := detectedNodeBinary.Load().(string)
 	originalLogger := logger
 	originalSelectionLogged := dingoProcessSelectionLogged.Load()
 	defer func() {
