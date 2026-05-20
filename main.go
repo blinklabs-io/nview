@@ -1531,15 +1531,15 @@ func processNameContains(
 }
 
 func valueFromArgs(args []string, flag string) string {
+	result := ""
 	for i, arg := range args {
 		if arg == flag && i+1 < len(args) {
-			return args[i+1]
-		}
-		if strings.HasPrefix(arg, flag+"=") {
-			return strings.TrimPrefix(arg, flag+"=")
+			result = args[i+1]
+		} else if strings.HasPrefix(arg, flag+"=") {
+			result = strings.TrimPrefix(arg, flag+"=")
 		}
 	}
-	return ""
+	return result
 }
 
 func valueFromEnv(env []string, name string) string {

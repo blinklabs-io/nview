@@ -520,6 +520,51 @@ func TestFindDingoProcessFallsBackToPID1WhenNoNameMatches(t *testing.T) {
 	}
 }
 
+func TestValueFromArgsUsesLastFlagOccurrence(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "equals form",
+			args: []string{
+				"--metrics-port=12798",
+				"--metrics-port=12799",
+			},
+			want: "12799",
+		},
+		{
+			name: "separate value form",
+			args: []string{
+				"--metrics-port",
+				"12798",
+				"--metrics-port",
+				"12799",
+			},
+			want: "12799",
+		},
+		{
+			name: "mixed forms",
+			args: []string{
+				"--metrics-port=12798",
+				"--metrics-port",
+				"12799",
+			},
+			want: "12799",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := valueFromArgs(tt.args, "--metrics-port")
+			if got != tt.want {
+				t.Fatalf("valueFromArgs() = %q, expected %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestGetEpochProgress(t *testing.T) {
 	tests := []struct {
 		name              string
