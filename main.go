@@ -1387,11 +1387,14 @@ func findDingoProcess(
 			)
 			if len(portMatches) == 1 {
 				proc := portMatches[0].proc
-				logDingoProcessSelection(proc.Pid, "cmdline-match")
+				logDingoProcessSelection(proc.Pid, "port-match")
 				return proc, nil
 			}
 			if len(portMatches) > 1 {
-				selected := lowestPIDDingoCandidate(portMatches)
+				selected, ok := lowestPIDDingoCandidate(portMatches)
+				if !ok {
+					return nil, fmt.Errorf("no dingo process found")
+				}
 				logDingoCandidateAmbiguity(
 					fmt.Sprintf(
 						"multiple dingo processes declared metrics-port=%d, picked lowest pid=%d",
@@ -1402,13 +1405,16 @@ func findDingoProcess(
 					portMatches,
 					cfg.Prometheus.Port,
 				)
-				logDingoProcessSelection(selected.proc.Pid, "cmdline-match")
+				logDingoProcessSelection(selected.proc.Pid, "port-match")
 				return selected.proc, nil
 			}
 
 			// If no process declares the scrape port, use a deterministic
 			// name-only fallback and warn when there is real ambiguity.
-			selected := lowestPIDDingoCandidate(candidates)
+			selected, ok := lowestPIDDingoCandidate(candidates)
+			if !ok {
+				return nil, fmt.Errorf("no dingo process found")
+			}
 			if len(candidates) > 1 {
 				logDingoCandidateAmbiguity(
 					fmt.Sprintf(
@@ -1455,18 +1461,18 @@ func inspectDingoCandidates(
 			dataDir:     "-",
 		}
 
+		if env, err := proc.EnvironWithContext(ctx); err == nil {
+			if metricsPort := valueFromEnv(env, "DINGO_METRICS_PORT"); metricsPort != "" {
+				candidate.metricsPort = metricsPort
+			}
+		}
+
 		if args, err := proc.CmdlineSliceWithContext(ctx); err == nil {
 			if metricsPort := valueFromArgs(args, "--metrics-port"); metricsPort != "" {
 				candidate.metricsPort = metricsPort
 			}
 			if dataDir := valueFromArgs(args, "--data-dir"); dataDir != "" {
 				candidate.dataDir = dataDir
-			}
-		}
-
-		if env, err := proc.EnvironWithContext(ctx); err == nil {
-			if metricsPort := valueFromEnv(env, "DINGO_METRICS_PORT"); metricsPort != "" {
-				candidate.metricsPort = metricsPort
 			}
 		}
 
@@ -1489,14 +1495,17 @@ func dingoCandidatesByMetricsPort(
 	return matches
 }
 
-func lowestPIDDingoCandidate(candidates []dingoCandidate) dingoCandidate {
+func lowestPIDDingoCandidate(candidates []dingoCandidate) (dingoCandidate, bool) {
+	if len(candidates) == 0 {
+		return dingoCandidate{}, false
+	}
 	selected := candidates[0]
 	for _, candidate := range candidates[1:] {
 		if candidate.proc.Pid < selected.proc.Pid {
 			selected = candidate
 		}
 	}
-	return selected
+	return selected, true
 }
 
 func processNameContains(
@@ -1620,7 +1629,9 @@ func findTCPSocketOwner(
 }
 
 // tcpListenAddrMatches treats wildcard listener addresses as matching any
-// scrape host, while still supporting exact and parsed IP comparisons.
+// scrape host, while still supporting exact and parsed IP comparisons. It does
+// not resolve arbitrary hostnames; gopsutil normally reports listener addresses
+// as IP literals.
 func tcpListenAddrMatches(listenHost, scrapeHost string) bool {
 	listenIP := net.ParseIP(listenHost)
 	if listenIP != nil && listenIP.IsUnspecified() {

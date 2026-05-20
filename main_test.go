@@ -98,9 +98,21 @@ func startNamedDingoProcessHelper(
 	return nil
 }
 
+func preserveDingoDiscoveryAtomics(t *testing.T) {
+	t.Helper()
+	originalSelectionLogged := dingoProcessSelectionLogged.Load()
+	originalAmbiguityLogged := dingoProcessAmbiguityLogged.Load()
+	t.Cleanup(func() {
+		dingoProcessSelectionLogged.Store(originalSelectionLogged)
+		dingoProcessAmbiguityLogged.Store(originalAmbiguityLogged)
+	})
+}
+
 // TestFindDingoProcessUsesExplicitPID verifies that an operator-provided PID
 // wins before any automatic discovery is attempted.
 func TestFindDingoProcessUsesExplicitPID(t *testing.T) {
+	preserveDingoDiscoveryAtomics(t)
+
 	cfg := config.GetConfig()
 	originalNodePid := cfg.Node.Pid
 	defer func() {
@@ -212,6 +224,8 @@ func TestFindDingoProcessUsesSocketOwnerBeforePID1Fallback(t *testing.T) {
 // TestFindDingoProcessFallsBackFromSocketErrorToCmdlineMatch verifies that
 // socket lookup failures fall through to --metrics-port matching.
 func TestFindDingoProcessFallsBackFromSocketErrorToCmdlineMatch(t *testing.T) {
+	preserveDingoDiscoveryAtomics(t)
+
 	cfg := config.GetConfig()
 	originalNodePid := cfg.Node.Pid
 	originalPromPort := cfg.Prometheus.Port
@@ -224,7 +238,7 @@ func TestFindDingoProcessFallsBackFromSocketErrorToCmdlineMatch(t *testing.T) {
 	cfg.Prometheus.Port = 12798
 	matchingProc := startDingoProcessHelper(
 		t,
-		nil,
+		[]string{"DINGO_METRICS_PORT=12799"},
 		"--metrics-port=12798",
 		"--data-dir=/tmp/dingo-mainnet",
 	)
@@ -336,6 +350,8 @@ func TestFindDingoProcessWarnsAndPicksLowestPIDForDuplicateCmdlineMatches(t *tes
 // TestFindDingoProcessUsesEnvMetricsPortMatch verifies that
 // DINGO_METRICS_PORT can identify the process serving the scrape port.
 func TestFindDingoProcessUsesEnvMetricsPortMatch(t *testing.T) {
+	preserveDingoDiscoveryAtomics(t)
+
 	cfg := config.GetConfig()
 	originalNodePid := cfg.Node.Pid
 	originalPromPort := cfg.Prometheus.Port
@@ -352,13 +368,19 @@ func TestFindDingoProcessUsesEnvMetricsPortMatch(t *testing.T) {
 		"--data-dir",
 		"/tmp/dingo-mainnet",
 	)
+	nonmatchingProc := startDingoProcessHelper(
+		t,
+		[]string{"DINGO_METRICS_PORT=12799"},
+		"--data-dir",
+		"/tmp/dingo-preprod",
+	)
 
 	proc, err := findDingoProcess(context.Background(), cfg, procLookups{
 		socketOwner: func(context.Context, string, uint32) (int32, error) {
 			return 0, errors.New("no socket owner")
 		},
 		listProcs: func(context.Context, string) ([]*process.Process, error) {
-			return []*process.Process{matchingProc}, nil
+			return []*process.Process{nonmatchingProc, matchingProc}, nil
 		},
 	})
 	if err != nil {
@@ -403,6 +425,8 @@ func TestFindDingoProcessWarnsAndPicksLowestPIDForAmbiguousMultiMatch(t *testing
 	logBuffer = nil
 	logMutex.Unlock()
 
+	// Synthetic processes intentionally make cmdline/env reads fail, leaving
+	// candidate metadata as "-" to exercise the unreadable-process path.
 	lowest := &process.Process{Pid: 12345}
 	highest := &process.Process{Pid: 23456}
 	proc, err := findDingoProcess(context.Background(), cfg, procLookups{
@@ -442,6 +466,8 @@ func TestFindDingoProcessWarnsAndPicksLowestPIDForAmbiguousMultiMatch(t *testing
 // TestFindDingoProcessUsesSingleNameMatchWhenCmdlineUnreadable verifies that a
 // lone Dingo process is used even when cmdline and env metadata cannot be read.
 func TestFindDingoProcessUsesSingleNameMatchWhenCmdlineUnreadable(t *testing.T) {
+	preserveDingoDiscoveryAtomics(t)
+
 	cfg := config.GetConfig()
 	originalNodePid := cfg.Node.Pid
 	defer func() {
@@ -469,6 +495,8 @@ func TestFindDingoProcessUsesSingleNameMatchWhenCmdlineUnreadable(t *testing.T) 
 // TestFindDingoProcessFallsBackToPID1WhenNoNameMatches verifies that PID 1 is
 // only used after automatic discovery finds no Dingo process by name.
 func TestFindDingoProcessFallsBackToPID1WhenNoNameMatches(t *testing.T) {
+	preserveDingoDiscoveryAtomics(t)
+
 	cfg := config.GetConfig()
 	originalNodePid := cfg.Node.Pid
 	defer func() {
