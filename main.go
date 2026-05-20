@@ -1381,19 +1381,45 @@ func findDingoProcess(
 		processes, err := lookups.listProcs(ctx, DINGO_BINARY)
 		if err == nil && len(processes) > 0 {
 			candidates := inspectDingoCandidates(ctx, processes)
-			if proc := findDingoCandidateByMetricsPort(
+			portMatches := dingoCandidatesByMetricsPort(
 				candidates,
 				cfg.Prometheus.Port,
-			); proc != nil {
+			)
+			if len(portMatches) == 1 {
+				proc := portMatches[0].proc
 				logDingoProcessSelection(proc.Pid, "cmdline-match")
 				return proc, nil
+			}
+			if len(portMatches) > 1 {
+				selected := lowestPIDDingoCandidate(portMatches)
+				logDingoCandidateAmbiguity(
+					fmt.Sprintf(
+						"multiple dingo processes declared metrics-port=%d, picked lowest pid=%d",
+						cfg.Prometheus.Port,
+						selected.proc.Pid,
+					),
+					selected,
+					portMatches,
+					cfg.Prometheus.Port,
+				)
+				logDingoProcessSelection(selected.proc.Pid, "cmdline-match")
+				return selected.proc, nil
 			}
 
 			// If no process declares the scrape port, use a deterministic
 			// name-only fallback and warn when there is real ambiguity.
 			selected := lowestPIDDingoCandidate(candidates)
 			if len(candidates) > 1 {
-				logMultipleDingoCandidates(selected, candidates, cfg.Prometheus.Port)
+				logDingoCandidateAmbiguity(
+					fmt.Sprintf(
+						"multiple dingo processes found, none declared metrics-port=%d, picked lowest pid=%d",
+						cfg.Prometheus.Port,
+						selected.proc.Pid,
+					),
+					selected,
+					candidates,
+					cfg.Prometheus.Port,
+				)
 			}
 			logDingoProcessSelection(selected.proc.Pid, "name-only")
 			return selected.proc, nil
@@ -1449,17 +1475,18 @@ func inspectDingoCandidates(
 	return candidates
 }
 
-func findDingoCandidateByMetricsPort(
+func dingoCandidatesByMetricsPort(
 	candidates []dingoCandidate,
 	port uint32,
-) *process.Process {
+) []dingoCandidate {
 	expected := strconv.FormatUint(uint64(port), 10)
+	matches := []dingoCandidate{}
 	for _, candidate := range candidates {
 		if candidate.metricsPort == expected {
-			return candidate.proc
+			matches = append(matches, candidate)
 		}
 	}
-	return nil
+	return matches
 }
 
 func lowestPIDDingoCandidate(candidates []dingoCandidate) dingoCandidate {
@@ -1531,7 +1558,8 @@ func logDingoProcessSelection(pid int32, method string) {
 	)
 }
 
-func logMultipleDingoCandidates(
+func logDingoCandidateAmbiguity(
+	message string,
 	selected dingoCandidate,
 	candidates []dingoCandidate,
 	port uint32,
@@ -1543,11 +1571,7 @@ func logMultipleDingoCandidates(
 		return
 	}
 	logger.Warn(
-		fmt.Sprintf(
-			"multiple dingo processes found, none declared metrics-port=%d, picked lowest pid=%d",
-			port,
-			selected.proc.Pid,
-		),
+		message,
 		"metrics-port",
 		port,
 		"picked-pid",

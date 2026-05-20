@@ -228,13 +228,19 @@ func TestFindDingoProcessFallsBackFromSocketErrorToCmdlineMatch(t *testing.T) {
 		"--metrics-port=12798",
 		"--data-dir=/tmp/dingo-mainnet",
 	)
+	nonmatchingProc := startDingoProcessHelper(
+		t,
+		nil,
+		"--metrics-port=12799",
+		"--data-dir=/tmp/dingo-preprod",
+	)
 
 	proc, err := findDingoProcess(context.Background(), cfg, procLookups{
 		socketOwner: func(context.Context, string, uint32) (int32, error) {
 			return 0, errors.New("permission denied")
 		},
 		listProcs: func(context.Context, string) ([]*process.Process, error) {
-			return []*process.Process{matchingProc}, nil
+			return []*process.Process{nonmatchingProc, matchingProc}, nil
 		},
 	})
 	if err != nil {
@@ -242,6 +248,88 @@ func TestFindDingoProcessFallsBackFromSocketErrorToCmdlineMatch(t *testing.T) {
 	}
 	if proc.Pid != matchingProc.Pid {
 		t.Fatalf("findDingoProcess() returned pid %d, expected cmdline match pid %d", proc.Pid, matchingProc.Pid)
+	}
+}
+
+// TestFindDingoProcessWarnsAndPicksLowestPIDForDuplicateCmdlineMatches
+// verifies duplicate --metrics-port matches are treated as ambiguous.
+func TestFindDingoProcessWarnsAndPicksLowestPIDForDuplicateCmdlineMatches(t *testing.T) {
+	cfg := config.GetConfig()
+	originalNodePid := cfg.Node.Pid
+	originalPromPort := cfg.Prometheus.Port
+	originalLogBufferSize := cfg.App.LogBufferSize
+	originalLogger := logger
+	originalSelectionLogged := dingoProcessSelectionLogged.Load()
+	originalAmbiguityLogged := dingoProcessAmbiguityLogged.Load()
+	defer func() {
+		cfg.Node.Pid = originalNodePid
+		cfg.Prometheus.Port = originalPromPort
+		cfg.App.LogBufferSize = originalLogBufferSize
+		logger = originalLogger
+		dingoProcessSelectionLogged.Store(originalSelectionLogged)
+		dingoProcessAmbiguityLogged.Store(originalAmbiguityLogged)
+		logMutex.Lock()
+		logBuffer = nil
+		logMutex.Unlock()
+	}()
+
+	cfg.Node.Pid = 0
+	cfg.Prometheus.Port = 12798
+	cfg.App.LogBufferSize = 10
+	dingoProcessSelectionLogged.Store(false)
+	dingoProcessAmbiguityLogged.Store(false)
+	logger = slog.New(&bufferHandler{
+		handler: slog.NewTextHandler(&strings.Builder{}, &slog.HandlerOptions{}),
+	})
+	logMutex.Lock()
+	logBuffer = nil
+	logMutex.Unlock()
+
+	firstProc := startDingoProcessHelper(
+		t,
+		nil,
+		"--metrics-port=12798",
+		"--data-dir=/tmp/dingo-mainnet",
+	)
+	secondProc := startDingoProcessHelper(
+		t,
+		nil,
+		"--metrics-port=12798",
+		"--data-dir=/tmp/dingo-preprod",
+	)
+	expectedPID := firstProc.Pid
+	if secondProc.Pid < expectedPID {
+		expectedPID = secondProc.Pid
+	}
+
+	proc, err := findDingoProcess(context.Background(), cfg, procLookups{
+		socketOwner: func(context.Context, string, uint32) (int32, error) {
+			return 0, errors.New("permission denied")
+		},
+		listProcs: func(context.Context, string) ([]*process.Process, error) {
+			return []*process.Process{secondProc, firstProc}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("findDingoProcess() returned error: %v", err)
+	}
+	if proc.Pid != expectedPID {
+		t.Fatalf("findDingoProcess() returned pid %d, expected lowest duplicate match pid %d", proc.Pid, expectedPID)
+	}
+
+	logMutex.Lock()
+	defer logMutex.Unlock()
+	joinedLogs := strings.Join(logBuffer, "")
+	for _, expected := range []string{
+		"WARN",
+		"multiple dingo processes declared metrics-port=12798",
+		"picked-pid=",
+		"pid=",
+		"metrics-port=12798",
+	} {
+		if !strings.Contains(joinedLogs, expected) {
+			t.Fatalf("expected log buffer to contain %q, got %q", expected, joinedLogs)
+		}
 	}
 }
 
