@@ -122,7 +122,11 @@ func (h *bufferHandler) WithGroup(name string) slog.Handler {
 	return &bufferHandler{handler: h.handler.WithGroup(name)}
 }
 
-var logger *slog.Logger
+var (
+	logger                      *slog.Logger
+	dingoProcessSelectionLogged atomic.Bool
+	dingoProcessAmbiguityLogged atomic.Bool
+)
 
 // Global command line flags
 var cmdlineFlags struct {
@@ -1316,7 +1320,7 @@ func getProcessMetrics(ctx context.Context) (*process.Process, error) {
 	cfg := config.GetConfig()
 
 	// If CARDANO_NODE_PID is specified, use it directly for all node types
-	if cfg.Node.Pid > 0 {
+	if cfg.Node.Pid > 0 && getEffectiveNodeBinary() != DINGO_BINARY {
 		return getProcessMetricsByPid(ctx, cfg.Node.Pid)
 	}
 
@@ -1324,19 +1328,348 @@ func getProcessMetrics(ctx context.Context) (*process.Process, error) {
 	case AMARU_BINARY:
 		return getProcessMetricsByPidFile(ctx, cfg)
 	case DINGO_BINARY:
-		// Use configured PID, defaulting to 1 if not set
-		pid := cfg.Node.Pid
-		if pid == 0 {
-			pid = 1
-		}
-		if proc, err := getProcessMetricsByPid(ctx, pid); err == nil {
-			return proc, nil
-		}
-		// Fall back to name-based search
-		return getProcessMetricsByName(ctx, cfg)
+		return findDingoProcess(ctx, cfg, defaultProcLookups())
 	default:
 		return getProcessMetricsByNameAndPort(ctx, cfg)
 	}
+}
+
+type procLookups struct {
+	socketOwner func(ctx context.Context, host string, port uint32) (int32, error)
+	listProcs   func(ctx context.Context, name string) ([]*process.Process, error)
+}
+
+func defaultProcLookups() procLookups {
+	return procLookups{
+		socketOwner: findTCPSocketOwner,
+		listProcs:   listProcessesByName,
+	}
+}
+
+func findDingoProcess(
+	ctx context.Context,
+	cfg *config.Config,
+	lookups procLookups,
+) (*process.Process, error) {
+	if cfg.Node.Pid > 0 {
+		proc, err := getProcessMetricsByPid(ctx, cfg.Node.Pid)
+		if err == nil {
+			logDingoProcessSelection(proc.Pid, "explicit-pid")
+		}
+		return proc, err
+	}
+
+	// First try the process listening on the Prometheus metrics port, because
+	// that is the process nview is reading metrics from.
+	if lookups.socketOwner != nil {
+		pid, err := lookups.socketOwner(
+			ctx,
+			cfg.Prometheus.Host,
+			cfg.Prometheus.Port,
+		)
+		if err == nil && pid > 0 {
+			proc, err := getProcessMetricsByPid(ctx, pid)
+			if err == nil && processNameContains(ctx, proc, DINGO_BINARY) {
+				logDingoProcessSelection(proc.Pid, "socket-owner")
+				return proc, nil
+			}
+		}
+	}
+
+	// If socket ownership is unavailable, inspect named Dingo processes and
+	// select the one that declares the configured metrics port.
+	if lookups.listProcs != nil {
+		processes, err := lookups.listProcs(ctx, DINGO_BINARY)
+		if err == nil && len(processes) > 0 {
+			candidates := inspectDingoCandidates(ctx, processes)
+			portMatches := dingoCandidatesByMetricsPort(
+				candidates,
+				cfg.Prometheus.Port,
+			)
+			if len(portMatches) == 1 {
+				proc := portMatches[0].proc
+				logDingoProcessSelection(proc.Pid, "port-match")
+				return proc, nil
+			}
+			if len(portMatches) > 1 {
+				selected, ok := lowestPIDDingoCandidate(portMatches)
+				if !ok {
+					return nil, errors.New("no dingo process found")
+				}
+				logDingoCandidateAmbiguity(
+					fmt.Sprintf(
+						"multiple dingo processes declared metrics-port=%d, picked lowest pid=%d",
+						cfg.Prometheus.Port,
+						selected.proc.Pid,
+					),
+					selected,
+					portMatches,
+					cfg.Prometheus.Port,
+				)
+				logDingoProcessSelection(selected.proc.Pid, "port-match")
+				return selected.proc, nil
+			}
+
+			// If no process declares the scrape port, use a deterministic
+			// name-only fallback and warn when there is real ambiguity.
+			selected, ok := lowestPIDDingoCandidate(candidates)
+			if !ok {
+				return nil, errors.New("no dingo process found")
+			}
+			if len(candidates) > 1 {
+				logDingoCandidateAmbiguity(
+					fmt.Sprintf(
+						"multiple dingo processes found, none declared metrics-port=%d, picked lowest pid=%d",
+						cfg.Prometheus.Port,
+						selected.proc.Pid,
+					),
+					selected,
+					candidates,
+					cfg.Prometheus.Port,
+				)
+			}
+			logDingoProcessSelection(selected.proc.Pid, "name-only")
+			return selected.proc, nil
+		}
+	}
+
+	// As a final fallback, try PID 1 for containers where Dingo is the only
+	// process but process listing did not find it.
+	proc, err := getProcessMetricsByPid(ctx, 1)
+	if err == nil {
+		logDingoProcessSelection(proc.Pid, "pid-1-fallback")
+	}
+	return proc, err
+}
+
+type dingoCandidate struct {
+	proc        *process.Process
+	metricsPort string
+	dataDir     string
+}
+
+// inspectDingoCandidates reads process metadata used to disambiguate multiple
+// Dingo instances without failing when cmdline or env access is denied.
+func inspectDingoCandidates(
+	ctx context.Context,
+	processes []*process.Process,
+) []dingoCandidate {
+	candidates := make([]dingoCandidate, 0, len(processes))
+	for _, proc := range processes {
+		candidate := dingoCandidate{
+			proc:        proc,
+			metricsPort: "-",
+			dataDir:     "-",
+		}
+
+		if env, err := proc.EnvironWithContext(ctx); err == nil {
+			if metricsPort := valueFromEnv(env, "DINGO_METRICS_PORT"); metricsPort != "" {
+				candidate.metricsPort = metricsPort
+			}
+		}
+
+		if args, err := proc.CmdlineSliceWithContext(ctx); err == nil {
+			if metricsPort := valueFromArgs(args, "--metrics-port"); metricsPort != "" {
+				candidate.metricsPort = metricsPort
+			}
+			if dataDir := valueFromArgs(args, "--data-dir"); dataDir != "" {
+				candidate.dataDir = dataDir
+			}
+		}
+
+		candidates = append(candidates, candidate)
+	}
+	return candidates
+}
+
+func dingoCandidatesByMetricsPort(
+	candidates []dingoCandidate,
+	port uint32,
+) []dingoCandidate {
+	expected := strconv.FormatUint(uint64(port), 10)
+	matches := []dingoCandidate{}
+	for _, candidate := range candidates {
+		if candidate.metricsPort == expected {
+			matches = append(matches, candidate)
+		}
+	}
+	return matches
+}
+
+func lowestPIDDingoCandidate(candidates []dingoCandidate) (dingoCandidate, bool) {
+	if len(candidates) == 0 {
+		return dingoCandidate{}, false
+	}
+	selected := candidates[0]
+	for _, candidate := range candidates[1:] {
+		if candidate.proc.Pid < selected.proc.Pid {
+			selected = candidate
+		}
+	}
+	return selected, true
+}
+
+func processNameContains(
+	ctx context.Context,
+	proc *process.Process,
+	name string,
+) bool {
+	if procName, err := proc.NameWithContext(ctx); err == nil &&
+		strings.Contains(procName, name) {
+		return true
+	}
+	args, err := proc.CmdlineSliceWithContext(ctx)
+	if err != nil {
+		return false
+	}
+	for _, arg := range args {
+		if strings.Contains(arg, name) {
+			return true
+		}
+	}
+	return false
+}
+
+func valueFromArgs(args []string, flag string) string {
+	result := ""
+	for i, arg := range args {
+		if arg == flag && i+1 < len(args) {
+			result = args[i+1]
+		} else if strings.HasPrefix(arg, flag+"=") {
+			result = strings.TrimPrefix(arg, flag+"=")
+		}
+	}
+	return result
+}
+
+func valueFromEnv(env []string, name string) string {
+	prefix := name + "="
+	for _, item := range env {
+		if strings.HasPrefix(item, prefix) {
+			return strings.TrimPrefix(item, prefix)
+		}
+	}
+	return ""
+}
+
+func logDingoProcessSelection(pid int32, method string) {
+	if logger == nil {
+		return
+	}
+	if !dingoProcessSelectionLogged.CompareAndSwap(false, true) {
+		return
+	}
+	logger.Info(
+		"selected dingo process",
+		"pid",
+		pid,
+		"method",
+		method,
+	)
+}
+
+func logDingoCandidateAmbiguity(
+	message string,
+	selected dingoCandidate,
+	candidates []dingoCandidate,
+	port uint32,
+) {
+	if logger == nil {
+		return
+	}
+	if !dingoProcessAmbiguityLogged.CompareAndSwap(false, true) {
+		return
+	}
+	logger.Warn(
+		message,
+		"metrics-port",
+		port,
+		"picked-pid",
+		selected.proc.Pid,
+		"candidates",
+		formatDingoCandidates(candidates),
+	)
+}
+
+func formatDingoCandidates(candidates []dingoCandidate) string {
+	parts := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		parts = append(
+			parts,
+			fmt.Sprintf(
+				"pid=%d metrics-port=%s data-dir=%s",
+				candidate.proc.Pid,
+				candidate.metricsPort,
+				candidate.dataDir,
+			),
+		)
+	}
+	return "[" + strings.Join(parts, "] [") + "]"
+}
+
+// findTCPSocketOwner returns the PID that owns the configured Prometheus TCP
+// listener, if the OS exposes that socket ownership information.
+func findTCPSocketOwner(
+	ctx context.Context,
+	host string,
+	port uint32,
+) (int32, error) {
+	connections, err := netutil.ConnectionsWithContext(ctx, "tcp")
+	if err != nil {
+		return 0, err
+	}
+	for _, conn := range connections {
+		if conn.Status != "LISTEN" || conn.Laddr.Port != port || conn.Pid <= 0 {
+			continue
+		}
+		if tcpListenAddrMatches(conn.Laddr.IP, host) {
+			return conn.Pid, nil
+		}
+	}
+	return 0, fmt.Errorf("no tcp listener found on %s:%d", host, port)
+}
+
+// tcpListenAddrMatches treats wildcard listener addresses as matching any
+// scrape host, while still supporting exact and parsed IP comparisons. It does
+// not resolve arbitrary hostnames; gopsutil normally reports listener addresses
+// as IP literals.
+func tcpListenAddrMatches(listenHost, scrapeHost string) bool {
+	listenIP := net.ParseIP(listenHost)
+	if listenIP != nil && listenIP.IsUnspecified() {
+		return true
+	}
+	if listenHost == scrapeHost {
+		return true
+	}
+	scrapeIP := net.ParseIP(scrapeHost)
+	if listenIP == nil || scrapeIP == nil {
+		if scrapeHost == "localhost" && listenIP != nil {
+			return listenIP.IsLoopback()
+		}
+		return false
+	}
+	return listenIP.Equal(scrapeIP)
+}
+
+func listProcessesByName(
+	ctx context.Context,
+	name string,
+) ([]*process.Process, error) {
+	processes, err := process.ProcessesWithContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get processes: %w", err)
+	}
+	matches := []*process.Process{}
+	for _, proc := range processes {
+		procName, err := proc.NameWithContext(ctx)
+		if err != nil {
+			continue
+		}
+		if strings.Contains(procName, name) {
+			matches = append(matches, proc)
+		}
+	}
+	return matches, nil
 }
 
 func getProcessMetricsByPid(
@@ -1406,47 +1739,6 @@ func getProcessMetricsByPidFile(
 	}
 
 	return proc, nil
-}
-
-func getProcessMetricsByName(
-	ctx context.Context,
-	_ *config.Config,
-) (*process.Process, error) {
-	r, _ := process.NewProcessWithContext(ctx, 0)
-	processes, err := process.ProcessesWithContext(ctx)
-	if err != nil {
-		return r, fmt.Errorf("failed to get processes: %w", err)
-	}
-	for _, p := range processes {
-		n, err := p.NameWithContext(ctx)
-		if err != nil {
-			continue
-		}
-
-		if strings.Contains(n, getEffectiveNodeBinary()) {
-			r = p
-			break
-		}
-	}
-
-	// Check if we found a process
-	if r == nil || r.Pid == 0 {
-		return r, fmt.Errorf(
-			"no process found with name containing %s",
-			getEffectiveNodeBinary(),
-		)
-	}
-
-	exists, err := r.IsRunning()
-	if err != nil {
-		return r, fmt.Errorf("failed to check if process is running: %w", err)
-	}
-
-	if !exists {
-		return r, errors.New("process is not running")
-	}
-
-	return r, nil
 }
 
 func getProcessMetricsByNameAndPort(
