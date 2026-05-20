@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -1393,7 +1394,7 @@ func findDingoProcess(
 			if len(portMatches) > 1 {
 				selected, ok := lowestPIDDingoCandidate(portMatches)
 				if !ok {
-					return nil, fmt.Errorf("no dingo process found")
+					return nil, errors.New("no dingo process found")
 				}
 				logDingoCandidateAmbiguity(
 					fmt.Sprintf(
