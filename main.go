@@ -1359,8 +1359,8 @@ func findDingoProcess(
 		return proc, err
 	}
 
-	// Prefer the process that owns the Prometheus scrape socket. This is the
-	// strongest automatic signal because it is serving the metrics we read.
+	// First try the process listening on the Prometheus metrics port, because
+	// that is the process nview is reading metrics from.
 	if lookups.socketOwner != nil {
 		pid, err := lookups.socketOwner(
 			ctx,
@@ -1433,8 +1433,8 @@ func findDingoProcess(
 		}
 	}
 
-	// Last resort for single-process containers where Dingo is PID 1 but
-	// process enumeration did not find it.
+	// As a final fallback, try PID 1 for containers where Dingo is the only
+	// process but process listing did not find it.
 	proc, err := getProcessMetricsByPid(ctx, 1)
 	if err == nil {
 		logDingoProcessSelection(proc.Pid, "pid-1-fallback")
