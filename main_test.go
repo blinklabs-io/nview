@@ -39,6 +39,8 @@ func TestDingoProcessHelper(t *testing.T) {
 	os.Exit(0)
 }
 
+// startDingoProcessHelper starts a real child process with optional env and
+// args so gopsutil can inspect cmdline/env data in tests.
 func startDingoProcessHelper(
 	t *testing.T,
 	env []string,
@@ -48,6 +50,8 @@ func startDingoProcessHelper(
 	return startNamedDingoProcessHelper(t, "", env, args...)
 }
 
+// startNamedDingoProcessHelper starts the helper through an optional symlink
+// name so socket-owner tests can make the process look like Dingo.
 func startNamedDingoProcessHelper(
 	t *testing.T,
 	name string,
@@ -98,6 +102,8 @@ func startNamedDingoProcessHelper(
 	return nil
 }
 
+// preserveDingoDiscoveryAtomics restores one-shot Dingo logging flags so tests
+// that invoke findDingoProcess do not leak state into later tests.
 func preserveDingoDiscoveryAtomics(t *testing.T) {
 	t.Helper()
 	originalSelectionLogged := dingoProcessSelectionLogged.Load()
