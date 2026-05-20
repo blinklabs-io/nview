@@ -20,6 +20,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -44,10 +45,27 @@ func startDingoProcessHelper(
 	args ...string,
 ) *process.Process {
 	t.Helper()
+	return startNamedDingoProcessHelper(t, "", env, args...)
+}
+
+func startNamedDingoProcessHelper(
+	t *testing.T,
+	name string,
+	env []string,
+	args ...string,
+) *process.Process {
+	t.Helper()
 
 	executable, err := os.Executable()
 	if err != nil {
 		t.Fatalf("failed to find test executable: %v", err)
+	}
+	if name != "" {
+		linkPath := filepath.Join(t.TempDir(), name)
+		if err := os.Symlink(executable, linkPath); err != nil {
+			t.Fatalf("failed to create helper symlink: %v", err)
+		}
+		executable = linkPath
 	}
 	cmdArgs := append([]string{"-test.run=TestDingoProcessHelper", "--"}, args...)
 	cmd := exec.Command(executable, cmdArgs...)
@@ -152,7 +170,7 @@ func TestFindDingoProcessUsesSocketOwnerBeforePID1Fallback(t *testing.T) {
 	logBuffer = nil
 	logMutex.Unlock()
 
-	socketOwnerPID := int32(os.Getpid())
+	socketOwnerProc := startNamedDingoProcessHelper(t, DINGO_BINARY, nil)
 	proc, err := findDingoProcess(context.Background(), cfg, procLookups{
 		socketOwner: func(
 			_ context.Context,
@@ -165,15 +183,15 @@ func TestFindDingoProcessUsesSocketOwnerBeforePID1Fallback(t *testing.T) {
 			if port != cfg.Prometheus.Port {
 				t.Fatalf("socketOwner port = %d, expected %d", port, cfg.Prometheus.Port)
 			}
-			return socketOwnerPID, nil
+			return socketOwnerProc.Pid, nil
 		},
 	})
 	if err != nil {
 		t.Fatalf("findDingoProcess() returned error: %v", err)
 	}
 
-	if proc.Pid != socketOwnerPID {
-		t.Fatalf("findDingoProcess() returned pid %d, expected socket owner pid %d", proc.Pid, socketOwnerPID)
+	if proc.Pid != socketOwnerProc.Pid {
+		t.Fatalf("findDingoProcess() returned pid %d, expected socket owner pid %d", proc.Pid, socketOwnerProc.Pid)
 	}
 
 	logMutex.Lock()

@@ -1368,7 +1368,7 @@ func findDingoProcess(
 		)
 		if err == nil && pid > 0 {
 			proc, err := getProcessMetricsByPid(ctx, pid)
-			if err == nil {
+			if err == nil && processNameContains(ctx, proc, DINGO_BINARY) {
 				logDingoProcessSelection(proc.Pid, "socket-owner")
 				return proc, nil
 			}
@@ -1470,6 +1470,27 @@ func lowestPIDDingoCandidate(candidates []dingoCandidate) dingoCandidate {
 		}
 	}
 	return selected
+}
+
+func processNameContains(
+	ctx context.Context,
+	proc *process.Process,
+	name string,
+) bool {
+	if procName, err := proc.NameWithContext(ctx); err == nil &&
+		strings.Contains(procName, name) {
+		return true
+	}
+	args, err := proc.CmdlineSliceWithContext(ctx)
+	if err != nil {
+		return false
+	}
+	for _, arg := range args {
+		if strings.Contains(arg, name) {
+			return true
+		}
+	}
+	return false
 }
 
 func valueFromArgs(args []string, flag string) string {
