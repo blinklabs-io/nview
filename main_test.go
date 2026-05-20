@@ -67,7 +67,7 @@ func startNamedDingoProcessHelper(
 	if name != "" {
 		linkPath := filepath.Join(t.TempDir(), name)
 		if err := os.Symlink(executable, linkPath); err != nil {
-			t.Fatalf("failed to create helper symlink: %v", err)
+			t.Skipf("cannot create helper symlink: %v", err)
 		}
 		executable = linkPath
 	}
