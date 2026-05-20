@@ -1414,7 +1414,7 @@ func findDingoProcess(
 			// name-only fallback and warn when there is real ambiguity.
 			selected, ok := lowestPIDDingoCandidate(candidates)
 			if !ok {
-				return nil, fmt.Errorf("no dingo process found")
+				return nil, errors.New("no dingo process found")
 			}
 			if len(candidates) > 1 {
 				logDingoCandidateAmbiguity(
