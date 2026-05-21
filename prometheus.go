@@ -89,6 +89,30 @@ type PromMetrics struct {
 	GoGcCount             uint64 `json:"go_gc_duration_seconds_count"`
 	DingoShelleyStartTime uint64 `json:"dingo_shelley_start_time"`
 	DingoEpochLengthSlots uint64 `json:"dingo_epoch_length_slots"`
+
+	// Dingo-native metrics
+	DingoDbSizeBytes       uint64 `json:"dingo_database_size_bytes"`
+	DingoChainCachedBlocks uint64 `json:"dingo_chain_manager_cached_blocks"`
+	DingoTipGapSlots       uint64 `json:"dingo_tip_gap_slots"`
+	DingoForgeTipGapSlots  uint64 `json:"dingo_forge_tip_gap_slots"`
+	DingoSlotClockFallback uint64 `json:"dingo_ledger_slot_clock_fallback_total"`
+	DingoForgeSlotClockErr uint64 `json:"dingo_forge_slot_clock_errors_total"`
+	DingoForgeSyncSkip     uint64 `json:"dingo_forge_sync_skip_total"`
+
+	// CBOR cache counters (cumulative)
+	DingoCacheUtxoHotHits  uint64 `json:"dingo_cbor_cache_utxo_hot_hits_total"`
+	DingoCacheUtxoHotMiss  uint64 `json:"dingo_cbor_cache_utxo_hot_misses_total"`
+	DingoCacheTxHotHits    uint64 `json:"dingo_cbor_cache_tx_hot_hits_total"`
+	DingoCacheTxHotMiss    uint64 `json:"dingo_cbor_cache_tx_hot_misses_total"`
+	DingoCacheBlockLruHits uint64 `json:"dingo_cbor_cache_block_lru_hits_total"`
+	DingoCacheBlockLruMiss uint64 `json:"dingo_cbor_cache_block_lru_misses_total"`
+	DingoCacheColdExtract  uint64 `json:"dingo_cbor_cache_cold_extractions_total"`
+
+	// Event bus
+	EventTotal            uint64 `json:"event_total"`
+	EventSubscribers      uint64 `json:"event_subscribers"`
+	EventDeliveryErrors   uint64 `json:"event_delivery_errors_total"`
+	EventDeliveryTimeouts uint64 `json:"event_delivery_timeouts_total"`
 }
 
 // Gets metrics from prometheus and return a PromMetrics instance
@@ -181,16 +205,17 @@ func prom2json(prom []byte) ([]byte, error) {
 	}
 	for _, val := range families {
 		for _, m := range val.GetMetric() {
+			name := val.GetName()
 			switch val.GetType() {
 			case dto.MetricType_COUNTER:
-				out[val.GetName()] = m.GetCounter().GetValue()
+				setPromMetricValue(out, name, m.GetCounter().GetValue())
 			case dto.MetricType_GAUGE:
-				out[val.GetName()] = m.GetGauge().GetValue()
+				setPromMetricValue(out, name, m.GetGauge().GetValue())
 			case dto.MetricType_UNTYPED:
-				out[val.GetName()] = m.GetUntyped().GetValue()
+				setPromMetricValue(out, name, m.GetUntyped().GetValue())
 			case dto.MetricType_SUMMARY:
 				// Extract count from SUMMARY metrics (e.g. go_gc_duration_seconds_count)
-				out[val.GetName()+"_count"] = m.GetSummary().GetSampleCount()
+				out[name+"_count"] = m.GetSummary().GetSampleCount()
 			case dto.MetricType_HISTOGRAM,
 				dto.MetricType_GAUGE_HISTOGRAM:
 				// Skip unsupported metric types
@@ -204,4 +229,13 @@ func prom2json(prom []byte) ([]byte, error) {
 		return b, err
 	}
 	return b, nil
+}
+
+func setPromMetricValue(out map[string]any, name string, value float64) {
+	if strings.HasPrefix(name, "event_") {
+		if prev, ok := out[name].(float64); ok {
+			value += prev
+		}
+	}
+	out[name] = value
 }

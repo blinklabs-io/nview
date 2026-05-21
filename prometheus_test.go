@@ -221,6 +221,70 @@ dingo_epoch_length_slots 1000
 	}
 }
 
+// TestPromMetricsPopulatesAllDingoDiagnosticsFields verifies every new Dingo
+// and event-bus Prometheus metric is decoded into the PromMetrics struct.
+func TestPromMetricsPopulatesAllDingoDiagnosticsFields(t *testing.T) {
+	prom := []byte(`
+dingo_database_size_bytes{plugin="ledger"} 1337
+dingo_chain_manager_cached_blocks 8192
+dingo_tip_gap_slots 2
+dingo_forge_tip_gap_slots 3
+dingo_ledger_slot_clock_fallback_total 4
+dingo_forge_slot_clock_errors_total 5
+dingo_forge_sync_skip_total 6
+dingo_cbor_cache_utxo_hot_hits_total 100
+dingo_cbor_cache_utxo_hot_misses_total 10
+dingo_cbor_cache_tx_hot_hits_total 200
+dingo_cbor_cache_tx_hot_misses_total 20
+dingo_cbor_cache_block_lru_hits_total 300
+dingo_cbor_cache_block_lru_misses_total 30
+dingo_cbor_cache_cold_extractions_total 40
+event_total{type="block"} 20
+event_total{type="tx"} 30
+event_subscribers{topic="block"} 25
+event_subscribers{topic="tx"} 35
+event_delivery_errors_total{topic="block"} 30
+event_delivery_errors_total{topic="tx"} 40
+event_delivery_timeouts_total{topic="block"} 35
+event_delivery_timeouts_total{topic="tx"} 45
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	tests := []struct {
+		name string
+		got  uint64
+		want uint64
+	}{
+		{"DingoDbSizeBytes", metrics.DingoDbSizeBytes, 1337},
+		{"DingoChainCachedBlocks", metrics.DingoChainCachedBlocks, 8192},
+		{"DingoTipGapSlots", metrics.DingoTipGapSlots, 2},
+		{"DingoForgeTipGapSlots", metrics.DingoForgeTipGapSlots, 3},
+		{"DingoSlotClockFallback", metrics.DingoSlotClockFallback, 4},
+		{"DingoForgeSlotClockErr", metrics.DingoForgeSlotClockErr, 5},
+		{"DingoForgeSyncSkip", metrics.DingoForgeSyncSkip, 6},
+		{"DingoCacheUtxoHotHits", metrics.DingoCacheUtxoHotHits, 100},
+		{"DingoCacheUtxoHotMiss", metrics.DingoCacheUtxoHotMiss, 10},
+		{"DingoCacheTxHotHits", metrics.DingoCacheTxHotHits, 200},
+		{"DingoCacheTxHotMiss", metrics.DingoCacheTxHotMiss, 20},
+		{"DingoCacheBlockLruHits", metrics.DingoCacheBlockLruHits, 300},
+		{"DingoCacheBlockLruMiss", metrics.DingoCacheBlockLruMiss, 30},
+		{"DingoCacheColdExtract", metrics.DingoCacheColdExtract, 40},
+		{"EventTotal", metrics.EventTotal, 50},
+		{"EventSubscribers", metrics.EventSubscribers, 60},
+		{"EventDeliveryErrors", metrics.EventDeliveryErrors, 70},
+		{"EventDeliveryTimeouts", metrics.EventDeliveryTimeouts, 80},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.got != tt.want {
+				t.Errorf("%s = %d, expected %d", tt.name, tt.got, tt.want)
+			}
+		})
+	}
+}
+
 func decodePromMetrics(t *testing.T, prom []byte) PromMetrics {
 	t.Helper()
 

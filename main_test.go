@@ -741,6 +741,265 @@ func TestTcpinfoRtt(t *testing.T) {
 	}
 }
 
+// TestFormatDingoHitRatio verifies cache hit percentages are calculated from
+// previous-sample deltas instead of cumulative counter totals.
+func TestFormatDingoHitRatio(t *testing.T) {
+	tests := []struct {
+		name     string
+		currHits uint64
+		currMiss uint64
+		prevHits uint64
+		prevMiss uint64
+		expected string
+	}{
+		{
+			name:     "zero sample",
+			expected: "n/a",
+		},
+		{
+			name:     "growing hits and misses",
+			currHits: 150,
+			currMiss: 50,
+			prevHits: 100,
+			prevMiss: 25,
+			expected: "66.7%",
+		},
+		{
+			name:     "steady state",
+			currHits: 100,
+			currMiss: 25,
+			prevHits: 100,
+			prevMiss: 25,
+			expected: "n/a",
+		},
+		{
+			name:     "cumulative only misses",
+			currMiss: 10,
+			expected: "0.0%",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatDingoHitRatio(
+				tt.currHits,
+				tt.currMiss,
+				tt.prevHits,
+				tt.prevMiss,
+			)
+			if result != tt.expected {
+				t.Errorf(
+					"formatDingoHitRatio() = %q, expected %q",
+					result,
+					tt.expected,
+				)
+			}
+		})
+	}
+}
+
+// TestFormatDingoRate verifies cumulative Dingo counters are converted into
+// per-second rates using the elapsed time between samples.
+func TestFormatDingoRate(t *testing.T) {
+	result := formatDingoRate(22, 10, 3*time.Second)
+	if result != "4" {
+		t.Errorf("formatDingoRate() = %q, expected %q", result, "4")
+	}
+}
+
+// TestApplyDefaultSecondaryView verifies the first-scrape secondary pane
+// default and the NVIEW_DEFAULT_VIEW override behavior.
+func TestApplyDefaultSecondaryView(t *testing.T) {
+	tests := []struct {
+		name     string
+		envValue string
+		binary   string
+		expected secondaryView
+	}{
+		{
+			name:     "auto dingo",
+			binary:   DINGO_BINARY,
+			expected: viewDingo,
+		},
+		{
+			name:     "auto non-dingo",
+			binary:   CARDANO_BINARY,
+			expected: viewNone,
+		},
+		{
+			name:     "peers override",
+			envValue: "peers",
+			binary:   DINGO_BINARY,
+			expected: viewPeers,
+		},
+		{
+			name:     "none override",
+			envValue: "none",
+			binary:   DINGO_BINARY,
+			expected: viewNone,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("NVIEW_DEFAULT_VIEW", tt.envValue)
+			cfg := config.GetConfig()
+			originalBinary := cfg.Node.Binary
+			originalDefaultSet := secondaryDefaultSet.Load()
+			originalActive := getActiveSecondaryView()
+			defer func() {
+				cfg.Node.Binary = originalBinary
+				secondaryDefaultSet.Store(originalDefaultSet)
+				setActiveSecondaryView(originalActive)
+				detectedNodeBinary.Store("")
+			}()
+
+			cfg.Node.Binary = ""
+			detectedNodeBinary.Store(tt.binary)
+			secondaryDefaultSet.Store(false)
+			setActiveSecondaryView(viewPeers)
+
+			applyDefaultSecondaryView()
+
+			if getActiveSecondaryView() != tt.expected {
+				t.Errorf(
+					"active secondary = %d, expected %d",
+					getActiveSecondaryView(),
+					tt.expected,
+				)
+			}
+		})
+	}
+}
+
+// TestGetDingoStatsRendersDiagnostics verifies the diagnostics pane renders
+// Dingo-native values plus derived cache ratios and event/cold-extract rates.
+func TestGetDingoStatsRendersDiagnostics(t *testing.T) {
+	originalPromMetrics := promMetrics
+	originalLastDingoSample := lastDingoSample
+	originalLastDingoSampleAt := lastDingoSampleAt
+	originalLastDingoRateBase := lastDingoRateBase
+	originalLastDingoRateBaseAt := lastDingoRateBaseAt
+	originalLastDingoSampleSrc := lastDingoSampleSrc
+	defer func() {
+		promMetrics = originalPromMetrics
+		lastDingoSample = originalLastDingoSample
+		lastDingoSampleAt = originalLastDingoSampleAt
+		lastDingoRateBase = originalLastDingoRateBase
+		lastDingoRateBaseAt = originalLastDingoRateBaseAt
+		lastDingoSampleSrc = originalLastDingoSampleSrc
+	}()
+
+	lastDingoRateBase = nil
+	lastDingoRateBaseAt = time.Time{}
+	lastDingoSampleSrc = nil
+	lastDingoSample = &PromMetrics{
+		DingoCacheUtxoHotHits:  90,
+		DingoCacheUtxoHotMiss:  10,
+		DingoCacheTxHotHits:    40,
+		DingoCacheTxHotMiss:    10,
+		DingoCacheBlockLruHits: 5,
+		DingoCacheBlockLruMiss: 5,
+		DingoCacheColdExtract:  10,
+		EventDeliveryErrors:    1,
+		EventDeliveryTimeouts:  2,
+	}
+	lastDingoSampleAt = time.Now().Add(-10 * time.Second)
+	promMetrics = &PromMetrics{
+		DingoDbSizeBytes:       BytesInGigabyte,
+		DingoChainCachedBlocks: 8192,
+		DingoTipGapSlots:       0,
+		DingoForgeTipGapSlots:  1,
+		DingoSlotClockFallback: 2,
+		DingoForgeSlotClockErr: 3,
+		DingoForgeSyncSkip:     4,
+		DingoCacheUtxoHotHits:  188,
+		DingoCacheUtxoHotMiss:  12,
+		DingoCacheTxHotHits:    131,
+		DingoCacheTxHotMiss:    19,
+		DingoCacheBlockLruHits: 81,
+		DingoCacheBlockLruMiss: 29,
+		DingoCacheColdExtract:  130,
+		EventTotal:             100,
+		EventSubscribers:       14,
+		EventDeliveryErrors:    1,
+		EventDeliveryTimeouts:  2,
+	}
+
+	result := getDingoStats()
+	expectedParts := []string{
+		"DB Size",
+		"1.0G",
+		"Cached Blocks",
+		"8192",
+		"Tip Gap",
+		"Forge Gap",
+		"CBOR Cache",
+		"utxo 98.0%",
+		"tx 91.0%",
+		"blk 76.0%",
+		"Cold Extract",
+		"12",
+		"Events",
+		"14",
+		"Slot Clock",
+		"fallback 2",
+		"forgeErr 3",
+		"syncSkip 4",
+	}
+	for _, part := range expectedParts {
+		if !strings.Contains(result, part) {
+			t.Errorf("getDingoStats() missing %q in:\n%s", part, result)
+		}
+	}
+}
+
+func TestGetDingoStatsFirstSampleShowsUnavailableDeltas(t *testing.T) {
+	originalPromMetrics := promMetrics
+	originalLastDingoSample := lastDingoSample
+	originalLastDingoSampleAt := lastDingoSampleAt
+	originalLastDingoRateBase := lastDingoRateBase
+	originalLastDingoRateBaseAt := lastDingoRateBaseAt
+	originalLastDingoSampleSrc := lastDingoSampleSrc
+	defer func() {
+		promMetrics = originalPromMetrics
+		lastDingoSample = originalLastDingoSample
+		lastDingoSampleAt = originalLastDingoSampleAt
+		lastDingoRateBase = originalLastDingoRateBase
+		lastDingoRateBaseAt = originalLastDingoRateBaseAt
+		lastDingoSampleSrc = originalLastDingoSampleSrc
+	}()
+
+	lastDingoSample = nil
+	lastDingoSampleAt = time.Time{}
+	lastDingoRateBase = nil
+	lastDingoRateBaseAt = time.Time{}
+	lastDingoSampleSrc = nil
+	promMetrics = &PromMetrics{
+		DingoCacheUtxoHotHits:  100,
+		DingoCacheTxHotHits:    100,
+		DingoCacheBlockLruHits: 100,
+		DingoCacheColdExtract:  100,
+		EventDeliveryErrors:    100,
+		EventDeliveryTimeouts:  100,
+	}
+
+	result := getDingoStats()
+	expectedParts := []string{
+		"utxo n/a",
+		"tx n/a",
+		"blk n/a",
+		"Cold Extract : [white]n/a",
+		"err [white]n/a",
+		"timeout [white]n/a",
+	}
+	for _, part := range expectedParts {
+		if !strings.Contains(result, part) {
+			t.Errorf("getDingoStats() missing %q in:\n%s", part, result)
+		}
+	}
+}
+
 func BenchmarkGetEpochProgress(b *testing.B) {
 	// Set up config
 	cfg := config.GetConfig()

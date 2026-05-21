@@ -20,10 +20,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
 	"net"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -128,6 +130,31 @@ var (
 	dingoProcessAmbiguityLogged atomic.Bool
 )
 
+type secondaryView int
+
+const (
+	viewNone secondaryView = iota
+	viewPeers
+	viewDingo
+)
+
+const (
+	viewNoneValue  int32 = int32(viewNone)
+	viewPeersValue int32 = int32(viewPeers)
+	viewDingoValue int32 = int32(viewDingo)
+)
+
+var (
+	activeSecondary     atomic.Int32
+	secondaryDefaultSet atomic.Bool
+	lastDingoSample     *PromMetrics
+	lastDingoSampleAt   time.Time
+	lastDingoRateBase   *PromMetrics
+	lastDingoRateBaseAt time.Time
+	lastDingoSampleSrc  *PromMetrics
+	lastDingoSampleMu   sync.Mutex
+)
+
 // Global command line flags
 var cmdlineFlags struct {
 	configFile string
@@ -170,7 +197,8 @@ var coreTextView = tview.NewTextView().
 
 var footerTextView = tview.NewTextView().
 	SetDynamicColors(true).
-	SetTextColor(tcell.ColorGreen)
+	SetTextColor(tcell.ColorGreen).
+	SetWrap(false)
 
 var headerTextView = tview.NewTextView().
 	SetTextColor(tcell.ColorGreen)
@@ -204,6 +232,89 @@ var processMetrics *process.Process
 // Track our failures
 var failCount atomic.Uint32
 
+func getActiveSecondaryView() secondaryView {
+	return secondaryView(activeSecondary.Load())
+}
+
+func setActiveSecondaryView(view secondaryView) {
+	switch view {
+	case viewNone:
+		activeSecondary.Store(viewNoneValue)
+	case viewPeers:
+		activeSecondary.Store(viewPeersValue)
+	case viewDingo:
+		activeSecondary.Store(viewDingoValue)
+	}
+}
+
+func applyDefaultSecondaryView() {
+	if !secondaryDefaultSet.CompareAndSwap(false, true) {
+		return
+	}
+
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("NVIEW_DEFAULT_VIEW"))) {
+	case "peers":
+		setActiveSecondaryView(viewPeers)
+	case "dingo":
+		if getEffectiveNodeBinary() == DINGO_BINARY {
+			setActiveSecondaryView(viewDingo)
+		} else {
+			setActiveSecondaryView(viewNone)
+			if logger != nil {
+				logger.Debug(
+					"ignoring dingo default view for non-dingo node",
+					"binary",
+					getEffectiveNodeBinary(),
+				)
+			}
+		}
+	case "none":
+		setActiveSecondaryView(viewNone)
+	case "":
+		if getEffectiveNodeBinary() == DINGO_BINARY {
+			setActiveSecondaryView(viewDingo)
+		} else {
+			setActiveSecondaryView(viewNone)
+		}
+	default:
+		setActiveSecondaryView(viewNone)
+		if logger != nil {
+			logger.Debug(
+				"ignoring invalid NVIEW_DEFAULT_VIEW",
+				"value",
+				os.Getenv("NVIEW_DEFAULT_VIEW"),
+			)
+		}
+	}
+}
+
+func getSecondaryViewText(ctx context.Context) (string, string) {
+	switch getActiveSecondaryView() {
+	case viewPeers:
+		return "Peers", getPeerText(ctx)
+	case viewDingo:
+		return "Dingo Diagnostics", getDingoStats()
+	case viewNone:
+		return "Secondary", ""
+	default:
+		return "Secondary", ""
+	}
+}
+
+func updateSecondaryText(ctx context.Context) {
+	title, tmpText := getSecondaryViewText(ctx)
+	peerTextView.SetTitle(title)
+	if tmpText != peerText {
+		peerText = tmpText
+		peerTextView.Clear()
+		peerTextView.SetText(peerText)
+		if scrollPeers {
+			scrollPeers = false
+			peerTextView.ScrollToBeginning()
+		}
+	}
+}
+
 func main() {
 	// Check if any command line flags are given
 	flag.StringVar(
@@ -223,7 +334,7 @@ func main() {
 
 	// Initialize logger with buffer
 	baseHandler := slog.NewTextHandler(
-		os.Stderr,
+		io.Discard,
 		&slog.HandlerOptions{Level: slog.LevelInfo},
 	)
 	bufferedHandler := &bufferHandler{handler: baseHandler}
@@ -250,8 +361,6 @@ func main() {
 	if err == nil {
 		publicIP = &ip
 	}
-	checkPeers = true
-
 	// Fetch data from Prometheus
 	go func() {
 		for {
@@ -296,6 +405,7 @@ func main() {
 					)
 				}
 			}
+			applyDefaultSecondaryView()
 			promMetrics = prom
 			select {
 			case <-ctx.Done():
@@ -406,17 +516,7 @@ func main() {
 				return
 			default:
 			}
-			err := pingPeers(ctx)
-			if err != nil {
-				logger.Warn("Failed to ping peers", "error", err)
-				failCount.Add(1)
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(time.Second * 10):
-				}
-				continue
-			}
+			pingPeers(ctx)
 			select {
 			case <-ctx.Done():
 				return
@@ -448,11 +548,12 @@ func main() {
 		SetTitle("Block Propagation").
 		SetBorder(true)
 
-	peerText = getPeerText(ctx)
-	peerTextView.SetText(peerText).SetTitle("Peers").SetBorder(true)
+	peerTitle, peerTextValue := getSecondaryViewText(ctx)
+	peerText = peerTextValue
+	peerTextView.SetText(peerText).SetTitle(peerTitle).SetBorder(true)
 
 	// Set our footer
-	defaultFooterText := " [yellow](esc/q)[white] Quit | [yellow](p)[white] Peer Analysis"
+	defaultFooterText := " [yellow](esc/q)[white] Quit | [yellow](p)[white] Peers | [yellow](d)[white] Dingo"
 	footerTextView.SetText(defaultFooterText)
 
 	// Add content to our flex box
@@ -528,7 +629,6 @@ func main() {
 		if event.Rune() == 104 || event.Rune() == 114 { // h or r
 			setRole()
 			resetPeers()
-			checkPeers = true
 			footerTextView.Clear()
 			footerTextView.SetText(defaultFooterText)
 			var tmpText string
@@ -572,23 +672,33 @@ func main() {
 				blockTextView.Clear()
 				blockTextView.SetText(blockText)
 			}
-			// Peers are last since they take time to process
-			tmpText = getPeerText(ctx)
-			if tmpText != "" && tmpText != peerText {
-				peerText = tmpText
-				peerTextView.Clear()
-				peerTextView.SetText(peerText)
-				// Scroll to the top only once
-				if scrollPeers {
-					scrollPeers = false
-					peerTextView.ScrollToBeginning()
-				}
-			}
+			updateSecondaryText(ctx)
 		}
 		if event.Rune() == 112 { // p
 			resetPeers()
-			checkPeers = true
+			if getActiveSecondaryView() == viewPeers {
+				setActiveSecondaryView(viewNone)
+			} else {
+				setActiveSecondaryView(viewPeers)
+			}
 			scrollPeers = false
+			updateSecondaryText(ctx)
+		}
+		if event.Rune() == 100 { // d
+			if getEffectiveNodeBinary() != DINGO_BINARY {
+				if logger != nil {
+					logger.Debug(
+						"ignoring dingo diagnostics keypress for non-dingo node",
+						"binary",
+						getEffectiveNodeBinary(),
+					)
+				}
+			} else if getActiveSecondaryView() == viewDingo {
+				setActiveSecondaryView(viewNone)
+			} else {
+				setActiveSecondaryView(viewDingo)
+			}
+			updateSecondaryText(ctx)
 		}
 		if event.Rune() == 113 || event.Key() == tcell.KeyEscape { // q
 			logMutex.Lock()
@@ -667,17 +777,7 @@ func main() {
 				blockTextView.Clear()
 				blockTextView.SetText(blockText)
 			}
-			tmpText = getPeerText(ctx)
-			if tmpText != "" && tmpText != peerText {
-				peerText = tmpText
-				peerTextView.Clear()
-				peerTextView.SetText(peerText)
-				// Scroll to the top only once
-				if scrollPeers {
-					scrollPeers = false
-					peerTextView.ScrollToBeginning()
-				}
-			}
+			updateSecondaryText(ctx)
 			select {
 			case <-ctx.Done():
 				return
@@ -712,6 +812,142 @@ func getUptimes(ctx context.Context, processMetrics *process.Process) uint64 {
 		uptimes = 0 // Handle clock skew by showing 0 uptime
 	}
 	return uptimes
+}
+
+func formatDingoBytes(bytes uint64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%dB", bytes)
+	}
+	div := float64(unit)
+	exp := 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f%c", float64(bytes)/div, "KMGTPE"[exp])
+}
+
+func dingoCounterDelta(curr, prev uint64) uint64 {
+	if curr < prev {
+		return curr
+	}
+	return curr - prev
+}
+
+func formatDingoHitRatio(currHits, currMiss, prevHits, prevMiss uint64) string {
+	hits := dingoCounterDelta(currHits, prevHits)
+	misses := dingoCounterDelta(currMiss, prevMiss)
+	total := hits + misses
+	if total == 0 {
+		return "n/a"
+	}
+	return fmt.Sprintf("%.1f%%", float64(hits)/float64(total)*100)
+}
+
+func formatDingoRate(curr, prev uint64, dt time.Duration) string {
+	if dt <= 0 {
+		return "n/a"
+	}
+	rate := float64(dingoCounterDelta(curr, prev)) / dt.Seconds()
+	return fmt.Sprintf("%.0f", math.Round(rate))
+}
+
+func getDingoStats() string {
+	if promMetrics == nil {
+		return ""
+	}
+
+	curr := *promMetrics
+	currSrc := promMetrics
+	now := time.Now()
+
+	lastDingoSampleMu.Lock()
+	if currSrc != lastDingoSampleSrc {
+		lastDingoRateBase = lastDingoSample
+		lastDingoRateBaseAt = lastDingoSampleAt
+		lastDingoSample = &curr
+		lastDingoSampleAt = now
+		lastDingoSampleSrc = currSrc
+	}
+	prev := lastDingoRateBase
+	prevAt := lastDingoRateBaseAt
+	currAt := lastDingoSampleAt
+	lastDingoSampleMu.Unlock()
+
+	prevMetrics := &PromMetrics{}
+	dt := time.Duration(0)
+	if prev != nil {
+		prevMetrics = prev
+		dt = currAt.Sub(prevAt)
+	}
+
+	utxoRatio := "n/a"
+	txRatio := "n/a"
+	blockRatio := "n/a"
+	coldExtractRate := "n/a"
+	eventErrorRate := "n/a"
+	eventTimeoutRate := "n/a"
+	if prev != nil {
+		utxoRatio = formatDingoHitRatio(
+			curr.DingoCacheUtxoHotHits,
+			curr.DingoCacheUtxoHotMiss,
+			prevMetrics.DingoCacheUtxoHotHits,
+			prevMetrics.DingoCacheUtxoHotMiss,
+		)
+		txRatio = formatDingoHitRatio(
+			curr.DingoCacheTxHotHits,
+			curr.DingoCacheTxHotMiss,
+			prevMetrics.DingoCacheTxHotHits,
+			prevMetrics.DingoCacheTxHotMiss,
+		)
+		blockRatio = formatDingoHitRatio(
+			curr.DingoCacheBlockLruHits,
+			curr.DingoCacheBlockLruMiss,
+			prevMetrics.DingoCacheBlockLruHits,
+			prevMetrics.DingoCacheBlockLruMiss,
+		)
+		coldExtractRate = formatDingoRate(
+			curr.DingoCacheColdExtract,
+			prevMetrics.DingoCacheColdExtract,
+			dt,
+		)
+		eventErrorRate = formatDingoRate(
+			curr.EventDeliveryErrors,
+			prevMetrics.EventDeliveryErrors,
+			dt,
+		)
+		eventTimeoutRate = formatDingoRate(
+			curr.EventDeliveryTimeouts,
+			prevMetrics.EventDeliveryTimeouts,
+			dt,
+		)
+	}
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, " [green]DB Size      : [white]%s\n",
+		formatDingoBytes(curr.DingoDbSizeBytes))
+	fmt.Fprintf(&sb, " [green]Cached Blocks: [white]%d\n",
+		curr.DingoChainCachedBlocks)
+	fmt.Fprintf(&sb, " [green]Tip Gap      : [white]%d[blue] slots[white]         [green]Forge Gap: [white]%d\n",
+		curr.DingoTipGapSlots,
+		curr.DingoForgeTipGapSlots)
+	fmt.Fprintf(&sb, " [green]CBOR Cache   : [white]utxo %s  tx %s  blk %s\n",
+		utxoRatio,
+		txRatio,
+		blockRatio)
+	fmt.Fprintf(&sb, " [green]Cold Extract : [white]%s[blue] / sec\n",
+		coldExtractRate)
+	fmt.Fprintf(&sb, " [green]Events       : [white]%d[blue] subs[white]   [green]total [white]%d[white]   [green]err [white]%s[blue]/s[white]   [green]timeout [white]%s[blue]/s\n",
+		curr.EventSubscribers,
+		curr.EventTotal,
+		eventErrorRate,
+		eventTimeoutRate)
+	fmt.Fprintf(&sb, " [green]Slot Clock   : [white]fallback %d   forgeErr %d   syncSkip %d\n",
+		curr.DingoSlotClockFallback,
+		curr.DingoForgeSlotClockErr,
+		curr.DingoForgeSyncSkip)
+	return sb.String()
 }
 
 func getEpochProgress() float32 {
@@ -1106,25 +1342,43 @@ func getPeerText(ctx context.Context) string {
 	charUnmarked = string('▖')
 	granularity := ProgressBarGranularity
 	granularitySmall := granularity / 2
-	if checkPeers {
-		peerCount := len(peersFiltered)
+
+	peersFilteredMu.RLock()
+	peerCount := len(peersFiltered)
+	peersFilteredMu.RUnlock()
+
+	peerStatsMu.Lock()
+	rttCount := len(peerStats.RTTresultsSlice)
+	cnt0 := peerStats.CNT0
+	cnt1 := peerStats.CNT1
+	cnt2 := peerStats.CNT2
+	cnt3 := peerStats.CNT3
+	cnt4 := peerStats.CNT4
+	pct1 := peerStats.PCT1
+	pct2 := peerStats.PCT2
+	pct3 := peerStats.PCT3
+	pct4 := peerStats.PCT4
+	rttAvg := peerStats.RTTAVG
+	peers := slices.Clone(peerStats.RTTresultsSlice)
+	peerStatsMu.Unlock()
+
+	if peerCount == 0 || rttCount < peerCount {
 		fmt.Fprintf(&sb, " [yellow]%s [blue]%d[white]/[green]%d[white]\n",
 			"Peer analysis started... please wait!",
-			len(peerStats.RTTresultsSlice),
+			rttCount,
 			peerCount)
 		scrollPeers = false
 		return sb.String()
 	}
 
-	peerCount := len(peersFiltered)
 	sb.WriteString("       [green]RTT : Peers / Percent\n")
 	fmt.Fprintf(&sb, "    [green]0-50ms : [white]%5s   %.f%%",
-		strconv.Itoa(peerStats.CNT1),
-		peerStats.PCT1)
-	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT1)))+"s",
+		strconv.Itoa(cnt1),
+		pct1)
+	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", pct1)))+"s",
 		" ")
 	for i := range granularitySmall {
-		if i < int(peerStats.PCT1) {
+		if i < int(pct1) {
 			sb.WriteString("[green]" + charMarked)
 		} else {
 			sb.WriteString("[white]" + charUnmarked)
@@ -1132,12 +1386,12 @@ func getPeerText(ctx context.Context) string {
 	}
 	sb.WriteString("[white]\n") // closeRow
 	fmt.Fprintf(&sb, "  [green]50-100ms : [white]%5s   %.f%%",
-		strconv.Itoa(peerStats.CNT2),
-		peerStats.PCT2)
-	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT2)))+"s",
+		strconv.Itoa(cnt2),
+		pct2)
+	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", pct2)))+"s",
 		"")
 	for i := range granularitySmall {
-		if i < int(peerStats.PCT2) {
+		if i < int(pct2) {
 			sb.WriteString("[yellow]" + charMarked)
 		} else {
 			sb.WriteString("[white]" + charUnmarked)
@@ -1145,12 +1399,12 @@ func getPeerText(ctx context.Context) string {
 	}
 	sb.WriteString("[white]\n") // closeRow
 	fmt.Fprintf(&sb, " [green]100-200ms : [white]%5s   %.f%%",
-		strconv.Itoa(peerStats.CNT3),
-		peerStats.PCT3)
-	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT3)))+"s",
+		strconv.Itoa(cnt3),
+		pct3)
+	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", pct3)))+"s",
 		"")
 	for i := range granularitySmall {
-		if i < int(peerStats.PCT3) {
+		if i < int(pct3) {
 			sb.WriteString("[red]" + charMarked)
 		} else {
 			sb.WriteString("[white]" + charUnmarked)
@@ -1158,12 +1412,12 @@ func getPeerText(ctx context.Context) string {
 	}
 	sb.WriteString("[white]\n") // closeRow
 	fmt.Fprintf(&sb, "   [green]200ms < : [white]%5s   %.f%%",
-		strconv.Itoa(peerStats.CNT4),
-		peerStats.PCT4)
-	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", peerStats.PCT4)))+"s",
+		strconv.Itoa(cnt4),
+		pct4)
+	fmt.Fprintf(&sb, "%"+strconv.Itoa(10-len(fmt.Sprintf("%.f", pct4)))+"s",
 		"")
 	for i := range granularitySmall {
-		if i < int(peerStats.PCT4) {
+		if i < int(pct4) {
 			sb.WriteString("[fuchsia]" + charMarked)
 		} else {
 			sb.WriteString("[white]" + charUnmarked)
@@ -1176,20 +1430,20 @@ func getPeerText(ctx context.Context) string {
 
 	fmt.Fprintf(&sb, " [green]Total / Undetermined : [white]%d[white] / ",
 		peerCount)
-	if peerStats.CNT0 == 0 {
+	if cnt0 == 0 {
 		sb.WriteString("[blue]0[white]")
 	} else {
-		fmt.Fprintf(&sb, "[fuchsia]%d[white]", peerStats.CNT0)
+		fmt.Fprintf(&sb, "[fuchsia]%d[white]", cnt0)
 	}
-	if peerStats.RTTAVG >= RTTThreshold3 {
+	if rttAvg >= RTTThreshold3 {
 		fmt.Fprintf(&sb, " Average RTT : [fuchsia]%d[white] ms\n",
-			peerStats.RTTAVG)
-	} else if peerStats.RTTAVG >= RTTThreshold2 {
-		fmt.Fprintf(&sb, " Average RTT : [red]%d[white] ms\n", peerStats.RTTAVG)
-	} else if peerStats.RTTAVG >= RTTThreshold1 {
-		fmt.Fprintf(&sb, " Average RTT : [yellow]%d[white] ms\n", peerStats.RTTAVG)
-	} else if peerStats.RTTAVG >= 0 {
-		fmt.Fprintf(&sb, " Average RTT : [green]%d[white] ms\n", peerStats.RTTAVG)
+			rttAvg)
+	} else if rttAvg >= RTTThreshold2 {
+		fmt.Fprintf(&sb, " Average RTT : [red]%d[white] ms\n", rttAvg)
+	} else if rttAvg >= RTTThreshold1 {
+		fmt.Fprintf(&sb, " Average RTT : [yellow]%d[white] ms\n", rttAvg)
+	} else if rttAvg >= 0 {
+		fmt.Fprintf(&sb, " Average RTT : [green]%d[white] ms\n", rttAvg)
 	} else {
 		fmt.Fprintf(&sb, " Average RTT : [red]%s[white] ms\n", "---")
 	}
@@ -1199,7 +1453,7 @@ func getPeerText(ctx context.Context) string {
 
 	fmt.Fprintf(&sb, "   [green]# %24s  I/O RTT   Geolocation\n", "REMOTE PEER")
 	// peerLocationWidth := width - 41
-	for peerNbr, peer := range peerStats.RTTresultsSlice {
+	for peerNbr, peer := range peers {
 		peerNbr++
 		peerRTT := peer.RTT
 		peerPORT := peer.Port
