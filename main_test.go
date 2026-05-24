@@ -1148,8 +1148,8 @@ func TestUpdateMithrilViewAutoSwitch(t *testing.T) {
 	setActiveSecondaryView(viewDingo)
 
 	promMetrics = &PromMetrics{
-		MithrilSyncCompleted:     0,
-		MithrilSyncSnapshotSize:  BytesInGigabyte,
+		MithrilSyncCompleted:    0,
+		MithrilSyncSnapshotSize: BytesInGigabyte,
 	}
 	updateMithrilView()
 	if getActiveSecondaryView() != viewMithril {
