@@ -151,11 +151,11 @@ var (
 	secondaryDefaultSet   atomic.Bool
 	mithrilViewAutoActive atomic.Bool
 	lastDingoSample       *PromMetrics
-	lastDingoSampleAt   time.Time
-	lastDingoRateBase   *PromMetrics
-	lastDingoRateBaseAt time.Time
-	lastDingoSampleSrc  *PromMetrics
-	lastDingoSampleMu   sync.Mutex
+	lastDingoSampleAt     time.Time
+	lastDingoRateBase     *PromMetrics
+	lastDingoRateBaseAt   time.Time
+	lastDingoSampleSrc    *PromMetrics
+	lastDingoSampleMu     sync.Mutex
 )
 
 // Global command line flags
@@ -1084,7 +1084,7 @@ func getMithrilStats() string {
 		formatDingoBytes(uint64(m.MithrilSyncDownloadRate)))
 
 	ldgPct := m.MithrilSyncLedgerImportPercent
-	ldgSuffix := fmt.Sprintf("%d", m.MithrilSyncLedgerImportCurrent)
+	ldgSuffix := strconv.FormatUint(m.MithrilSyncLedgerImportCurrent, 10)
 	if m.MithrilSyncLedgerImportTotal > 0 {
 		ldgSuffix = fmt.Sprintf("%d[blue]/[white]%d[blue] items", m.MithrilSyncLedgerImportCurrent, m.MithrilSyncLedgerImportTotal)
 	}
