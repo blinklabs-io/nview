@@ -1253,15 +1253,24 @@ func TestUpdateMithrilViewAutoSwitch(t *testing.T) {
 // failures counter appears in the diagnostics pane.
 func TestGetDingoStatsShowsGovernanceFailures(t *testing.T) {
 	originalPromMetrics := promMetrics
+	originalLastDingoSample := lastDingoSample
+	originalLastDingoSampleAt := lastDingoSampleAt
 	originalLastDingoSampleSrc := lastDingoSampleSrc
 	originalLastDingoRateBase := lastDingoRateBase
+	originalLastDingoRateBaseAt := lastDingoRateBaseAt
 	defer func() {
 		promMetrics = originalPromMetrics
+		lastDingoSample = originalLastDingoSample
+		lastDingoSampleAt = originalLastDingoSampleAt
 		lastDingoSampleSrc = originalLastDingoSampleSrc
 		lastDingoRateBase = originalLastDingoRateBase
+		lastDingoRateBaseAt = originalLastDingoRateBaseAt
 	}()
 
 	lastDingoRateBase = nil
+	lastDingoRateBaseAt = time.Time{}
+	lastDingoSample = nil
+	lastDingoSampleAt = time.Time{}
 	lastDingoSampleSrc = nil
 	promMetrics = &PromMetrics{
 		DingoGovernanceDecodeFailures: 7,
