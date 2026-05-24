@@ -113,6 +113,34 @@ type PromMetrics struct {
 	EventSubscribers      uint64 `json:"event_subscribers"`
 	EventDeliveryErrors   uint64 `json:"event_delivery_errors_total"`
 	EventDeliveryTimeouts uint64 `json:"event_delivery_timeouts_total"`
+
+	// Mithril bootstrap sync metrics
+	MithrilSyncCompleted              uint64  `json:"dingo_mithril_sync_completed"`
+	MithrilSyncStartedAt              float64 `json:"dingo_mithril_sync_started_at_seconds"`
+	MithrilSyncErrorsTotal            uint64  `json:"dingo_mithril_sync_errors_total"`
+	MithrilSyncDownloadBytes          uint64  `json:"dingo_mithril_sync_download_bytes"`
+	MithrilSyncDownloadTotalBytes     uint64  `json:"dingo_mithril_sync_download_total_bytes"`
+	MithrilSyncDownloadPercent        float64 `json:"dingo_mithril_sync_download_percent"`
+	MithrilSyncDownloadRate           float64 `json:"dingo_mithril_sync_download_bytes_per_second"`
+	MithrilSyncSnapshotSize           uint64  `json:"dingo_mithril_sync_snapshot_size_bytes"`
+	MithrilSyncSnapshotEpoch          uint64  `json:"dingo_mithril_sync_snapshot_epoch"`
+	MithrilSyncLedgerImportCurrent    uint64  `json:"dingo_mithril_sync_ledger_import_current"`
+	MithrilSyncLedgerImportTotal      uint64  `json:"dingo_mithril_sync_ledger_import_total"`
+	MithrilSyncLedgerImportPercent    float64 `json:"dingo_mithril_sync_ledger_import_percent"`
+	MithrilSyncImmutableBlocksCopied  uint64  `json:"dingo_mithril_sync_immutable_blocks_copied"`
+	MithrilSyncImmutableCopyPerSecond float64 `json:"dingo_mithril_sync_immutable_blocks_per_second"`
+	MithrilSyncImmutableCopyPercent   float64 `json:"dingo_mithril_sync_immutable_copy_percent"`
+	MithrilSyncGapBlocks              uint64  `json:"dingo_mithril_sync_gap_blocks"`
+	// Phase active flags — populated from dingo_mithril_sync_phase_active{phase="..."} labels
+	MithrilPhaseBootstrap  float64 `json:"dingo_mithril_sync_phase_active_bootstrap"`
+	MithrilPhaseImmutable  float64 `json:"dingo_mithril_sync_phase_active_immutable_copy"`
+	MithrilPhaseLedger     float64 `json:"dingo_mithril_sync_phase_active_ledger_import"`
+	MithrilPhaseGapBlocks  float64 `json:"dingo_mithril_sync_phase_active_gap_blocks"`
+	MithrilPhaseBackfill   float64 `json:"dingo_mithril_sync_phase_active_backfill"`
+	MithrilPhasePostLedger float64 `json:"dingo_mithril_sync_phase_active_post_ledger_state"`
+
+	// Governance metrics
+	DingoGovernanceDecodeFailures uint64 `json:"dingo_governance_proposal_decode_failures_total"`
 }
 
 // Gets metrics from prometheus and return a PromMetrics instance
@@ -210,9 +238,27 @@ func prom2json(prom []byte) ([]byte, error) {
 			case dto.MetricType_COUNTER:
 				setPromMetricValue(out, name, m.GetCounter().GetValue())
 			case dto.MetricType_GAUGE:
-				setPromMetricValue(out, name, m.GetGauge().GetValue())
+				if name == "dingo_mithril_sync_phase_active" {
+					for _, lp := range m.GetLabel() {
+						if lp.GetName() == "phase" {
+							setPromMetricValue(out, name+"_"+lp.GetValue(), m.GetGauge().GetValue())
+							break
+						}
+					}
+				} else {
+					setPromMetricValue(out, name, m.GetGauge().GetValue())
+				}
 			case dto.MetricType_UNTYPED:
-				setPromMetricValue(out, name, m.GetUntyped().GetValue())
+				if name == "dingo_mithril_sync_phase_active" {
+					for _, lp := range m.GetLabel() {
+						if lp.GetName() == "phase" {
+							setPromMetricValue(out, name+"_"+lp.GetValue(), m.GetUntyped().GetValue())
+							break
+						}
+					}
+				} else {
+					setPromMetricValue(out, name, m.GetUntyped().GetValue())
+				}
 			case dto.MetricType_SUMMARY:
 				// Extract count from SUMMARY metrics (e.g. go_gc_duration_seconds_count)
 				out[name+"_count"] = m.GetSummary().GetSampleCount()

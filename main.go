@@ -136,18 +136,21 @@ const (
 	viewNone secondaryView = iota
 	viewPeers
 	viewDingo
+	viewMithril
 )
 
 const (
-	viewNoneValue  int32 = int32(viewNone)
-	viewPeersValue int32 = int32(viewPeers)
-	viewDingoValue int32 = int32(viewDingo)
+	viewNoneValue    int32 = int32(viewNone)
+	viewPeersValue   int32 = int32(viewPeers)
+	viewDingoValue   int32 = int32(viewDingo)
+	viewMithrilValue int32 = int32(viewMithril)
 )
 
 var (
-	activeSecondary     atomic.Int32
-	secondaryDefaultSet atomic.Bool
-	lastDingoSample     *PromMetrics
+	activeSecondary       atomic.Int32
+	secondaryDefaultSet   atomic.Bool
+	mithrilViewAutoActive atomic.Bool
+	lastDingoSample       *PromMetrics
 	lastDingoSampleAt   time.Time
 	lastDingoRateBase   *PromMetrics
 	lastDingoRateBaseAt time.Time
@@ -244,6 +247,8 @@ func setActiveSecondaryView(view secondaryView) {
 		activeSecondary.Store(viewPeersValue)
 	case viewDingo:
 		activeSecondary.Store(viewDingoValue)
+	case viewMithril:
+		activeSecondary.Store(viewMithrilValue)
 	}
 }
 
@@ -294,6 +299,8 @@ func getSecondaryViewText(ctx context.Context) (string, string) {
 		return "Peers", getPeerText(ctx)
 	case viewDingo:
 		return "Dingo Diagnostics", getDingoStats()
+	case viewMithril:
+		return "Mithril Sync", getMithrilStats()
 	case viewNone:
 		return "Secondary", ""
 	default:
@@ -407,6 +414,7 @@ func main() {
 			}
 			applyDefaultSecondaryView()
 			promMetrics = prom
+			updateMithrilView()
 			select {
 			case <-ctx.Done():
 				return
@@ -553,7 +561,7 @@ func main() {
 	peerTextView.SetText(peerText).SetTitle(peerTitle).SetBorder(true)
 
 	// Set our footer
-	defaultFooterText := " [yellow](esc/q)[white] Quit | [yellow](p)[white] Peers | [yellow](d)[white] Dingo"
+	defaultFooterText := " [yellow](esc/q)[white] Quit | [yellow](p)[white] Peers | [yellow](d)[white] Dingo | [yellow](m)[white] Mithril"
 	footerTextView.SetText(defaultFooterText)
 
 	// Add content to our flex box
@@ -697,6 +705,24 @@ func main() {
 				setActiveSecondaryView(viewNone)
 			} else {
 				setActiveSecondaryView(viewDingo)
+			}
+			updateSecondaryText(ctx)
+		}
+		if event.Rune() == 109 { // m
+			if getEffectiveNodeBinary() != DINGO_BINARY {
+				if logger != nil {
+					logger.Debug(
+						"ignoring mithril view keypress for non-dingo node",
+						"binary",
+						getEffectiveNodeBinary(),
+					)
+				}
+			} else if getActiveSecondaryView() == viewMithril {
+				mithrilViewAutoActive.Store(false)
+				setActiveSecondaryView(viewDingo)
+			} else {
+				mithrilViewAutoActive.Store(false)
+				setActiveSecondaryView(viewMithril)
 			}
 			updateSecondaryText(ctx)
 		}
@@ -947,6 +973,140 @@ func getDingoStats() string {
 		curr.DingoSlotClockFallback,
 		curr.DingoForgeSlotClockErr,
 		curr.DingoForgeSyncSkip)
+	govColor := "white"
+	if curr.DingoGovernanceDecodeFailures > 0 {
+		govColor = "red"
+	}
+	fmt.Fprintf(&sb, " [green]Gov Failures : ["+govColor+"]%d[white]\n",
+		curr.DingoGovernanceDecodeFailures)
+	return sb.String()
+}
+
+func isMithrilSyncActive() bool {
+	if promMetrics == nil {
+		return false
+	}
+	if promMetrics.MithrilSyncCompleted == 1 {
+		return false
+	}
+	return promMetrics.MithrilSyncDownloadBytes > 0 ||
+		promMetrics.MithrilSyncSnapshotSize > 0 ||
+		promMetrics.MithrilSyncLedgerImportTotal > 0 ||
+		promMetrics.MithrilSyncImmutableBlocksCopied > 0 ||
+		promMetrics.MithrilSyncGapBlocks > 0
+}
+
+// updateMithrilView auto-switches to viewMithril when bootstrap is active and
+// back to viewDingo when it completes, without disturbing user-driven view changes.
+func updateMithrilView() {
+	if getEffectiveNodeBinary() != DINGO_BINARY {
+		return
+	}
+	if isMithrilSyncActive() {
+		if getActiveSecondaryView() == viewDingo {
+			setActiveSecondaryView(viewMithril)
+			mithrilViewAutoActive.Store(true)
+		}
+	} else if mithrilViewAutoActive.Load() && getActiveSecondaryView() == viewMithril {
+		setActiveSecondaryView(viewDingo)
+		mithrilViewAutoActive.Store(false)
+	}
+}
+
+func getMithrilStats() string {
+	if promMetrics == nil {
+		return ""
+	}
+	m := promMetrics
+
+	renderBar := func(pct float64, width int) string {
+		var bar strings.Builder
+		filled := int(pct) * width / 100
+		for i := 0; i < width; i++ {
+			if i < filled {
+				bar.WriteString("[blue]▌")
+			} else {
+				bar.WriteString("[white]▖")
+			}
+		}
+		return bar.String()
+	}
+
+	startedAgo := "n/a"
+	if m.MithrilSyncStartedAt > 0 {
+		elapsed := time.Since(time.Unix(int64(m.MithrilSyncStartedAt), 0)).Truncate(time.Second)
+		startedAgo = elapsed.String() + " ago"
+	}
+
+	phaseStr := "n/a"
+	switch {
+	case m.MithrilPhaseBootstrap > 0:
+		phaseStr = "bootstrap"
+	case m.MithrilPhaseLedger > 0:
+		phaseStr = "ledger_import"
+	case m.MithrilPhaseImmutable > 0:
+		phaseStr = "immutable_copy"
+	case m.MithrilPhaseGapBlocks > 0:
+		phaseStr = "gap_blocks"
+	case m.MithrilPhaseBackfill > 0:
+		phaseStr = "backfill"
+	case m.MithrilPhasePostLedger > 0:
+		phaseStr = "post_ledger"
+	}
+
+	snapshotStr := "n/a"
+	if m.MithrilSyncSnapshotSize > 0 {
+		snapshotStr = formatDingoBytes(m.MithrilSyncSnapshotSize)
+	}
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, " [green]Phase        : [white]%-4s[green]  Started : [white]%s\n",
+		phaseStr, startedAgo)
+
+	errColor := "white"
+	if m.MithrilSyncErrorsTotal > 0 {
+		errColor = "red"
+	}
+	fmt.Fprintf(&sb, " [green]Snapshot     : [white]%s[green]  Epoch : [white]%d[green]  Errors : ["+errColor+"]%d[white]\n",
+		snapshotStr,
+		m.MithrilSyncSnapshotEpoch,
+		m.MithrilSyncErrorsTotal)
+
+	dlPct := m.MithrilSyncDownloadPercent
+	dlSuffix := formatDingoBytes(m.MithrilSyncDownloadBytes)
+	if m.MithrilSyncDownloadTotalBytes > 0 {
+		dlSuffix = fmt.Sprintf("%s[blue]/[white]%s", formatDingoBytes(m.MithrilSyncDownloadBytes), formatDingoBytes(m.MithrilSyncDownloadTotalBytes))
+	}
+	fmt.Fprintf(&sb, " [green]Download     : [white]%5.1f%%  %s[white]  %s  [green]rate [white]%s[blue]/s\n",
+		dlPct,
+		renderBar(dlPct, 20),
+		dlSuffix,
+		formatDingoBytes(uint64(m.MithrilSyncDownloadRate)))
+
+	ldgPct := m.MithrilSyncLedgerImportPercent
+	ldgSuffix := fmt.Sprintf("%d", m.MithrilSyncLedgerImportCurrent)
+	if m.MithrilSyncLedgerImportTotal > 0 {
+		ldgSuffix = fmt.Sprintf("%d[blue]/[white]%d[blue] items", m.MithrilSyncLedgerImportCurrent, m.MithrilSyncLedgerImportTotal)
+	}
+	fmt.Fprintf(&sb, " [green]Ledger Import: [white]%5.1f%%  %s[white]  %s\n",
+		ldgPct,
+		renderBar(ldgPct, 20),
+		ldgSuffix)
+
+	immPct := m.MithrilSyncImmutableCopyPercent
+	fmt.Fprintf(&sb, " [green]Immutable    : [white]%5.1f%%  %s[white]  %d[blue] blocks  [white]%.0f[blue] blk/s\n",
+		immPct,
+		renderBar(immPct, 20),
+		m.MithrilSyncImmutableBlocksCopied,
+		m.MithrilSyncImmutableCopyPerSecond)
+
+	gapColor := "white"
+	if m.MithrilSyncGapBlocks > 0 {
+		gapColor = "yellow"
+	}
+	fmt.Fprintf(&sb, " [green]Gap Blocks   : ["+gapColor+"]%d[blue] blocks remaining\n",
+		m.MithrilSyncGapBlocks)
+
 	return sb.String()
 }
 

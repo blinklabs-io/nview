@@ -285,6 +285,87 @@ event_delivery_timeouts_total{topic="tx"} 45
 	}
 }
 
+func TestPromMetricsMithrilSyncFields(t *testing.T) {
+	prom := []byte(`
+dingo_mithril_sync_completed 0
+dingo_mithril_sync_started_at_seconds 1700000000
+dingo_mithril_sync_errors_total 1
+dingo_mithril_sync_download_bytes 1073741824
+dingo_mithril_sync_download_total_bytes 2147483648
+dingo_mithril_sync_download_percent 45.5
+dingo_mithril_sync_download_bytes_per_second 1048576
+dingo_mithril_sync_snapshot_size_bytes 2147483648
+dingo_mithril_sync_snapshot_epoch 500
+dingo_mithril_sync_ledger_import_current{stage="utxo"} 12345
+dingo_mithril_sync_ledger_import_total{stage="utxo"} 18230
+dingo_mithril_sync_ledger_import_percent{stage="utxo"} 67.7
+dingo_mithril_sync_immutable_blocks_copied 1234
+dingo_mithril_sync_immutable_blocks_per_second 56.0
+dingo_mithril_sync_immutable_copy_percent 23.1
+dingo_mithril_sync_gap_blocks 1200
+dingo_mithril_sync_phase_active{phase="bootstrap"} 0
+dingo_mithril_sync_phase_active{phase="immutable_copy"} 1
+dingo_mithril_sync_phase_active{phase="ledger_import"} 0
+dingo_mithril_sync_phase_active{phase="gap_blocks"} 0
+dingo_mithril_sync_phase_active{phase="backfill"} 0
+dingo_mithril_sync_phase_active{phase="post_ledger_state"} 0
+dingo_governance_proposal_decode_failures_total 3
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	uintTests := []struct {
+		name string
+		got  uint64
+		want uint64
+	}{
+		{"MithrilSyncCompleted", metrics.MithrilSyncCompleted, 0},
+		{"MithrilSyncErrorsTotal", metrics.MithrilSyncErrorsTotal, 1},
+		{"MithrilSyncDownloadBytes", metrics.MithrilSyncDownloadBytes, 1073741824},
+		{"MithrilSyncDownloadTotalBytes", metrics.MithrilSyncDownloadTotalBytes, 2147483648},
+		{"MithrilSyncSnapshotSize", metrics.MithrilSyncSnapshotSize, 2147483648},
+		{"MithrilSyncSnapshotEpoch", metrics.MithrilSyncSnapshotEpoch, 500},
+		{"MithrilSyncLedgerImportCurrent", metrics.MithrilSyncLedgerImportCurrent, 12345},
+		{"MithrilSyncLedgerImportTotal", metrics.MithrilSyncLedgerImportTotal, 18230},
+		{"MithrilSyncImmutableBlocksCopied", metrics.MithrilSyncImmutableBlocksCopied, 1234},
+		{"MithrilSyncGapBlocks", metrics.MithrilSyncGapBlocks, 1200},
+		{"DingoGovernanceDecodeFailures", metrics.DingoGovernanceDecodeFailures, 3},
+	}
+	for _, tt := range uintTests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.got != tt.want {
+				t.Errorf("%s = %d, expected %d", tt.name, tt.got, tt.want)
+			}
+		})
+	}
+
+	floatTests := []struct {
+		name string
+		got  float64
+		want float64
+	}{
+		{"MithrilSyncStartedAt", metrics.MithrilSyncStartedAt, 1700000000},
+		{"MithrilSyncDownloadPercent", metrics.MithrilSyncDownloadPercent, 45.5},
+		{"MithrilSyncDownloadRate", metrics.MithrilSyncDownloadRate, 1048576},
+		{"MithrilSyncLedgerImportPercent", metrics.MithrilSyncLedgerImportPercent, 67.7},
+		{"MithrilSyncImmutableCopyPerSecond", metrics.MithrilSyncImmutableCopyPerSecond, 56.0},
+		{"MithrilSyncImmutableCopyPercent", metrics.MithrilSyncImmutableCopyPercent, 23.1},
+		{"MithrilPhaseBootstrap", metrics.MithrilPhaseBootstrap, 0},
+		{"MithrilPhaseImmutable", metrics.MithrilPhaseImmutable, 1},
+		{"MithrilPhaseLedger", metrics.MithrilPhaseLedger, 0},
+		{"MithrilPhaseGapBlocks", metrics.MithrilPhaseGapBlocks, 0},
+		{"MithrilPhaseBackfill", metrics.MithrilPhaseBackfill, 0},
+		{"MithrilPhasePostLedger", metrics.MithrilPhasePostLedger, 0},
+	}
+	for _, tt := range floatTests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.got != tt.want {
+				t.Errorf("%s = %f, expected %f", tt.name, tt.got, tt.want)
+			}
+		})
+	}
+}
+
 func decodePromMetrics(t *testing.T, prom []byte) PromMetrics {
 	t.Helper()
 
