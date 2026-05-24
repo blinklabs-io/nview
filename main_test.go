@@ -1090,8 +1090,43 @@ func TestIsMithrilSyncActive(t *testing.T) {
 			want:    true,
 		},
 		{
+			name:    "active via started timestamp",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncStartedAt: 1700000000},
+			want:    true,
+		},
+		{
+			name:    "active via errors total",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncErrorsTotal: 1},
+			want:    true,
+		},
+		{
+			name:    "active via download total bytes",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncDownloadTotalBytes: 1000},
+			want:    true,
+		},
+		{
+			name:    "active via download percent",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncDownloadPercent: 1.5},
+			want:    true,
+		},
+		{
+			name:    "active via download rate",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncDownloadRate: 1.5},
+			want:    true,
+		},
+		{
 			name:    "active via snapshot size",
 			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncSnapshotSize: 1000},
+			want:    true,
+		},
+		{
+			name:    "active via snapshot epoch",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncSnapshotEpoch: 500},
+			want:    true,
+		},
+		{
+			name:    "active via ledger import current",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncLedgerImportCurrent: 1000},
 			want:    true,
 		},
 		{
@@ -1100,13 +1135,58 @@ func TestIsMithrilSyncActive(t *testing.T) {
 			want:    true,
 		},
 		{
+			name:    "active via ledger import percent",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncLedgerImportPercent: 1.5},
+			want:    true,
+		},
+		{
 			name:    "active via immutable blocks",
 			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncImmutableBlocksCopied: 1},
 			want:    true,
 		},
 		{
+			name:    "active via immutable rate",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncImmutableCopyPerSecond: 1.5},
+			want:    true,
+		},
+		{
+			name:    "active via immutable percent",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncImmutableCopyPercent: 1.5},
+			want:    true,
+		},
+		{
 			name:    "active via gap blocks",
 			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncGapBlocks: 500},
+			want:    true,
+		},
+		{
+			name:    "active via bootstrap phase",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhaseBootstrap: 1},
+			want:    true,
+		},
+		{
+			name:    "active via ledger phase",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhaseLedger: 1},
+			want:    true,
+		},
+		{
+			name:    "active via immutable phase",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhaseImmutable: 1},
+			want:    true,
+		},
+		{
+			name:    "active via gap blocks phase",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhaseGapBlocks: 1},
+			want:    true,
+		},
+		{
+			name:    "active via backfill phase",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhaseBackfill: 1},
+			want:    true,
+		},
+		{
+			name:    "active via post ledger phase",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhasePostLedger: 1},
 			want:    true,
 		},
 		{

@@ -989,11 +989,27 @@ func isMithrilSyncActive() bool {
 	if promMetrics.MithrilSyncCompleted == 1 {
 		return false
 	}
-	return promMetrics.MithrilSyncDownloadBytes > 0 ||
+	return promMetrics.MithrilSyncStartedAt > 0 ||
+		promMetrics.MithrilSyncErrorsTotal > 0 ||
+		promMetrics.MithrilSyncDownloadBytes > 0 ||
+		promMetrics.MithrilSyncDownloadTotalBytes > 0 ||
+		promMetrics.MithrilSyncDownloadPercent > 0 ||
+		promMetrics.MithrilSyncDownloadRate > 0 ||
 		promMetrics.MithrilSyncSnapshotSize > 0 ||
+		promMetrics.MithrilSyncSnapshotEpoch > 0 ||
+		promMetrics.MithrilSyncLedgerImportCurrent > 0 ||
 		promMetrics.MithrilSyncLedgerImportTotal > 0 ||
+		promMetrics.MithrilSyncLedgerImportPercent > 0 ||
 		promMetrics.MithrilSyncImmutableBlocksCopied > 0 ||
-		promMetrics.MithrilSyncGapBlocks > 0
+		promMetrics.MithrilSyncImmutableCopyPerSecond > 0 ||
+		promMetrics.MithrilSyncImmutableCopyPercent > 0 ||
+		promMetrics.MithrilSyncGapBlocks > 0 ||
+		promMetrics.MithrilPhaseBootstrap > 0 ||
+		promMetrics.MithrilPhaseLedger > 0 ||
+		promMetrics.MithrilPhaseImmutable > 0 ||
+		promMetrics.MithrilPhaseGapBlocks > 0 ||
+		promMetrics.MithrilPhaseBackfill > 0 ||
+		promMetrics.MithrilPhasePostLedger > 0
 }
 
 // updateMithrilView auto-switches to viewMithril when bootstrap is active and
