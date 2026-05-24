@@ -997,12 +997,17 @@ func isMithrilSyncActive() bool {
 		promMetrics.MithrilSyncDownloadRate > 0 ||
 		promMetrics.MithrilSyncSnapshotSize > 0 ||
 		promMetrics.MithrilSyncSnapshotEpoch > 0 ||
+		promMetrics.MithrilSyncSnapshotAncillarySize > 0 ||
+		promMetrics.MithrilSyncSnapshotImmutableFile > 0 ||
 		promMetrics.MithrilSyncLedgerImportCurrent > 0 ||
 		promMetrics.MithrilSyncLedgerImportTotal > 0 ||
 		promMetrics.MithrilSyncLedgerImportPercent > 0 ||
+		promMetrics.MithrilSyncLedgerStateSlot > 0 ||
 		promMetrics.MithrilSyncImmutableBlocksCopied > 0 ||
 		promMetrics.MithrilSyncImmutableCopyPerSecond > 0 ||
 		promMetrics.MithrilSyncImmutableCopyPercent > 0 ||
+		promMetrics.MithrilSyncImmutableCurrentSlot > 0 ||
+		promMetrics.MithrilSyncImmutableTipSlot > 0 ||
 		promMetrics.MithrilSyncGapBlocks > 0 ||
 		promMetrics.MithrilPhaseBootstrap > 0 ||
 		promMetrics.MithrilPhaseLedger > 0 ||
@@ -1087,6 +1092,9 @@ func getMithrilStats() string {
 		snapshotStr,
 		m.MithrilSyncSnapshotEpoch,
 		m.MithrilSyncErrorsTotal)
+	fmt.Fprintf(&sb, " [green]Snapshot Meta: [white]file %d[green]  Ancillary : [white]%s\n",
+		m.MithrilSyncSnapshotImmutableFile,
+		formatDingoBytes(m.MithrilSyncSnapshotAncillarySize))
 
 	dlPct := m.MithrilSyncDownloadPercent
 	dlSuffix := formatDingoBytes(m.MithrilSyncDownloadBytes)
@@ -1108,6 +1116,8 @@ func getMithrilStats() string {
 		ldgPct,
 		renderBar(ldgPct, 20),
 		ldgSuffix)
+	fmt.Fprintf(&sb, " [green]Ledger Slot  : [white]%d\n",
+		m.MithrilSyncLedgerStateSlot)
 
 	immPct := m.MithrilSyncImmutableCopyPercent
 	fmt.Fprintf(&sb, " [green]Immutable    : [white]%5.1f%%  %s[white]  %d[blue] blocks  [white]%.0f[blue] blk/s\n",
@@ -1115,6 +1125,9 @@ func getMithrilStats() string {
 		renderBar(immPct, 20),
 		m.MithrilSyncImmutableBlocksCopied,
 		m.MithrilSyncImmutableCopyPerSecond)
+	fmt.Fprintf(&sb, " [green]Immutable Slot: [white]%d[blue]/[white]%d\n",
+		m.MithrilSyncImmutableCurrentSlot,
+		m.MithrilSyncImmutableTipSlot)
 
 	gapColor := "white"
 	if m.MithrilSyncGapBlocks > 0 {

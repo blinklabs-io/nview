@@ -296,12 +296,17 @@ dingo_mithril_sync_download_percent 45.5
 dingo_mithril_sync_download_bytes_per_second 1048576
 dingo_mithril_sync_snapshot_size_bytes 2147483648
 dingo_mithril_sync_snapshot_epoch 500
+dingo_mithril_sync_snapshot_ancillary_size_bytes 482418384
+dingo_mithril_sync_snapshot_immutable_file_number 26153
 dingo_mithril_sync_ledger_import_current{stage="utxo"} 12345
 dingo_mithril_sync_ledger_import_total{stage="utxo"} 18230
 dingo_mithril_sync_ledger_import_percent{stage="utxo"} 67.7
+dingo_mithril_sync_ledger_state_slot 112986212
 dingo_mithril_sync_immutable_blocks_copied 1234
 dingo_mithril_sync_immutable_blocks_per_second 56.0
 dingo_mithril_sync_immutable_copy_percent 23.1
+dingo_mithril_sync_immutable_current_slot 112985271
+dingo_mithril_sync_immutable_tip_slot 112985271
 dingo_mithril_sync_gap_blocks 1200
 dingo_mithril_sync_phase_active{phase="bootstrap"} 0
 dingo_mithril_sync_phase_active{phase="immutable_copy"} 1
@@ -325,9 +330,14 @@ dingo_governance_proposal_decode_failures_total 3
 		{"MithrilSyncDownloadTotalBytes", metrics.MithrilSyncDownloadTotalBytes, 2147483648},
 		{"MithrilSyncSnapshotSize", metrics.MithrilSyncSnapshotSize, 2147483648},
 		{"MithrilSyncSnapshotEpoch", metrics.MithrilSyncSnapshotEpoch, 500},
+		{"MithrilSyncSnapshotAncillarySize", metrics.MithrilSyncSnapshotAncillarySize, 482418384},
+		{"MithrilSyncSnapshotImmutableFile", metrics.MithrilSyncSnapshotImmutableFile, 26153},
 		{"MithrilSyncLedgerImportCurrent", metrics.MithrilSyncLedgerImportCurrent, 12345},
 		{"MithrilSyncLedgerImportTotal", metrics.MithrilSyncLedgerImportTotal, 18230},
+		{"MithrilSyncLedgerStateSlot", metrics.MithrilSyncLedgerStateSlot, 112986212},
 		{"MithrilSyncImmutableBlocksCopied", metrics.MithrilSyncImmutableBlocksCopied, 1234},
+		{"MithrilSyncImmutableCurrentSlot", metrics.MithrilSyncImmutableCurrentSlot, 112985271},
+		{"MithrilSyncImmutableTipSlot", metrics.MithrilSyncImmutableTipSlot, 112985271},
 		{"MithrilSyncGapBlocks", metrics.MithrilSyncGapBlocks, 1200},
 		{"DingoGovernanceDecodeFailures", metrics.DingoGovernanceDecodeFailures, 3},
 	}

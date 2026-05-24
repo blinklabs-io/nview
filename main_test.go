@@ -1016,12 +1016,17 @@ func TestGetMithrilStatsRendersView(t *testing.T) {
 		MithrilSyncDownloadRate:           1048576,
 		MithrilSyncSnapshotSize:           3 * BytesInGigabyte,
 		MithrilSyncSnapshotEpoch:          500,
+		MithrilSyncSnapshotAncillarySize:  BytesInGigabyte,
+		MithrilSyncSnapshotImmutableFile:  26153,
 		MithrilSyncLedgerImportCurrent:    12345,
 		MithrilSyncLedgerImportTotal:      18230,
 		MithrilSyncLedgerImportPercent:    67.7,
+		MithrilSyncLedgerStateSlot:        112986212,
 		MithrilSyncImmutableBlocksCopied:  1234,
 		MithrilSyncImmutableCopyPerSecond: 56,
 		MithrilSyncImmutableCopyPercent:   23.1,
+		MithrilSyncImmutableCurrentSlot:   112985271,
+		MithrilSyncImmutableTipSlot:       112985271,
 		MithrilSyncGapBlocks:              1200,
 		MithrilPhaseImmutable:             1,
 	}
@@ -1035,6 +1040,9 @@ func TestGetMithrilStatsRendersView(t *testing.T) {
 		"Snapshot",
 		"Epoch",
 		"500",
+		"Snapshot Meta",
+		"26153",
+		"Ancillary",
 		"Errors",
 		"Download",
 		"45.5%",
@@ -1042,9 +1050,13 @@ func TestGetMithrilStatsRendersView(t *testing.T) {
 		"67.7%",
 		"12345",
 		"18230",
+		"Ledger Slot",
+		"112986212",
 		"Immutable",
 		"23.1%",
 		"1234",
+		"Immutable Slot",
+		"112985271",
 		"Gap Blocks",
 		"1200",
 	}
@@ -1125,6 +1137,16 @@ func TestIsMithrilSyncActive(t *testing.T) {
 			want:    true,
 		},
 		{
+			name:    "active via snapshot ancillary size",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncSnapshotAncillarySize: 1000},
+			want:    true,
+		},
+		{
+			name:    "active via snapshot immutable file",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncSnapshotImmutableFile: 26153},
+			want:    true,
+		},
+		{
 			name:    "active via ledger import current",
 			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncLedgerImportCurrent: 1000},
 			want:    true,
@@ -1140,6 +1162,11 @@ func TestIsMithrilSyncActive(t *testing.T) {
 			want:    true,
 		},
 		{
+			name:    "active via ledger state slot",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncLedgerStateSlot: 112986212},
+			want:    true,
+		},
+		{
 			name:    "active via immutable blocks",
 			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncImmutableBlocksCopied: 1},
 			want:    true,
@@ -1152,6 +1179,16 @@ func TestIsMithrilSyncActive(t *testing.T) {
 		{
 			name:    "active via immutable percent",
 			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncImmutableCopyPercent: 1.5},
+			want:    true,
+		},
+		{
+			name:    "active via immutable current slot",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncImmutableCurrentSlot: 112985271},
+			want:    true,
+		},
+		{
+			name:    "active via immutable tip slot",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncImmutableTipSlot: 112985271},
 			want:    true,
 		},
 		{

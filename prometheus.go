@@ -124,12 +124,17 @@ type PromMetrics struct {
 	MithrilSyncDownloadRate           float64 `json:"dingo_mithril_sync_download_bytes_per_second"`
 	MithrilSyncSnapshotSize           uint64  `json:"dingo_mithril_sync_snapshot_size_bytes"`
 	MithrilSyncSnapshotEpoch          uint64  `json:"dingo_mithril_sync_snapshot_epoch"`
+	MithrilSyncSnapshotAncillarySize  uint64  `json:"dingo_mithril_sync_snapshot_ancillary_size_bytes"`
+	MithrilSyncSnapshotImmutableFile  uint64  `json:"dingo_mithril_sync_snapshot_immutable_file_number"`
 	MithrilSyncLedgerImportCurrent    uint64  `json:"dingo_mithril_sync_ledger_import_current"`
 	MithrilSyncLedgerImportTotal      uint64  `json:"dingo_mithril_sync_ledger_import_total"`
 	MithrilSyncLedgerImportPercent    float64 `json:"dingo_mithril_sync_ledger_import_percent"`
+	MithrilSyncLedgerStateSlot        uint64  `json:"dingo_mithril_sync_ledger_state_slot"`
 	MithrilSyncImmutableBlocksCopied  uint64  `json:"dingo_mithril_sync_immutable_blocks_copied"`
 	MithrilSyncImmutableCopyPerSecond float64 `json:"dingo_mithril_sync_immutable_blocks_per_second"`
 	MithrilSyncImmutableCopyPercent   float64 `json:"dingo_mithril_sync_immutable_copy_percent"`
+	MithrilSyncImmutableCurrentSlot   uint64  `json:"dingo_mithril_sync_immutable_current_slot"`
+	MithrilSyncImmutableTipSlot       uint64  `json:"dingo_mithril_sync_immutable_tip_slot"`
 	MithrilSyncGapBlocks              uint64  `json:"dingo_mithril_sync_gap_blocks"`
 	// Phase active flags — populated from dingo_mithril_sync_phase_active{phase="..."} labels
 	MithrilPhaseBootstrap  float64 `json:"dingo_mithril_sync_phase_active_bootstrap"`
