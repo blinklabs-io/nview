@@ -1253,11 +1253,12 @@ func TestUpdateMithrilViewAutoSwitch(t *testing.T) {
 	originalPromMetrics := promMetrics
 	originalMithrilAutoActive := mithrilViewAutoActive.Load()
 	originalActive := getActiveSecondaryView()
+	originalDetectedBinary, _ := detectedNodeBinary.Load().(string)
 	defer func() {
 		promMetrics = originalPromMetrics
 		mithrilViewAutoActive.Store(originalMithrilAutoActive)
 		setActiveSecondaryView(originalActive)
-		detectedNodeBinary.Store("")
+		detectedNodeBinary.Store(originalDetectedBinary)
 	}()
 
 	detectedNodeBinary.Store(DINGO_BINARY)
