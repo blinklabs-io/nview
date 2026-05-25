@@ -290,6 +290,7 @@ func setPromMetricValueWithLabels(out map[string]any, name string, value float64
 	if strings.HasPrefix(name, "dingo_mithril_sync_ledger_import_") {
 		if stage := labelValue(labels, "stage"); stage != "" {
 			setMithrilLedgerImportStageValue(out, name, stage, value)
+			return
 		}
 	}
 	setPromMetricValue(out, name, value)
