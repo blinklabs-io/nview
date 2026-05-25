@@ -1045,10 +1045,11 @@ func getMithrilStats() string {
 	}
 	m := promMetrics
 
-	renderBar := func(pct float64, width int) string {
+	const mithrilProgressBarWidth = 20
+	renderBar := func(pct float64) string {
 		var bar strings.Builder
-		filled := int(pct) * width / 100
-		for i := 0; i < width; i++ {
+		filled := int(pct) * mithrilProgressBarWidth / 100
+		for i := 0; i < mithrilProgressBarWidth; i++ {
 			if i < filled {
 				bar.WriteString("[blue]▌")
 			} else {
@@ -1108,7 +1109,7 @@ func getMithrilStats() string {
 	}
 	fmt.Fprintf(&sb, " [green]Download     : [white]%5.1f%%  %s[white]  %s  [green]rate [white]%s[blue]/s\n",
 		dlPct,
-		renderBar(dlPct, 20),
+		renderBar(dlPct),
 		dlSuffix,
 		formatDingoBytes(uint64(m.MithrilSyncDownloadRate)))
 
@@ -1119,7 +1120,7 @@ func getMithrilStats() string {
 	}
 	fmt.Fprintf(&sb, " [green]Ledger Import: [white]%5.1f%%  %s[white]  %s\n",
 		ldgPct,
-		renderBar(ldgPct, 20),
+		renderBar(ldgPct),
 		ldgSuffix)
 	if len(m.MithrilSyncLedgerImportStages) > 0 {
 		stages := make([]string, 0, len(m.MithrilSyncLedgerImportStages))
@@ -1136,7 +1137,7 @@ func getMithrilStats() string {
 			fmt.Fprintf(&sb, " [green]  %-10s : [white]%5.1f%%  %s[white]  %s\n",
 				stage,
 				stageMetrics.Percent,
-				renderBar(stageMetrics.Percent, 20),
+				renderBar(stageMetrics.Percent),
 				stageSuffix)
 		}
 	}
@@ -1146,7 +1147,7 @@ func getMithrilStats() string {
 	immPct := m.MithrilSyncImmutableCopyPercent
 	fmt.Fprintf(&sb, " [green]Immutable    : [white]%5.1f%%  %s[white]  %d[blue] blocks  [white]%.0f[blue] blk/s\n",
 		immPct,
-		renderBar(immPct, 20),
+		renderBar(immPct),
 		m.MithrilSyncImmutableBlocksCopied,
 		m.MithrilSyncImmutableCopyPerSecond)
 	fmt.Fprintf(&sb, " [green]Immutable Slot: [white]%d[blue]/[white]%d\n",
