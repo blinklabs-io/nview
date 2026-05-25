@@ -989,6 +989,11 @@ func isMithrilSyncActive() bool {
 	if promMetrics.MithrilSyncCompleted == 1 {
 		return false
 	}
+	for _, stage := range promMetrics.MithrilSyncLedgerImportStages {
+		if stage.Current > 0 || stage.Total > 0 || stage.Percent > 0 {
+			return true
+		}
+	}
 	return promMetrics.MithrilSyncStartedAt > 0 ||
 		promMetrics.MithrilSyncErrorsTotal > 0 ||
 		promMetrics.MithrilSyncDownloadBytes > 0 ||
@@ -1116,6 +1121,25 @@ func getMithrilStats() string {
 		ldgPct,
 		renderBar(ldgPct, 20),
 		ldgSuffix)
+	if len(m.MithrilSyncLedgerImportStages) > 0 {
+		stages := make([]string, 0, len(m.MithrilSyncLedgerImportStages))
+		for stage := range m.MithrilSyncLedgerImportStages {
+			stages = append(stages, stage)
+		}
+		slices.Sort(stages)
+		for _, stage := range stages {
+			stageMetrics := m.MithrilSyncLedgerImportStages[stage]
+			stageSuffix := strconv.FormatUint(stageMetrics.Current, 10)
+			if stageMetrics.Total > 0 {
+				stageSuffix = fmt.Sprintf("%d[blue]/[white]%d[blue] items", stageMetrics.Current, stageMetrics.Total)
+			}
+			fmt.Fprintf(&sb, " [green]  %-10s : [white]%5.1f%%  %s[white]  %s\n",
+				stage,
+				stageMetrics.Percent,
+				renderBar(stageMetrics.Percent, 20),
+				stageSuffix)
+		}
+	}
 	fmt.Fprintf(&sb, " [green]Ledger Slot  : [white]%d\n",
 		m.MithrilSyncLedgerStateSlot)
 

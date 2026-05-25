@@ -298,8 +298,11 @@ dingo_mithril_sync_snapshot_size_bytes 2147483648
 dingo_mithril_sync_snapshot_epoch 500
 dingo_mithril_sync_snapshot_ancillary_size_bytes 482418384
 dingo_mithril_sync_snapshot_immutable_file_number 26153
+dingo_mithril_sync_ledger_import_current{stage="accounts"} 89720
 dingo_mithril_sync_ledger_import_current{stage="utxo"} 12345
+dingo_mithril_sync_ledger_import_total{stage="accounts"} 89720
 dingo_mithril_sync_ledger_import_total{stage="utxo"} 18230
+dingo_mithril_sync_ledger_import_percent{stage="accounts"} 100
 dingo_mithril_sync_ledger_import_percent{stage="utxo"} 67.7
 dingo_mithril_sync_ledger_state_slot 112986212
 dingo_mithril_sync_immutable_blocks_copied 1234
@@ -371,6 +374,25 @@ dingo_governance_proposal_decode_failures_total 3
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.got != tt.want {
 				t.Errorf("%s = %f, expected %f", tt.name, tt.got, tt.want)
+			}
+		})
+	}
+
+	stageTests := []struct {
+		stage string
+		want  MithrilLedgerImportStage
+	}{
+		{"accounts", MithrilLedgerImportStage{Current: 89720, Total: 89720, Percent: 100}},
+		{"utxo", MithrilLedgerImportStage{Current: 12345, Total: 18230, Percent: 67.7}},
+	}
+	for _, tt := range stageTests {
+		t.Run("stage "+tt.stage, func(t *testing.T) {
+			got, ok := metrics.MithrilSyncLedgerImportStages[tt.stage]
+			if !ok {
+				t.Fatalf("missing ledger import stage %q", tt.stage)
+			}
+			if got != tt.want {
+				t.Errorf("ledger import stage %q = %+v, expected %+v", tt.stage, got, tt.want)
 			}
 		})
 	}
