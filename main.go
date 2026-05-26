@@ -140,10 +140,9 @@ const (
 )
 
 const (
-	viewNoneValue    int32 = int32(viewNone)
-	viewPeersValue   int32 = int32(viewPeers)
-	viewDingoValue   int32 = int32(viewDingo)
-	viewMithrilValue int32 = int32(viewMithril)
+	viewNoneValue  int32 = int32(viewNone)
+	viewPeersValue int32 = int32(viewPeers)
+	viewDingoValue int32 = int32(viewDingo)
 )
 
 var (
@@ -248,7 +247,7 @@ func setActiveSecondaryView(view secondaryView) {
 	case viewDingo:
 		activeSecondary.Store(viewDingoValue)
 	case viewMithril:
-		activeSecondary.Store(viewMithrilValue)
+		activeSecondary.Store(int32(viewMithril))
 	}
 }
 
@@ -561,7 +560,7 @@ func main() {
 	peerTextView.SetText(peerText).SetTitle(peerTitle).SetBorder(true)
 
 	// Set our footer
-	defaultFooterText := " [yellow](esc/q)[white] Quit | [yellow](p)[white] Peers | [yellow](d)[white] Dingo | [yellow](m)[white] Mithril"
+	defaultFooterText := " [yellow](esc/q)[white] Quit | [yellow](p)[white] Peers | [yellow](d)[white] Dingo"
 	footerTextView.SetText(defaultFooterText)
 
 	// Add content to our flex box
@@ -705,24 +704,6 @@ func main() {
 				setActiveSecondaryView(viewNone)
 			} else {
 				setActiveSecondaryView(viewDingo)
-			}
-			updateSecondaryText(ctx)
-		}
-		if event.Rune() == 109 { // m
-			if getEffectiveNodeBinary() != DINGO_BINARY {
-				if logger != nil {
-					logger.Debug(
-						"ignoring mithril view keypress for non-dingo node",
-						"binary",
-						getEffectiveNodeBinary(),
-					)
-				}
-			} else if getActiveSecondaryView() == viewMithril {
-				mithrilViewAutoActive.Store(false)
-				setActiveSecondaryView(viewDingo)
-			} else {
-				mithrilViewAutoActive.Store(false)
-				setActiveSecondaryView(viewMithril)
 			}
 			updateSecondaryText(ctx)
 		}
