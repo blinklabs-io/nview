@@ -1000,6 +1000,346 @@ func TestGetDingoStatsFirstSampleShowsUnavailableDeltas(t *testing.T) {
 	}
 }
 
+// TestGetMithrilStatsRendersView verifies the Mithril sync pane renders all
+// key fields including progress bars and error highlighting.
+func TestGetMithrilStatsRendersView(t *testing.T) {
+	originalPromMetrics := promMetrics
+	defer func() { promMetrics = originalPromMetrics }()
+
+	promMetrics = &PromMetrics{
+		MithrilSyncCompleted:             0,
+		MithrilSyncStartedAt:             1700000000,
+		MithrilSyncErrorsTotal:           1,
+		MithrilSyncDownloadBytes:         BytesInGigabyte,
+		MithrilSyncDownloadTotalBytes:    2 * BytesInGigabyte,
+		MithrilSyncDownloadPercent:       45.5,
+		MithrilSyncDownloadRate:          1048576,
+		MithrilSyncSnapshotSize:          3 * BytesInGigabyte,
+		MithrilSyncSnapshotEpoch:         500,
+		MithrilSyncSnapshotAncillarySize: BytesInGigabyte,
+		MithrilSyncSnapshotImmutableFile: 26153,
+		MithrilSyncLedgerImportCurrent:   12345,
+		MithrilSyncLedgerImportTotal:     18230,
+		MithrilSyncLedgerImportPercent:   67.7,
+		MithrilSyncLedgerImportStages: map[string]MithrilLedgerImportStage{
+			"accounts": {Current: 89720, Total: 89720, Percent: 100},
+			"utxo":     {Current: 12345, Total: 18230, Percent: 67.7},
+		},
+		MithrilSyncLedgerStateSlot:        112986212,
+		MithrilSyncImmutableBlocksCopied:  1234,
+		MithrilSyncImmutableCopyPerSecond: 56,
+		MithrilSyncImmutableCopyPercent:   23.1,
+		MithrilSyncImmutableCurrentSlot:   112985271,
+		MithrilSyncImmutableTipSlot:       112985271,
+		MithrilSyncGapBlocks:              1200,
+		MithrilPhaseImmutable:             1,
+	}
+
+	result := getMithrilStats()
+
+	expectedParts := []string{
+		"Phase",
+		"immutable_copy",
+		"Started",
+		"Snapshot",
+		"Epoch",
+		"500",
+		"Snapshot Meta",
+		"26153",
+		"Ancillary",
+		"Errors",
+		"Download",
+		"45.5%",
+		"Ledger Import",
+		"67.7%",
+		"accounts",
+		"89720",
+		"utxo",
+		"12345",
+		"18230",
+		"Ledger Slot",
+		"112986212",
+		"Immutable",
+		"23.1%",
+		"1234",
+		"Immutable Slot",
+		"112985271",
+		"Gap Blocks",
+		"1200",
+	}
+	for _, part := range expectedParts {
+		if !strings.Contains(result, part) {
+			t.Errorf("getMithrilStats() missing %q in:\n%s", part, result)
+		}
+	}
+}
+
+func TestGetMithrilStatsNilMetrics(t *testing.T) {
+	originalPromMetrics := promMetrics
+	defer func() { promMetrics = originalPromMetrics }()
+
+	promMetrics = nil
+	result := getMithrilStats()
+	if result != "" {
+		t.Errorf("getMithrilStats() with nil metrics = %q, expected empty string", result)
+	}
+}
+
+// TestIsMithrilSyncActive verifies the active-sync predicate covers all relevant
+// fields and respects the completed flag.
+func TestIsMithrilSyncActive(t *testing.T) {
+	tests := []struct {
+		name    string
+		metrics *PromMetrics
+		want    bool
+	}{
+		{
+			name:    "nil metrics",
+			metrics: nil,
+			want:    false,
+		},
+		{
+			name:    "completed flag set",
+			metrics: &PromMetrics{MithrilSyncCompleted: 1, MithrilSyncDownloadBytes: 1000},
+			want:    false,
+		},
+		{
+			name:    "active via download bytes",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncDownloadBytes: 1000},
+			want:    true,
+		},
+		{
+			name:    "active via started timestamp",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncStartedAt: 1700000000},
+			want:    true,
+		},
+		{
+			name:    "active via errors total",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncErrorsTotal: 1},
+			want:    true,
+		},
+		{
+			name:    "active via download total bytes",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncDownloadTotalBytes: 1000},
+			want:    true,
+		},
+		{
+			name:    "active via download percent",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncDownloadPercent: 1.5},
+			want:    true,
+		},
+		{
+			name:    "active via download rate",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncDownloadRate: 1.5},
+			want:    true,
+		},
+		{
+			name:    "active via snapshot size",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncSnapshotSize: 1000},
+			want:    true,
+		},
+		{
+			name:    "active via snapshot epoch",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncSnapshotEpoch: 500},
+			want:    true,
+		},
+		{
+			name:    "active via snapshot ancillary size",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncSnapshotAncillarySize: 1000},
+			want:    true,
+		},
+		{
+			name:    "active via snapshot immutable file",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncSnapshotImmutableFile: 26153},
+			want:    true,
+		},
+		{
+			name:    "active via ledger import current",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncLedgerImportCurrent: 1000},
+			want:    true,
+		},
+		{
+			name:    "active via ledger import total",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncLedgerImportTotal: 1000},
+			want:    true,
+		},
+		{
+			name:    "active via ledger import percent",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncLedgerImportPercent: 1.5},
+			want:    true,
+		},
+		{
+			name: "active via ledger import stage",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted: 0,
+				MithrilSyncLedgerImportStages: map[string]MithrilLedgerImportStage{
+					"accounts": {Current: 1},
+				},
+			},
+			want: true,
+		},
+		{
+			name:    "active via ledger state slot",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncLedgerStateSlot: 112986212},
+			want:    true,
+		},
+		{
+			name:    "active via immutable blocks",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncImmutableBlocksCopied: 1},
+			want:    true,
+		},
+		{
+			name:    "active via immutable rate",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncImmutableCopyPerSecond: 1.5},
+			want:    true,
+		},
+		{
+			name:    "active via immutable percent",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncImmutableCopyPercent: 1.5},
+			want:    true,
+		},
+		{
+			name:    "active via immutable current slot",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncImmutableCurrentSlot: 112985271},
+			want:    true,
+		},
+		{
+			name:    "active via immutable tip slot",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncImmutableTipSlot: 112985271},
+			want:    true,
+		},
+		{
+			name:    "active via gap blocks",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncGapBlocks: 500},
+			want:    true,
+		},
+		{
+			name:    "active via bootstrap phase",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhaseBootstrap: 1},
+			want:    true,
+		},
+		{
+			name:    "active via ledger phase",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhaseLedger: 1},
+			want:    true,
+		},
+		{
+			name:    "active via immutable phase",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhaseImmutable: 1},
+			want:    true,
+		},
+		{
+			name:    "active via gap blocks phase",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhaseGapBlocks: 1},
+			want:    true,
+		},
+		{
+			name:    "active via backfill phase",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhaseBackfill: 1},
+			want:    true,
+		},
+		{
+			name:    "active via post ledger phase",
+			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhasePostLedger: 1},
+			want:    true,
+		},
+		{
+			name:    "all zeros not active",
+			metrics: &PromMetrics{},
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			originalPromMetrics := promMetrics
+			defer func() { promMetrics = originalPromMetrics }()
+			promMetrics = tt.metrics
+
+			got := isMithrilSyncActive()
+			if got != tt.want {
+				t.Errorf("isMithrilSyncActive() = %v, expected %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestUpdateMithrilViewAutoSwitch verifies that the view switches to viewMithril
+// when sync is active on a Dingo node, and back to viewDingo on completion.
+func TestUpdateMithrilViewAutoSwitch(t *testing.T) {
+	originalPromMetrics := promMetrics
+	originalMithrilAutoActive := mithrilViewAutoActive.Load()
+	originalActive := getActiveSecondaryView()
+	originalDetectedBinary, _ := detectedNodeBinary.Load().(string)
+	defer func() {
+		promMetrics = originalPromMetrics
+		mithrilViewAutoActive.Store(originalMithrilAutoActive)
+		setActiveSecondaryView(originalActive)
+		detectedNodeBinary.Store(originalDetectedBinary)
+	}()
+
+	detectedNodeBinary.Store(DINGO_BINARY)
+	mithrilViewAutoActive.Store(false)
+	setActiveSecondaryView(viewDingo)
+
+	promMetrics = &PromMetrics{
+		MithrilSyncCompleted:    0,
+		MithrilSyncSnapshotSize: BytesInGigabyte,
+	}
+	updateMithrilView()
+	if getActiveSecondaryView() != viewMithril {
+		t.Errorf("expected viewMithril when sync active, got %d", getActiveSecondaryView())
+	}
+	if !mithrilViewAutoActive.Load() {
+		t.Error("expected mithrilViewAutoActive to be true after auto-switch")
+	}
+
+	promMetrics = &PromMetrics{MithrilSyncCompleted: 1}
+	updateMithrilView()
+	if getActiveSecondaryView() != viewDingo {
+		t.Errorf("expected viewDingo after sync completion, got %d", getActiveSecondaryView())
+	}
+	if mithrilViewAutoActive.Load() {
+		t.Error("expected mithrilViewAutoActive to be false after completion")
+	}
+}
+
+// TestGetDingoStatsShowsGovernanceFailures verifies the governance decode
+// failures counter appears in the diagnostics pane.
+func TestGetDingoStatsShowsGovernanceFailures(t *testing.T) {
+	originalPromMetrics := promMetrics
+	originalLastDingoSample := lastDingoSample
+	originalLastDingoSampleAt := lastDingoSampleAt
+	originalLastDingoSampleSrc := lastDingoSampleSrc
+	originalLastDingoRateBase := lastDingoRateBase
+	originalLastDingoRateBaseAt := lastDingoRateBaseAt
+	defer func() {
+		promMetrics = originalPromMetrics
+		lastDingoSample = originalLastDingoSample
+		lastDingoSampleAt = originalLastDingoSampleAt
+		lastDingoSampleSrc = originalLastDingoSampleSrc
+		lastDingoRateBase = originalLastDingoRateBase
+		lastDingoRateBaseAt = originalLastDingoRateBaseAt
+	}()
+
+	lastDingoRateBase = nil
+	lastDingoRateBaseAt = time.Time{}
+	lastDingoSample = nil
+	lastDingoSampleAt = time.Time{}
+	lastDingoSampleSrc = nil
+	promMetrics = &PromMetrics{
+		DingoGovernanceDecodeFailures: 7,
+	}
+
+	result := getDingoStats()
+	if !strings.Contains(result, "Gov Failures") {
+		t.Errorf("getDingoStats() missing 'Gov Failures' in:\n%s", result)
+	}
+	if !strings.Contains(result, "7") {
+		t.Errorf("getDingoStats() missing governance count in:\n%s", result)
+	}
+}
+
 func BenchmarkGetEpochProgress(b *testing.B) {
 	// Set up config
 	cfg := config.GetConfig()

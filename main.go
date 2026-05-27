@@ -136,6 +136,7 @@ const (
 	viewNone secondaryView = iota
 	viewPeers
 	viewDingo
+	viewMithril
 )
 
 const (
@@ -145,14 +146,15 @@ const (
 )
 
 var (
-	activeSecondary     atomic.Int32
-	secondaryDefaultSet atomic.Bool
-	lastDingoSample     *PromMetrics
-	lastDingoSampleAt   time.Time
-	lastDingoRateBase   *PromMetrics
-	lastDingoRateBaseAt time.Time
-	lastDingoSampleSrc  *PromMetrics
-	lastDingoSampleMu   sync.Mutex
+	activeSecondary       atomic.Int32
+	secondaryDefaultSet   atomic.Bool
+	mithrilViewAutoActive atomic.Bool
+	lastDingoSample       *PromMetrics
+	lastDingoSampleAt     time.Time
+	lastDingoRateBase     *PromMetrics
+	lastDingoRateBaseAt   time.Time
+	lastDingoSampleSrc    *PromMetrics
+	lastDingoSampleMu     sync.Mutex
 )
 
 // Global command line flags
@@ -244,6 +246,8 @@ func setActiveSecondaryView(view secondaryView) {
 		activeSecondary.Store(viewPeersValue)
 	case viewDingo:
 		activeSecondary.Store(viewDingoValue)
+	case viewMithril:
+		activeSecondary.Store(int32(viewMithril))
 	}
 }
 
@@ -294,6 +298,8 @@ func getSecondaryViewText(ctx context.Context) (string, string) {
 		return "Peers", getPeerText(ctx)
 	case viewDingo:
 		return "Dingo Diagnostics", getDingoStats()
+	case viewMithril:
+		return "Mithril Sync", getMithrilStats()
 	case viewNone:
 		return "Secondary", ""
 	default:
@@ -407,6 +413,7 @@ func main() {
 			}
 			applyDefaultSecondaryView()
 			promMetrics = prom
+			updateMithrilView()
 			select {
 			case <-ctx.Done():
 				return
@@ -947,6 +954,194 @@ func getDingoStats() string {
 		curr.DingoSlotClockFallback,
 		curr.DingoForgeSlotClockErr,
 		curr.DingoForgeSyncSkip)
+	govColor := "white"
+	if curr.DingoGovernanceDecodeFailures > 0 {
+		govColor = "red"
+	}
+	fmt.Fprintf(&sb, " [green]Gov Failures : ["+govColor+"]%d[white]\n",
+		curr.DingoGovernanceDecodeFailures)
+	return sb.String()
+}
+
+func isMithrilSyncActive() bool {
+	if promMetrics == nil {
+		return false
+	}
+	if promMetrics.MithrilSyncCompleted == 1 {
+		return false
+	}
+	for _, stage := range promMetrics.MithrilSyncLedgerImportStages {
+		if stage.Current > 0 || stage.Total > 0 || stage.Percent > 0 {
+			return true
+		}
+	}
+	return promMetrics.MithrilSyncStartedAt > 0 ||
+		promMetrics.MithrilSyncErrorsTotal > 0 ||
+		promMetrics.MithrilSyncDownloadBytes > 0 ||
+		promMetrics.MithrilSyncDownloadTotalBytes > 0 ||
+		promMetrics.MithrilSyncDownloadPercent > 0 ||
+		promMetrics.MithrilSyncDownloadRate > 0 ||
+		promMetrics.MithrilSyncSnapshotSize > 0 ||
+		promMetrics.MithrilSyncSnapshotEpoch > 0 ||
+		promMetrics.MithrilSyncSnapshotAncillarySize > 0 ||
+		promMetrics.MithrilSyncSnapshotImmutableFile > 0 ||
+		promMetrics.MithrilSyncLedgerImportCurrent > 0 ||
+		promMetrics.MithrilSyncLedgerImportTotal > 0 ||
+		promMetrics.MithrilSyncLedgerImportPercent > 0 ||
+		promMetrics.MithrilSyncLedgerStateSlot > 0 ||
+		promMetrics.MithrilSyncImmutableBlocksCopied > 0 ||
+		promMetrics.MithrilSyncImmutableCopyPerSecond > 0 ||
+		promMetrics.MithrilSyncImmutableCopyPercent > 0 ||
+		promMetrics.MithrilSyncImmutableCurrentSlot > 0 ||
+		promMetrics.MithrilSyncImmutableTipSlot > 0 ||
+		promMetrics.MithrilSyncGapBlocks > 0 ||
+		promMetrics.MithrilPhaseBootstrap > 0 ||
+		promMetrics.MithrilPhaseLedger > 0 ||
+		promMetrics.MithrilPhaseImmutable > 0 ||
+		promMetrics.MithrilPhaseGapBlocks > 0 ||
+		promMetrics.MithrilPhaseBackfill > 0 ||
+		promMetrics.MithrilPhasePostLedger > 0
+}
+
+// updateMithrilView auto-switches to viewMithril when bootstrap is active and
+// back to viewDingo when it completes, without disturbing user-driven view changes.
+func updateMithrilView() {
+	if getEffectiveNodeBinary() != DINGO_BINARY {
+		return
+	}
+	if isMithrilSyncActive() {
+		if getActiveSecondaryView() == viewDingo {
+			setActiveSecondaryView(viewMithril)
+			mithrilViewAutoActive.Store(true)
+		}
+	} else if mithrilViewAutoActive.Load() && getActiveSecondaryView() == viewMithril {
+		setActiveSecondaryView(viewDingo)
+		mithrilViewAutoActive.Store(false)
+	}
+}
+
+func getMithrilStats() string {
+	if promMetrics == nil {
+		return ""
+	}
+	m := promMetrics
+
+	const mithrilProgressBarWidth = 20
+	renderBar := func(pct float64) string {
+		var bar strings.Builder
+		filled := int(pct) * mithrilProgressBarWidth / 100
+		for i := 0; i < mithrilProgressBarWidth; i++ {
+			if i < filled {
+				bar.WriteString("[blue]▌")
+			} else {
+				bar.WriteString("[white]▖")
+			}
+		}
+		return bar.String()
+	}
+
+	startedAgo := "n/a"
+	if m.MithrilSyncStartedAt > 0 {
+		elapsed := time.Since(time.Unix(int64(m.MithrilSyncStartedAt), 0)).Truncate(time.Second)
+		startedAgo = elapsed.String() + " ago"
+	}
+
+	phaseStr := "n/a"
+	switch {
+	case m.MithrilPhaseBootstrap > 0:
+		phaseStr = "bootstrap"
+	case m.MithrilPhaseLedger > 0:
+		phaseStr = "ledger_import"
+	case m.MithrilPhaseImmutable > 0:
+		phaseStr = "immutable_copy"
+	case m.MithrilPhaseGapBlocks > 0:
+		phaseStr = "gap_blocks"
+	case m.MithrilPhaseBackfill > 0:
+		phaseStr = "backfill"
+	case m.MithrilPhasePostLedger > 0:
+		phaseStr = "post_ledger"
+	}
+
+	snapshotStr := "n/a"
+	if m.MithrilSyncSnapshotSize > 0 {
+		snapshotStr = formatDingoBytes(m.MithrilSyncSnapshotSize)
+	}
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, " [green]Phase        : [white]%-4s[green]  Started : [white]%s\n",
+		phaseStr, startedAgo)
+
+	errColor := "white"
+	if m.MithrilSyncErrorsTotal > 0 {
+		errColor = "red"
+	}
+	fmt.Fprintf(&sb, " [green]Snapshot     : [white]%s[green]  Epoch : [white]%d[green]  Errors : ["+errColor+"]%d[white]\n",
+		snapshotStr,
+		m.MithrilSyncSnapshotEpoch,
+		m.MithrilSyncErrorsTotal)
+	fmt.Fprintf(&sb, " [green]Snapshot Meta: [white]file %d[green]  Ancillary : [white]%s\n",
+		m.MithrilSyncSnapshotImmutableFile,
+		formatDingoBytes(m.MithrilSyncSnapshotAncillarySize))
+
+	dlPct := m.MithrilSyncDownloadPercent
+	dlSuffix := formatDingoBytes(m.MithrilSyncDownloadBytes)
+	if m.MithrilSyncDownloadTotalBytes > 0 {
+		dlSuffix = fmt.Sprintf("%s[blue]/[white]%s", formatDingoBytes(m.MithrilSyncDownloadBytes), formatDingoBytes(m.MithrilSyncDownloadTotalBytes))
+	}
+	fmt.Fprintf(&sb, " [green]Download     : [white]%5.1f%%  %s[white]  %s  [green]rate [white]%s[blue]/s\n",
+		dlPct,
+		renderBar(dlPct),
+		dlSuffix,
+		formatDingoBytes(uint64(m.MithrilSyncDownloadRate)))
+
+	ldgPct := m.MithrilSyncLedgerImportPercent
+	ldgSuffix := strconv.FormatUint(m.MithrilSyncLedgerImportCurrent, 10)
+	if m.MithrilSyncLedgerImportTotal > 0 {
+		ldgSuffix = fmt.Sprintf("%d[blue]/[white]%d[blue] items", m.MithrilSyncLedgerImportCurrent, m.MithrilSyncLedgerImportTotal)
+	}
+	fmt.Fprintf(&sb, " [green]Ledger Import: [white]%5.1f%%  %s[white]  %s\n",
+		ldgPct,
+		renderBar(ldgPct),
+		ldgSuffix)
+	if len(m.MithrilSyncLedgerImportStages) > 0 {
+		stages := make([]string, 0, len(m.MithrilSyncLedgerImportStages))
+		for stage := range m.MithrilSyncLedgerImportStages {
+			stages = append(stages, stage)
+		}
+		slices.Sort(stages)
+		for _, stage := range stages {
+			stageMetrics := m.MithrilSyncLedgerImportStages[stage]
+			stageSuffix := strconv.FormatUint(stageMetrics.Current, 10)
+			if stageMetrics.Total > 0 {
+				stageSuffix = fmt.Sprintf("%d[blue]/[white]%d[blue] items", stageMetrics.Current, stageMetrics.Total)
+			}
+			fmt.Fprintf(&sb, " [green]  %-10s : [white]%5.1f%%  %s[white]  %s\n",
+				stage,
+				stageMetrics.Percent,
+				renderBar(stageMetrics.Percent),
+				stageSuffix)
+		}
+	}
+	fmt.Fprintf(&sb, " [green]Ledger Slot  : [white]%d\n",
+		m.MithrilSyncLedgerStateSlot)
+
+	immPct := m.MithrilSyncImmutableCopyPercent
+	fmt.Fprintf(&sb, " [green]Immutable    : [white]%5.1f%%  %s[white]  %d[blue] blocks  [white]%.0f[blue] blk/s\n",
+		immPct,
+		renderBar(immPct),
+		m.MithrilSyncImmutableBlocksCopied,
+		m.MithrilSyncImmutableCopyPerSecond)
+	fmt.Fprintf(&sb, " [green]Immutable Slot: [white]%d[blue]/[white]%d\n",
+		m.MithrilSyncImmutableCurrentSlot,
+		m.MithrilSyncImmutableTipSlot)
+
+	gapColor := "white"
+	if m.MithrilSyncGapBlocks > 0 {
+		gapColor = "yellow"
+	}
+	fmt.Fprintf(&sb, " [green]Gap Blocks   : ["+gapColor+"]%d[blue] blocks remaining\n",
+		m.MithrilSyncGapBlocks)
+
 	return sb.String()
 }
 
