@@ -13,5 +13,5 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
       - uses: webiny/action-conventional-commits@v1.4.2
