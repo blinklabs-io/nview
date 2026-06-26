@@ -807,6 +807,65 @@ func TestFormatDingoRate(t *testing.T) {
 	}
 }
 
+func TestFormatBlockPropagationPercent(t *testing.T) {
+	cfg := config.GetConfig()
+	originalBinary := cfg.Node.Binary
+	originalDetectedBinary, _ := detectedNodeBinary.Load().(string)
+	defer func() {
+		cfg.Node.Binary = originalBinary
+		detectedNodeBinary.Store(originalDetectedBinary)
+	}()
+
+	tests := []struct {
+		name   string
+		binary string
+		value  float64
+		want   string
+	}{
+		{
+			name:   "cardano node ratio",
+			binary: CARDANO_BINARY,
+			value:  0.992083,
+			want:   "99.21",
+		},
+		{
+			name:   "cardano node percent",
+			binary: CARDANO_BINARY,
+			value:  99.2083,
+			want:   "99.21",
+		},
+		{
+			name:   "dingo percent",
+			binary: DINGO_BINARY,
+			value:  99.2083,
+			want:   "99.21",
+		},
+		{
+			name:   "dingo sub-one percent",
+			binary: DINGO_BINARY,
+			value:  0.5,
+			want:   "0.50",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg.Node.Binary = ""
+			detectedNodeBinary.Store(tt.binary)
+
+			got := formatBlockPropagationPercent(tt.value)
+			if got != tt.want {
+				t.Errorf(
+					"formatBlockPropagationPercent(%f) = %q, expected %q",
+					tt.value,
+					got,
+					tt.want,
+				)
+			}
+		})
+	}
+}
+
 // TestApplyDefaultSecondaryView verifies the first-scrape secondary pane
 // default and the NVIEW_DEFAULT_VIEW override behavior.
 func TestApplyDefaultSecondaryView(t *testing.T) {
