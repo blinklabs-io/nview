@@ -21,13 +21,45 @@ import (
 	"net"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/oschwald/geoip2-golang"
 )
 
+var (
+	nodeVersionCacheMu sync.Mutex
+	nodeVersionCache   = map[string]nodeVersionInfo{}
+)
+
+type nodeVersionInfo struct {
+	version  string
+	revision string
+	err      error
+}
+
 func getNodeVersion() (version string, revision string, err error) {
 	binary := getEffectiveNodeBinary()
+	nodeVersionCacheMu.Lock()
+	if cached, ok := nodeVersionCache[binary]; ok {
+		nodeVersionCacheMu.Unlock()
+		return cached.version, cached.revision, cached.err
+	}
+	nodeVersionCacheMu.Unlock()
+
+	version, revision, err = getNodeVersionUncached(binary)
+	if err == nil {
+		nodeVersionCacheMu.Lock()
+		nodeVersionCache[binary] = nodeVersionInfo{
+			version:  version,
+			revision: revision,
+		}
+		nodeVersionCacheMu.Unlock()
+	}
+	return version, revision, err
+}
+
+func getNodeVersionUncached(binary string) (version string, revision string, err error) {
 	cmd := exec.Command(binary, "version") // #nosec G204
 	stdout, err := cmd.Output()
 	if err != nil {

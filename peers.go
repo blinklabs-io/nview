@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"slices"
 	"sort"
 	"strconv"
@@ -37,6 +38,19 @@ var (
 	peerStatsMu     sync.Mutex
 )
 
+const (
+	peerProbeBatchSize = 8
+	peerProbeFreshFor  = 10 * time.Minute
+	peerProbeStaleFor  = 30 * time.Second
+)
+
+type peerProbe struct {
+	ip          string
+	port        string
+	direction   string
+	scheduledAt time.Time
+}
+
 func filterPeers(ctx context.Context) error {
 	var peers []string
 	if processMetrics == nil {
@@ -54,114 +68,26 @@ func filterPeers(ctx context.Context) error {
 		return err
 	}
 
-	var peersIn []string
-	var peersOut []string
-
 	// Loops each connection, looking for ESTABLISHED
 	for _, c := range connections {
 		if c.Status == "ESTABLISHED" {
 			// If local port == node port, it's incoming (except P2P)
 			if c.Laddr.Port == cfg.Node.Port {
-				peersIn = append(
-					peersIn,
-					fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port),
-				)
+				peers = appendFilteredPeer(peers, c.Raddr.IP, c.Raddr.Port, "i")
 			}
 			// If local port != node port, ekg port, or prometheus port, it's outgoing
 			if c.Laddr.Port != cfg.Node.Port && c.Laddr.Port != uint32(12788) &&
 				c.Laddr.Port != cfg.Prometheus.Port {
-				peersOut = append(
-					peersOut,
-					fmt.Sprintf("%s:%d", c.Raddr.IP, c.Raddr.Port),
-				)
+				peers = appendFilteredPeer(peers, c.Raddr.IP, c.Raddr.Port, "o")
 			}
 		}
 	}
 
 	// Skip everything if we have no peers
-	if len(peersIn) == 0 && len(peersOut) == 0 {
+	if len(peers) == 0 {
+		resetPeers()
 		failCount.Store(0)
 		return nil
-	}
-
-	// Process peersIn
-	for _, peer := range peersIn {
-		p := strings.Split(peer, ":")
-		if p == nil {
-			continue
-		}
-		peerIP := p[0]
-		peerPORT := p[1]
-		if strings.HasPrefix(peerIP, "[") { // IPv6
-			peerIP = strings.TrimPrefix(strings.TrimSuffix(peerIP, "]"), "[")
-		}
-
-		if peerIP == "127.0.0.1" ||
-			(publicIP != nil && peerIP == publicIP.String() && peerPORT == strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
-			// Do nothing
-			continue
-		} else {
-			added := false
-			for i, toCheck := range peers {
-				checkIPArr := strings.Split(toCheck, ":")
-				if checkIPArr == nil {
-					continue
-				}
-				checkIP := checkIPArr[0]
-				if checkIP == peerIP {
-					if p[2] != "i" {
-						// Remove and re-add as duplex (i+o)
-						peers = slices.Delete(peers, i, i+1)
-						peers = append(peers, fmt.Sprintf("%s;%s;i+o", peerIP, peerPORT))
-						added = true
-						break
-					}
-				}
-			}
-			if !added {
-				peers = append(peers, fmt.Sprintf("%s;%s;i", peerIP, peerPORT))
-			}
-		}
-	}
-
-	// Process peersOut
-	for _, peer := range peersOut {
-		p := strings.Split(peer, ":")
-		if p == nil {
-			continue
-		}
-		peerIP := p[0]
-		peerPORT := p[1]
-		if strings.HasPrefix(peerIP, "[") { // IPv6
-			peerIP = strings.TrimPrefix(strings.TrimSuffix(peerIP, "]"), "[")
-		}
-
-		if peerIP == "127.0.0.1" ||
-			(publicIP != nil && peerIP == publicIP.String() && peerPORT == strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
-			// Do nothing
-			continue
-		} else {
-			added := false
-			for i, toCheck := range peers {
-				checkIPArr := strings.Split(toCheck, ":")
-				if checkIPArr == nil {
-					continue
-				}
-				checkIP := checkIPArr[0]
-				if checkIP == peerIP {
-					if p[2] != "o" {
-						// Remove and re-add as duplex (i+o)
-						peers = slices.Delete(peers, i, i+1)
-						peers = append(peers, fmt.Sprintf("%s;%s;i+o", peerIP, peerPORT))
-						added = true
-						break
-					}
-				}
-			}
-			if !added {
-				peers = append(peers, fmt.Sprintf("%s;%s;o", peerIP, peerPORT))
-			}
-		}
 	}
 
 	// Early return if peers haven't changed
@@ -181,153 +107,263 @@ func filterPeers(ctx context.Context) error {
 	return nil
 }
 
+func appendFilteredPeer(peers []string, peerIP string, peerPort uint32, direction string) []string {
+	cfg := config.GetConfig()
+	peerPortText := strconv.FormatUint(uint64(peerPort), 10)
+	if peerIP == "127.0.0.1" || peerIP == "::1" ||
+		(publicIP != nil &&
+			peerIP == publicIP.String() &&
+			peerPortText == strconv.FormatUint(uint64(cfg.Node.Port), 10)) {
+		return peers
+	}
+
+	for idx, existing := range peers {
+		probe, ok := parsePeerProbe(existing)
+		if !ok || probe.ip != peerIP {
+			continue
+		}
+		nextDirection := mergePeerDirections(probe.direction, direction)
+		nextPort := preferredPeerProbePort(probe, peerPortText, direction)
+		if nextDirection == probe.direction && nextPort == probe.port {
+			return peers
+		}
+		peers = slices.Delete(peers, idx, idx+1)
+		return append(peers, fmt.Sprintf("%s;%s;%s", peerIP, nextPort, nextDirection))
+	}
+	return append(peers, fmt.Sprintf("%s;%s;%s", peerIP, peerPortText, direction))
+}
+
+func preferredPeerProbePort(existing peerProbe, nextPort, nextDirection string) string {
+	if directionHasOutgoing(nextDirection) {
+		return nextPort
+	}
+	if directionHasOutgoing(existing.direction) {
+		return existing.port
+	}
+	return nextPort
+}
+
+func directionHasOutgoing(direction string) bool {
+	return direction == "o" || direction == "i+o"
+}
+
+func mergePeerDirections(existing, next string) string {
+	if existing == next || existing == "i+o" {
+		return existing
+	}
+	if (existing == "i" && next == "o") || (existing == "o" && next == "i") {
+		return "i+o"
+	}
+	return next
+}
+
 func pingPeers(ctx context.Context) {
-	if getActiveSecondaryView() != viewPeers {
+	if !dashboardShowsPeers() && getActiveSecondaryView() != viewPeers {
 		failCount.Store(0)
 		return
 	}
 
 	scrollPeers = false
-	granularity := 68
-	granularitySmall := granularity / 2
-	// counters, etc.
-	var wg sync.WaitGroup
 	peersFilteredMu.RLock()
-	peerCount := len(peersFiltered)
-	if peerCount == 0 {
-		peersFilteredMu.RUnlock()
+	peers := slices.Clone(peersFiltered)
+	peersFilteredMu.RUnlock()
+	if len(peers) == 0 {
 		return
 	}
-	for _, v := range peersFiltered {
-		// increment waitgroup counter
-		wg.Add(1)
 
-		go func(v string) {
-			defer wg.Done()
-			peerArr := strings.Split(v, ";")
-			if len(peerArr) < 3 {
-				return
-			}
-			peerIP := peerArr[0]
-			peerPORT := peerArr[1]
-			peerDIR := peerArr[2]
+	now := time.Now()
+	freshAfter := now.Add(-peerProbeFreshFor)
+	inFlightAfter := now.Add(-peerProbeStaleFor)
+	probes := make([]peerProbe, 0, peerProbeBatchSize)
 
-			// Return early if we've been checked recently
-			now := time.Now()
-			expire := now.Add(-600 * time.Second)
-			peerStatsMu.Lock()
-			existing, ok := peerStats.RTTresultsMap[peerIP]
-			peerStatsMu.Unlock()
-			if ok {
-				if existing.UpdatedAt.After(expire) && existing.RTT != 0 && existing.Location != "---" {
-					return
-				}
-			}
-			peerStatsMu.Lock()
-			if len(peerStats.RTTresultsMap) == 0 {
-				peerStats.RTTresultsMap = make(
-					peerRTTresultsMap,
-					peerCount,
-				)
-			}
-			peerStatsMu.Unlock()
-
-			// Start RTT loop
-			// for tool in ... return peerRTT
-			peerRTT := tcpinfoRtt(fmt.Sprintf("%s:%s", peerIP, peerPORT))
-			peerPort, err := strconv.Atoi(peerPORT)
-			if err != nil {
-				peerPort = 0
-			}
-			peerLocation := getGeoIP(ctx, peerIP)
-			peer := &Peer{
-				IP:        peerIP,
-				Port:      peerPort,
-				Direction: peerDIR,
-				RTT:       peerRTT,
-				Location:  peerLocation,
-				UpdatedAt: time.Now(),
-			}
-			peerStatsMu.Lock()
-			if peerRTT != 99999 {
-				peerStats.RTTSUM += peerRTT
-			}
-			// Update counters
-			if peerRTT < 50 {
-				peerStats.CNT1++
-			} else if peerRTT < 100 {
-				peerStats.CNT2++
-			} else if peerRTT < 200 {
-				peerStats.CNT3++
-			} else if peerRTT < 99999 {
-				peerStats.CNT4++
-			} else {
-				peerStats.CNT0++
-			}
-			peerStats.RTTresultsMap[peerIP] = peer
-			peerStats.RTTresultsSlice = append(
-				peerStats.RTTresultsSlice,
-				peer,
-			)
-			sort.Sort(peerStats.RTTresultsSlice)
-			peerStatsMu.Unlock()
-		}(v)
+	peerStatsMu.Lock()
+	if peerStats.RTTresultsMap == nil {
+		peerStats.RTTresultsMap = make(peerRTTresultsMap, len(peers))
 	}
-	peersFilteredMu.RUnlock()
-	wg.Wait()
-	peerCNTreachable := peerCount - peerStats.CNT0
-	if peerCNTreachable > 0 {
-		peerStats.RTTAVG = peerStats.RTTSUM / peerCNTreachable
-		peerStats.PCT1 = float32(
-			peerStats.CNT1,
-		) / float32(
-			peerCNTreachable,
-		) * 100
-		peerStats.PCT1items = int(peerStats.PCT1) * granularitySmall / 100
-		peerStats.PCT2 = float32(
-			peerStats.CNT2,
-		) / float32(
-			peerCNTreachable,
-		) * 100
-		peerStats.PCT2items = int(peerStats.PCT2) * granularitySmall / 100
-		peerStats.PCT3 = float32(
-			peerStats.CNT3,
-		) / float32(
-			peerCNTreachable,
-		) * 100
-		peerStats.PCT3items = int(peerStats.PCT3) * granularitySmall / 100
-		peerStats.PCT4 = float32(
-			peerStats.CNT4,
-		) / float32(
-			peerCNTreachable,
-		) * 100
-		peerStats.PCT4items = int(peerStats.PCT4) * granularitySmall / 100
+	if peerStats.InFlight == nil {
+		peerStats.InFlight = make(map[string]time.Time, len(peers))
 	}
-	if len(peerStats.RTTresultsSlice) != 0 &&
-		len(peerStats.RTTresultsSlice) >= peerCount {
-		scrollPeers = true
+	prunePeerStatsLocked(peers)
+	for _, peer := range peers {
+		probe, ok := parsePeerProbe(peer)
+		if !ok {
+			continue
+		}
+		existing, exists := peerStats.RTTresultsMap[probe.ip]
+		if exists &&
+			existing.UpdatedAt.After(freshAfter) &&
+			existing.RTT != 0 &&
+			existing.Location != "---" {
+			continue
+		}
+		if startedAt, inFlight := peerStats.InFlight[probe.ip]; inFlight &&
+			startedAt.After(inFlightAfter) {
+			continue
+		}
+		probe = schedulePeerProbeLocked(probe, now)
+		probes = append(probes, probe)
+		if len(probes) >= peerProbeBatchSize {
+			break
+		}
+	}
+	recomputePeerStatsLocked()
+	peerStatsMu.Unlock()
+
+	for _, probe := range probes {
+		go probePeer(ctx, probe)
 	}
 	failCount.Store(0)
 }
 
-func resetPeers() {
+func schedulePeerProbeLocked(probe peerProbe, scheduledAt time.Time) peerProbe {
+	probe.scheduledAt = scheduledAt
+	peerStats.InFlight[probe.ip] = scheduledAt
+	return probe
+}
+
+func parsePeerProbe(peer string) (peerProbe, bool) {
+	peerArr := strings.Split(peer, ";")
+	if len(peerArr) < 3 {
+		return peerProbe{}, false
+	}
+	return peerProbe{
+		ip:        peerArr[0],
+		port:      peerArr[1],
+		direction: peerArr[2],
+	}, true
+}
+
+func probePeer(ctx context.Context, probe peerProbe) {
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
+
+	peerRTT := tcpinfoRtt(net.JoinHostPort(probe.ip, probe.port))
+	peerPort, err := strconv.Atoi(probe.port)
+	if err != nil {
+		peerPort = 0
+	}
+	peerLocation := getGeoIP(ctx, probe.ip)
+	peer := &Peer{
+		IP:        probe.ip,
+		Port:      peerPort,
+		Direction: probe.direction,
+		RTT:       peerRTT,
+		Location:  peerLocation,
+		UpdatedAt: time.Now(),
+	}
+
+	completePeerProbe(probe, peer)
+}
+
+func completePeerProbe(probe peerProbe, peer *Peer) bool {
 	peerStatsMu.Lock()
 	defer peerStatsMu.Unlock()
+	startedAt, inFlight := peerStats.InFlight[probe.ip]
+	if !inFlight || !startedAt.Equal(probe.scheduledAt) {
+		return false
+	}
+	if peerStats.RTTresultsMap == nil {
+		peerStats.RTTresultsMap = make(peerRTTresultsMap)
+	}
+	peerStats.RTTresultsMap[probe.ip] = peer
+	delete(peerStats.InFlight, probe.ip)
+	recomputePeerStatsLocked()
+	return true
+}
 
+func prunePeerStatsLocked(peers []string) {
+	active := make(map[string]struct{}, len(peers))
+	for _, peer := range peers {
+		probe, ok := parsePeerProbe(peer)
+		if !ok {
+			continue
+		}
+		active[probe.ip] = struct{}{}
+	}
+	for peerIP := range peerStats.RTTresultsMap {
+		if _, ok := active[peerIP]; !ok {
+			delete(peerStats.RTTresultsMap, peerIP)
+		}
+	}
+	for peerIP := range peerStats.InFlight {
+		if _, ok := active[peerIP]; !ok {
+			delete(peerStats.InFlight, peerIP)
+		}
+	}
+}
+
+func recomputePeerStatsLocked() {
 	peerStats.CNT0 = 0
 	peerStats.CNT1 = 0
 	peerStats.CNT2 = 0
 	peerStats.CNT3 = 0
 	peerStats.CNT4 = 0
 	peerStats.RTTSUM = 0
-	peerStats.RTTresultsSlice = []*Peer{}
-	for _, peerIP := range peerStats.RTTresultsMap {
-		peerIP.RTT = 0
-	}
+	peerStats.RTTAVG = 0
+	peerStats.PCT1 = 0
+	peerStats.PCT2 = 0
+	peerStats.PCT3 = 0
+	peerStats.PCT4 = 0
+	peerStats.PCT1items = 0
+	peerStats.PCT2items = 0
+	peerStats.PCT3items = 0
+	peerStats.PCT4items = 0
+	peerStats.RTTresultsSlice = peerStats.RTTresultsSlice[:0]
 
+	for _, peer := range peerStats.RTTresultsMap {
+		peerStats.RTTresultsSlice = append(peerStats.RTTresultsSlice, peer)
+		if peer.RTT < RTTThreshold1 {
+			peerStats.RTTSUM += peer.RTT
+			peerStats.CNT1++
+		} else if peer.RTT < RTTThreshold2 {
+			peerStats.RTTSUM += peer.RTT
+			peerStats.CNT2++
+		} else if peer.RTT < RTTThreshold3 {
+			peerStats.RTTSUM += peer.RTT
+			peerStats.CNT3++
+		} else if peer.RTT < RTTUnreachable {
+			peerStats.RTTSUM += peer.RTT
+			peerStats.CNT4++
+		} else {
+			peerStats.CNT0++
+		}
+	}
+	sort.Sort(peerStats.RTTresultsSlice)
+
+	peerCNTReachable := len(peerStats.RTTresultsSlice) - peerStats.CNT0
+	if peerCNTReachable <= 0 {
+		return
+	}
+	peerStats.RTTAVG = peerStats.RTTSUM / peerCNTReachable
+	granularitySmall := ProgressBarGranularity / 2
+	peerStats.PCT1 = float32(peerStats.CNT1) / float32(peerCNTReachable) * 100
+	peerStats.PCT1items = int(peerStats.PCT1) * granularitySmall / 100
+	peerStats.PCT2 = float32(peerStats.CNT2) / float32(peerCNTReachable) * 100
+	peerStats.PCT2items = int(peerStats.PCT2) * granularitySmall / 100
+	peerStats.PCT3 = float32(peerStats.CNT3) / float32(peerCNTReachable) * 100
+	peerStats.PCT3items = int(peerStats.PCT3) * granularitySmall / 100
+	peerStats.PCT4 = float32(peerStats.CNT4) / float32(peerCNTReachable) * 100
+	peerStats.PCT4items = int(peerStats.PCT4) * granularitySmall / 100
+}
+
+func resetPeers() {
 	peersFilteredMu.Lock()
+	peerStatsMu.Lock()
 	peersFiltered = []string{}
+	resetPeerStatsLocked()
+	peerStatsMu.Unlock()
 	peersFilteredMu.Unlock()
+}
+
+func resetPeerStatsLocked() {
+	peerStats = PeerStats{
+		RTTresultsMap:   make(peerRTTresultsMap),
+		RTTresultsSlice: peerRTTresultsSlice{},
+		InFlight:        make(map[string]time.Time),
+	}
 }
 
 var peerStats PeerStats
@@ -350,6 +386,7 @@ type PeerStats struct {
 	PCT4items       int
 	RTTresultsMap   peerRTTresultsMap
 	RTTresultsSlice peerRTTresultsSlice
+	InFlight        map[string]time.Time
 }
 
 type Peer struct {
@@ -376,7 +413,25 @@ func (p peerRTTresultsSlice) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
 }
 
-// Less is part of sort.Interface and we use RTT as the value to sort by
+// Less is part of sort.Interface. RTT remains the primary key, but endpoint
+// details make the order deterministic when RTT values are tied or unavailable.
 func (p peerRTTresultsSlice) Less(i, j int) bool {
-	return p[i].RTT < p[j].RTT
+	left := p[i]
+	right := p[j]
+	if left == nil || right == nil {
+		return right != nil
+	}
+	if left.RTT != right.RTT {
+		return left.RTT < right.RTT
+	}
+	if left.IP != right.IP {
+		return left.IP < right.IP
+	}
+	if left.Port != right.Port {
+		return left.Port < right.Port
+	}
+	if left.Direction != right.Direction {
+		return left.Direction < right.Direction
+	}
+	return left.Location < right.Location
 }

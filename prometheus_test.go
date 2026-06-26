@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/blinklabs-io/nview/internal/config"
+	dto "github.com/prometheus/client_model/go"
 )
 
 func TestDetectNodeType(t *testing.T) {
@@ -221,17 +222,72 @@ dingo_epoch_length_slots 1000
 	}
 }
 
+func TestPromMetricsCollectsLeiosMetrics(t *testing.T) {
+	prom := []byte(`
+# TYPE dingo_leios_input_blocks_total counter
+dingo_leios_input_blocks_total{network="preview",stage="diffuse"} 3
+# TYPE cardano_node_metrics_leios_vote_duration_seconds histogram
+cardano_node_metrics_leios_vote_duration_seconds_bucket{network="preview",le="0.1"} 1
+cardano_node_metrics_leios_vote_duration_seconds_bucket{network="preview",le="+Inf"} 2
+cardano_node_metrics_leios_vote_duration_seconds_sum{network="preview"} 0.25
+cardano_node_metrics_leios_vote_duration_seconds_count{network="preview"} 2
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	if got := metrics.LeiosMetrics["dingo_leios_input_blocks_total{stage=diffuse}"]; got != 3 {
+		t.Fatalf("Leios counter = %v, expected 3", got)
+	}
+	if got := metrics.LeiosMetrics["cardano_node_metrics_leios_vote_duration_seconds_count"]; got != 2 {
+		t.Fatalf("Leios histogram count = %v, expected 2", got)
+	}
+	if got := metrics.LeiosMetrics["cardano_node_metrics_leios_vote_duration_seconds_sum"]; got != 0.25 {
+		t.Fatalf("Leios histogram sum = %v, expected 0.25", got)
+	}
+}
+
 // TestPromMetricsPopulatesAllDingoDiagnosticsFields verifies every new Dingo
 // and event-bus Prometheus metric is decoded into the PromMetrics struct.
 func TestPromMetricsPopulatesAllDingoDiagnosticsFields(t *testing.T) {
 	prom := []byte(`
-dingo_database_size_bytes{plugin="ledger"} 1337
+cardano_node_metrics_blocksForgedNum_int{network="preview"} 12
+cardano_node_metrics_forging_enabled 1
+cardano_node_metrics_nodeStartTime_int 1700000001
+cardano_node_metrics_peerSelection_KnownPeers 19
+cardano_node_metrics_peerSelection_EstablishedPeers 7
+cardano_node_metrics_peerSelection_ActivePeers 3
+cardano_node_metrics_peerSelection_WarmPeersPromotions 11
+cardano_node_metrics_peerSelection_WarmPeersDemotions 2
+cardano_node_metrics_peerSelection_churn_IncreasedKnownPeers 125
+cardano_node_metrics_peerSelection_churn_DecreasedKnownPeers 5
+dingo_database_size_bytes{store="blob"} 1000
+dingo_database_size_bytes{store="metadata"} 337
+dingo_build_info{commit="62809b98",goversion="go1.26.1",network="preview",version="v0.57.0 (commit 62809b98)"} 1
 dingo_chain_manager_cached_blocks 8192
+dingo_chainsync_seen_headers 15
 dingo_tip_gap_slots 2
 dingo_forge_tip_gap_slots 3
 dingo_ledger_slot_clock_fallback_total 4
 dingo_forge_slot_clock_errors_total 5
 dingo_forge_sync_skip_total 6
+dingo_metrics_txsEvictedNum_int 7
+dingo_metrics_txsExpiredNum_int 8
+dingo_metrics_peerSelection_InboundArrivalsTotal 9
+dingo_metrics_peerSelection_InboundDuplexHeld 10
+dingo_metrics_peerSelection_InboundHotHeld 11
+dingo_metrics_peerSelection_InboundHotQuota 12
+dingo_metrics_peerSelection_InboundHotQuotaUsage 0.5
+dingo_metrics_peerSelection_InboundPruned 13
+dingo_metrics_peerSelection_InboundTopologyMatched 14
+dingo_metrics_peerSelection_InboundWarmHeld 15
+dingo_metrics_peerSelection_InboundWarmTarget 16
+dingo_metrics_peerSelection_InboundWarmTargetOccupancy 0.25
+dingo_metrics_peerSelection_peers_by_source{source="ledger",state="cold"} 18
+dingo_metrics_peerSelection_peers_by_source{source="ledger",state="hot"} 1
+dingo_metrics_peerSelection_peers_by_source{source="inbound",state="warm"} 2
+dingo_metrics_peerSelection_peers_by_source{source="gossip",state="cold"} 3
+dingo_metrics_peerSelection_churn_promotions_by_source{source="ledger"} 4
+dingo_metrics_peerSelection_churn_demotions_by_source{source="ledger"} 5
 dingo_cbor_cache_utxo_hot_hits_total 100
 dingo_cbor_cache_utxo_hot_misses_total 10
 dingo_cbor_cache_tx_hot_hits_total 200
@@ -239,6 +295,35 @@ dingo_cbor_cache_tx_hot_misses_total 20
 dingo_cbor_cache_block_lru_hits_total 300
 dingo_cbor_cache_block_lru_misses_total 30
 dingo_cbor_cache_cold_extractions_total 40
+dingo_protocol_messages_received_total{network="preview",outcome="success",protocol="blockfetch"} 5669
+dingo_protocol_messages_received_total{network="preview",outcome="success",protocol="chainsync"} 356904
+dingo_protocol_messages_received_total{network="preview",outcome="success",protocol="keepalive"} 6254
+dingo_protocol_messages_received_total{network="preview",outcome="success",protocol="txsubmission"} 1
+dingo_blockfetch_shadow_gate_decisions_total{cutoff="fallback",network="preview",path="dispatched"} 2
+dingo_blockfetch_shadow_gate_decisions_total{cutoff="fallback",network="preview",path="skipped_fast"} 2472
+dingo_blockfetch_shadow_gate_decisions_total{cutoff="no_sample",network="preview",path="dispatched"} 10
+dingo_blockfetch_shadow_gate_decisions_total{cutoff="no_sample",network="preview",path="skipped_no_peer"} 30
+# TYPE dingo_protocol_message_duration_seconds histogram
+dingo_protocol_message_duration_seconds_bucket{network="preview",outcome="success",protocol="blockfetch",le="+Inf"} 10
+dingo_protocol_message_duration_seconds_sum{network="preview",outcome="success",protocol="blockfetch"} 0.02
+dingo_protocol_message_duration_seconds_count{network="preview",outcome="success",protocol="blockfetch"} 10
+dingo_protocol_message_duration_seconds_bucket{network="preview",outcome="success",protocol="chainsync",le="+Inf"} 20
+dingo_protocol_message_duration_seconds_sum{network="preview",outcome="success",protocol="chainsync"} 0.04
+dingo_protocol_message_duration_seconds_count{network="preview",outcome="success",protocol="chainsync"} 20
+dingo_metrics_stake_snapshot_capture_success_total 2
+dingo_metrics_stake_snapshot_capture_failure_total 1
+dingo_metrics_stake_snapshot_last_successful_epoch_int 1340
+dingo_metrics_stake_snapshot_pool_count_int 658
+dingo_metrics_stake_snapshot_total_active_stake_lovelace 1496610126371652
+go_goroutines 452
+go_threads 22
+process_open_fds 965
+process_max_fds 122880
+# TYPE dingo_metrics_blockForgingLatency_seconds histogram
+dingo_metrics_blockForgingLatency_seconds_bucket{le="1"} 2
+dingo_metrics_blockForgingLatency_seconds_bucket{le="+Inf"} 2
+dingo_metrics_blockForgingLatency_seconds_sum 1.25
+dingo_metrics_blockForgingLatency_seconds_count 2
 event_total{type="block"} 20
 event_total{type="tx"} 30
 event_subscribers{topic="block"} 25
@@ -251,18 +336,50 @@ event_delivery_timeouts_total{topic="tx"} 45
 
 	metrics := decodePromMetrics(t, prom)
 
+	if metrics.Network != "preview" {
+		t.Fatalf("Network = %q, expected preview", metrics.Network)
+	}
+
 	tests := []struct {
 		name string
 		got  uint64
 		want uint64
 	}{
+		{"BlocksForged", metrics.BlocksForged, 12},
+		{"ForgingEnabled", metrics.ForgingEnabled, 1},
+		{"NodeStartTime", metrics.NodeStartTime, 1700000001},
+		{"PeersKnown", metrics.PeersKnown, 19},
+		{"PeersEstablished", metrics.PeersEstablished, 7},
+		{"PeersActive", metrics.PeersActive, 3},
+		{"PeerWarmPromotions", metrics.PeerWarmPromotions, 11},
+		{"PeerWarmDemotions", metrics.PeerWarmDemotions, 2},
+		{"PeerChurnKnownUp", metrics.PeerChurnKnownUp, 125},
+		{"PeerChurnKnownDown", metrics.PeerChurnKnownDown, 5},
 		{"DingoDbSizeBytes", metrics.DingoDbSizeBytes, 1337},
+		{"DingoDbBlobSizeBytes", metrics.DingoDbBlobSizeBytes, 1000},
+		{"DingoDbMetadataSizeBytes", metrics.DingoDbMetadataSizeBytes, 337},
 		{"DingoChainCachedBlocks", metrics.DingoChainCachedBlocks, 8192},
+		{"DingoChainsyncSeenHeaders", metrics.DingoChainsyncSeenHeaders, 15},
 		{"DingoTipGapSlots", metrics.DingoTipGapSlots, 2},
 		{"DingoForgeTipGapSlots", metrics.DingoForgeTipGapSlots, 3},
 		{"DingoSlotClockFallback", metrics.DingoSlotClockFallback, 4},
 		{"DingoForgeSlotClockErr", metrics.DingoForgeSlotClockErr, 5},
 		{"DingoForgeSyncSkip", metrics.DingoForgeSyncSkip, 6},
+		{"DingoTxsEvicted", metrics.DingoTxsEvicted, 7},
+		{"DingoTxsExpired", metrics.DingoTxsExpired, 8},
+		{"DingoInboundArrivalsTotal", metrics.DingoInboundArrivalsTotal, 9},
+		{"DingoInboundDuplexHeld", metrics.DingoInboundDuplexHeld, 10},
+		{"DingoInboundHotHeld", metrics.DingoInboundHotHeld, 11},
+		{"DingoInboundHotQuota", metrics.DingoInboundHotQuota, 12},
+		{"DingoInboundPruned", metrics.DingoInboundPruned, 13},
+		{"DingoInboundTopologyMatch", metrics.DingoInboundTopologyMatch, 14},
+		{"DingoInboundWarmHeld", metrics.DingoInboundWarmHeld, 15},
+		{"DingoInboundWarmTarget", metrics.DingoInboundWarmTarget, 16},
+		{"DingoPeersBySourceLedger", metrics.DingoPeersBySourceLedger, 19},
+		{"DingoPeersBySourceInbound", metrics.DingoPeersBySourceInbound, 2},
+		{"DingoPeersBySourceGossip", metrics.DingoPeersBySourceGossip, 3},
+		{"DingoPeerPromotionsLedger", metrics.DingoPeerPromotionsLedger, 4},
+		{"DingoPeerDemotionsLedger", metrics.DingoPeerDemotionsLedger, 5},
 		{"DingoCacheUtxoHotHits", metrics.DingoCacheUtxoHotHits, 100},
 		{"DingoCacheUtxoHotMiss", metrics.DingoCacheUtxoHotMiss, 10},
 		{"DingoCacheTxHotHits", metrics.DingoCacheTxHotHits, 200},
@@ -270,6 +387,25 @@ event_delivery_timeouts_total{topic="tx"} 45
 		{"DingoCacheBlockLruHits", metrics.DingoCacheBlockLruHits, 300},
 		{"DingoCacheBlockLruMiss", metrics.DingoCacheBlockLruMiss, 30},
 		{"DingoCacheColdExtract", metrics.DingoCacheColdExtract, 40},
+		{"DingoProtocolBlockfetchMessages", metrics.DingoProtocolBlockfetchMessages, 5669},
+		{"DingoProtocolChainsyncMessages", metrics.DingoProtocolChainsyncMessages, 356904},
+		{"DingoProtocolKeepaliveMessages", metrics.DingoProtocolKeepaliveMessages, 6254},
+		{"DingoProtocolTxSubmitMessages", metrics.DingoProtocolTxSubmitMessages, 1},
+		{"DingoProtocolBlockfetchCount", metrics.DingoProtocolBlockfetchCount, 10},
+		{"DingoProtocolChainsyncCount", metrics.DingoProtocolChainsyncCount, 20},
+		{"DingoBlockfetchGateDispatched", metrics.DingoBlockfetchGateDispatched, 12},
+		{"DingoBlockfetchGateSkippedFast", metrics.DingoBlockfetchGateSkippedFast, 2472},
+		{"DingoBlockfetchGateSkippedPeer", metrics.DingoBlockfetchGateSkippedPeer, 30},
+		{"DingoBlockForgingLatencyN", metrics.DingoBlockForgingLatencyN, 2},
+		{"DingoStakeSnapshotSuccess", metrics.DingoStakeSnapshotSuccess, 2},
+		{"DingoStakeSnapshotFailure", metrics.DingoStakeSnapshotFailure, 1},
+		{"DingoStakeSnapshotLastEpoch", metrics.DingoStakeSnapshotLastEpoch, 1340},
+		{"DingoStakeSnapshotPoolCount", metrics.DingoStakeSnapshotPoolCount, 658},
+		{"DingoStakeSnapshotActiveStake", metrics.DingoStakeSnapshotActiveStake, 1496610126371652},
+		{"GoRoutines", metrics.GoRoutines, 452},
+		{"GoThreads", metrics.GoThreads, 22},
+		{"ProcessOpenFDs", metrics.ProcessOpenFDs, 965},
+		{"ProcessMaxFDs", metrics.ProcessMaxFDs, 122880},
 		{"EventTotal", metrics.EventTotal, 50},
 		{"EventSubscribers", metrics.EventSubscribers, 60},
 		{"EventDeliveryErrors", metrics.EventDeliveryErrors, 70},
@@ -283,6 +419,88 @@ event_delivery_timeouts_total{topic="tx"} 45
 			}
 		})
 	}
+
+	if metrics.DingoInboundHotQuotaUsage != 0.5 {
+		t.Errorf(
+			"DingoInboundHotQuotaUsage = %f, expected 0.5",
+			metrics.DingoInboundHotQuotaUsage,
+		)
+	}
+	if metrics.DingoInboundWarmOccupancy != 0.25 {
+		t.Errorf(
+			"DingoInboundWarmOccupancy = %f, expected 0.25",
+			metrics.DingoInboundWarmOccupancy,
+		)
+	}
+	if metrics.DingoBlockForgingLatencyS != 1.25 {
+		t.Errorf(
+			"DingoBlockForgingLatencyS = %f, expected 1.25",
+			metrics.DingoBlockForgingLatencyS,
+		)
+	}
+	if metrics.DingoProtocolBlockfetchSum != 0.02 {
+		t.Errorf("DingoProtocolBlockfetchSum = %f, expected 0.02", metrics.DingoProtocolBlockfetchSum)
+	}
+	if metrics.DingoProtocolChainsyncSum != 0.04 {
+		t.Errorf("DingoProtocolChainsyncSum = %f, expected 0.04", metrics.DingoProtocolChainsyncSum)
+	}
+	if metrics.DingoBuildVersion != "v0.57.0 (commit 62809b98)" {
+		t.Errorf("DingoBuildVersion = %q", metrics.DingoBuildVersion)
+	}
+	if metrics.DingoBuildCommit != "62809b98" {
+		t.Errorf("DingoBuildCommit = %q", metrics.DingoBuildCommit)
+	}
+	if metrics.DingoBuildGoVersion != "go1.26.1" {
+		t.Errorf("DingoBuildGoVersion = %q", metrics.DingoBuildGoVersion)
+	}
+}
+
+func TestHistogramSampleCountPrefersFloatCount(t *testing.T) {
+	sampleCount := uint64(7)
+	sampleCountFloat := 2.5
+	histogram := &dto.Histogram{
+		SampleCount:      &sampleCount,
+		SampleCountFloat: &sampleCountFloat,
+	}
+	if got := histogramSampleCount(histogram); got != sampleCountFloat {
+		t.Fatalf("histogramSampleCount() = %f, expected %f", got, sampleCountFloat)
+	}
+
+	histogram.SampleCountFloat = nil
+	if got := histogramSampleCount(histogram); got != float64(sampleCount) {
+		t.Fatalf("histogramSampleCount() fallback = %f, expected %d", got, sampleCount)
+	}
+}
+
+func TestBucketByLabelPreservesTotalOption(t *testing.T) {
+	labels := []*dto.LabelPair{
+		{
+			Name:  stringPtr("source"),
+			Value: stringPtr("ledger"),
+		},
+	}
+
+	withTotal := map[string]any{}
+	bucketByLabel(withTotal, "metric_total", 3, labels, "source", true)
+	if got := withTotal["metric_total_ledger"]; got != float64(3) {
+		t.Fatalf("suffixed metric = %#v, expected 3", got)
+	}
+	if got := withTotal["metric_total"]; got != float64(3) {
+		t.Fatalf("total metric = %#v, expected 3", got)
+	}
+
+	withoutTotal := map[string]any{}
+	bucketByLabel(withoutTotal, "metric_total", 5, labels, "source", false)
+	if got := withoutTotal["metric_total_ledger"]; got != float64(5) {
+		t.Fatalf("suffixed-only metric = %#v, expected 5", got)
+	}
+	if _, ok := withoutTotal["metric_total"]; ok {
+		t.Fatal("bucketByLabel() emitted total when includeTotal=false")
+	}
+}
+
+func stringPtr(value string) *string {
+	return &value
 }
 
 func TestPromMetricsMithrilSyncFields(t *testing.T) {
