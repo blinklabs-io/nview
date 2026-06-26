@@ -27,26 +27,31 @@ import (
 )
 
 func getNodeVersion() (version string, revision string, err error) {
-	cmd := exec.Command(getEffectiveNodeBinary(), "version") // #nosec G204
+	binary := getEffectiveNodeBinary()
+	cmd := exec.Command(binary, "version") // #nosec G204
 	stdout, err := cmd.Output()
 	if err != nil {
 		return "N/A", "N/A", fmt.Errorf(
 			"failed to execute %s version command: %w",
-			getEffectiveNodeBinary(),
+			binary,
 			err,
 		)
 	}
-	output := strings.TrimSpace(string(stdout))
+	return parseNodeVersionOutput(binary, strings.TrimSpace(string(stdout)))
+}
 
+func parseNodeVersionOutput(
+	binary string,
+	output string,
+) (version string, revision string, err error) {
 	// Handle Dingo format: "devel (commit 80ae952)" or "v0.17.0 (commit 1f54020)"
-	if strings.Contains(output, "(commit ") {
-		parts := strings.Split(output, " ")
-		if len(parts) >= 3 {
-			version = parts[0]
-			// Extract commit hash from "(commit XXXXXXX)"
-			commitPart := parts[2]
-			if strings.HasPrefix(commitPart, "(commit") && len(commitPart) > 7 {
-				revision = commitPart[7 : len(commitPart)-1] // Remove "(commit" and ")"
+	if commitStart := strings.Index(output, "(commit "); commitStart >= 0 {
+		version = strings.TrimSpace(output[:commitStart])
+		hashStart := commitStart + len("(commit ")
+		hashEnd := strings.Index(output[hashStart:], ")")
+		if version != "" && hashEnd >= 0 {
+			revision = strings.TrimSpace(output[hashStart : hashStart+hashEnd])
+			if revision != "" {
 				if len(revision) > 8 {
 					revision = revision[0:8]
 				}
@@ -56,16 +61,27 @@ func getNodeVersion() (version string, revision string, err error) {
 	}
 
 	// Handle cardano-node format (fallback)
-	strArray := strings.Split(output, " ")
-	if len(strArray) < 8 {
+	strArray := strings.Fields(output)
+	if len(strArray) < 2 {
 		return "N/A", "N/A", fmt.Errorf(
-			"unexpected version format from %s: output has %d parts, expected at least 8",
-			getEffectiveNodeBinary(),
+			"unexpected version format from %s: output has %d parts, expected at least 2",
+			binary,
 			len(strArray),
 		)
 	}
 	version = strArray[1]
-	revision = strArray[7]
+	for idx, part := range strArray {
+		if part == "rev" && idx+1 < len(strArray) {
+			revision = strArray[idx+1]
+			break
+		}
+	}
+	if revision == "" {
+		return "N/A", "N/A", fmt.Errorf(
+			"unexpected version format from %s: output is missing git revision",
+			binary,
+		)
+	}
 	if len(revision) > 8 {
 		revision = revision[0:8]
 	}
