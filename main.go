@@ -1449,9 +1449,9 @@ func getBlockText(ctx context.Context) string {
 
 	var sb strings.Builder
 
-	blk1s := fmt.Sprintf("%.2f", promMetrics.BlocksW1s*100)
-	blk3s := fmt.Sprintf("%.2f", promMetrics.BlocksW3s*100)
-	blk5s := fmt.Sprintf("%.2f", promMetrics.BlocksW5s*100)
+	blk1s := formatBlockPropagationPercent(promMetrics.BlocksW1s)
+	blk3s := formatBlockPropagationPercent(promMetrics.BlocksW3s)
+	blk5s := formatBlockPropagationPercent(promMetrics.BlocksW5s)
 	delay := fmt.Sprintf("%.2f", promMetrics.BlockDelay)
 
 	// Row 1
@@ -1479,6 +1479,13 @@ func getBlockText(ctx context.Context) string {
 
 	failCount.Store(0)
 	return sb.String()
+}
+
+func formatBlockPropagationPercent(value float64) string {
+	if getEffectiveNodeBinary() != DINGO_BINARY && value <= 1 {
+		value *= 100
+	}
+	return fmt.Sprintf("%.2f", value)
 }
 
 func getNodeText(ctx context.Context) string {
