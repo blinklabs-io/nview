@@ -390,7 +390,7 @@ func (c *Config) populateShelleyGenesis() error {
 	}
 
 	if c.Node.ShelleyGenesis.EpochLength == 0 {
-		// Our epoch length is 432000, except sanchonet/preview/musashi
+		// Our epoch length is 432000, except sancho/preview/musashi
 		c.Node.ShelleyGenesis.EpochLength = 432000
 		switch network {
 		case "sancho", "preview", "musashi":
