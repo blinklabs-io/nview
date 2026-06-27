@@ -1,4 +1,4 @@
-// Copyright 2025 Blink Labs Software
+// Copyright 2026 Blink Labs Software
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -250,6 +250,8 @@ func (c *Config) populateNetworkMagic() error {
 				c.Node.NetworkMagic = 1
 			case "preview":
 				c.Node.NetworkMagic = 2
+			case "musashi":
+				c.Node.NetworkMagic = 164
 			default:
 				return errors.New("unknown network")
 			}
@@ -263,6 +265,8 @@ func (c *Config) populateNetworkMagic() error {
 				c.Node.NetworkMagic = 1
 			case "preview":
 				c.Node.NetworkMagic = 2
+			case "musashi":
+				c.Node.NetworkMagic = 164
 			default:
 				return errors.New("unknown network")
 			}
@@ -310,7 +314,7 @@ func (c *Config) populateByronGenesis() error {
 	if c.Node.ByronGenesis.SlotLength == 0 {
 		c.Node.ByronGenesis.SlotLength = 20000
 	}
-	// Our K is 2160, except preview, which we'll override below
+	// Our K is 2160, except preview/sancho/musashi, which we override below
 	kWasDefaulted := false
 	if c.Node.ByronGenesis.K == 0 {
 		c.Node.ByronGenesis.K = 2160
@@ -343,6 +347,13 @@ func (c *Config) populateByronGenesis() error {
 		}
 		if c.Node.ByronGenesis.StartTime == 0 {
 			c.Node.ByronGenesis.StartTime = 1686789000
+		}
+	case "musashi":
+		if kWasDefaulted {
+			c.Node.ByronGenesis.K = 432
+		}
+		if c.Node.ByronGenesis.StartTime == 0 {
+			c.Node.ByronGenesis.StartTime = 1780012800
 		}
 	case "mainnet":
 		if c.Node.ByronGenesis.StartTime == 0 {
@@ -379,10 +390,10 @@ func (c *Config) populateShelleyGenesis() error {
 	}
 
 	if c.Node.ShelleyGenesis.EpochLength == 0 {
-		// Our epoch length is 432000, except sanchonet/preview
+		// Our epoch length is 432000, except sancho/preview/musashi
 		c.Node.ShelleyGenesis.EpochLength = 432000
 		switch network {
-		case "sancho", "preview":
+		case "sancho", "preview", "musashi":
 			c.Node.ShelleyGenesis.EpochLength = 86400
 		}
 	} else {
