@@ -53,7 +53,9 @@ func TestPopulateNetworkMagic(t *testing.T) {
 		{"mainnet app", "mainnet", "", 764824073, false},
 		{"preprod app", "preprod", "", 1, false},
 		{"preview app", "preview", "", 2, false},
+		{"musashi app", "musashi", "", 164, false},
 		{"mainnet node", "", "mainnet", 764824073, false},
+		{"musashi node", "", "musashi", 164, false},
 		{"unknown app", "unknown", "", 0, true},
 		{"no network", "", "", 764824073, false}, // defaults to mainnet
 	}
@@ -98,6 +100,7 @@ func TestPopulateByronGenesis(t *testing.T) {
 		{"preprod app", "preprod", "", 1654041600, 2160},
 		{"preview app", "preview", "", 1666656000, 432},
 		{"sancho app", "sancho", "", 1686789000, 432},
+		{"musashi app", "musashi", "", 1780012800, 432},
 		{"mainnet node", "", "mainnet", 1506203091, 2160},
 	}
 
@@ -171,6 +174,7 @@ func TestPopulateShelleyGenesis(t *testing.T) {
 		{"preprod app", "preprod", "", 432000},
 		{"preview app", "preview", "", 86400},
 		{"sancho app", "sancho", "", 86400},
+		{"musashi app", "musashi", "", 86400},
 		{"mainnet node", "", "mainnet", 432000},
 	}
 
@@ -209,6 +213,7 @@ func TestPopulateShelleyTransEpoch(t *testing.T) {
 		{"mainnet app", "mainnet", "", 208},
 		{"preprod app", "preprod", "", 4},
 		{"preview app", "preview", "", 0}, // not set, defaults to 0
+		{"musashi app", "musashi", "", 0}, // all eras fork at epoch 0
 		{"mainnet node", "", "mainnet", 208},
 	}
 
