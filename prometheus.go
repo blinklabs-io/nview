@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"sync/atomic"
 
@@ -46,6 +47,7 @@ var promMetrics *PromMetrics
 // It includes metrics for blocks, epochs, slots, memory, connections, and more.
 // The struct fields are tagged with JSON names corresponding to Prometheus metric names.
 type PromMetrics struct {
+	Network             string  `json:"network"`
 	BlockNum            uint64  `json:"cardano_node_metrics_blockNum_int"`
 	EpochNum            uint64  `json:"cardano_node_metrics_epoch_int"`
 	SlotInEpoch         uint64  `json:"cardano_node_metrics_slotInEpoch_int"`
@@ -54,6 +56,9 @@ type PromMetrics struct {
 	TxProcessed         uint64  `json:"cardano_node_metrics_txsProcessedNum_int"`
 	MempoolTx           uint64  `json:"cardano_node_metrics_txsInMempool_int"`
 	MempoolBytes        uint64  `json:"cardano_node_metrics_mempoolBytes_int"`
+	BlocksForged        uint64  `json:"cardano_node_metrics_blocksForgedNum_int"`
+	ForgingEnabled      uint64  `json:"cardano_node_metrics_forging_enabled"`
+	NodeStartTime       uint64  `json:"cardano_node_metrics_nodeStartTime_int"`
 	KesPeriod           uint64  `json:"cardano_node_metrics_currentKESPeriod_int"`
 	RemainingKesPeriods uint64  `json:"cardano_node_metrics_remainingKESPeriods_int"`
 	IsLeader            uint64  `json:"cardano_node_metrics_Forge_node_is_leader_int"`
@@ -75,6 +80,13 @@ type PromMetrics struct {
 	PeersCold           uint64  `json:"cardano_node_metrics_peerSelection_cold"`
 	PeersWarm           uint64  `json:"cardano_node_metrics_peerSelection_warm"`
 	PeersHot            uint64  `json:"cardano_node_metrics_peerSelection_hot"`
+	PeersKnown          uint64  `json:"cardano_node_metrics_peerSelection_KnownPeers"`
+	PeersEstablished    uint64  `json:"cardano_node_metrics_peerSelection_EstablishedPeers"`
+	PeersActive         uint64  `json:"cardano_node_metrics_peerSelection_ActivePeers"`
+	PeerWarmPromotions  uint64  `json:"cardano_node_metrics_peerSelection_WarmPeersPromotions"`
+	PeerWarmDemotions   uint64  `json:"cardano_node_metrics_peerSelection_WarmPeersDemotions"`
+	PeerChurnKnownUp    uint64  `json:"cardano_node_metrics_peerSelection_churn_IncreasedKnownPeers"`
+	PeerChurnKnownDown  uint64  `json:"cardano_node_metrics_peerSelection_churn_DecreasedKnownPeers"`
 	ConnIncoming        uint64  `json:"cardano_node_metrics_connectionManager_incomingConns"`
 	ConnOutgoing        uint64  `json:"cardano_node_metrics_connectionManager_outgoingConns"`
 	ConnUniDir          uint64  `json:"cardano_node_metrics_connectionManager_unidirectionalConns"`
@@ -87,17 +99,46 @@ type PromMetrics struct {
 	GoHeapInuse           uint64 `json:"go_memstats_heap_inuse_bytes"`
 	GoHeapSys             uint64 `json:"go_memstats_heap_sys_bytes"`
 	GoGcCount             uint64 `json:"go_gc_duration_seconds_count"`
+	GoRoutines            uint64 `json:"go_goroutines"`
+	GoThreads             uint64 `json:"go_threads"`
+	ProcessOpenFDs        uint64 `json:"process_open_fds"`
+	ProcessMaxFDs         uint64 `json:"process_max_fds"`
 	DingoShelleyStartTime uint64 `json:"dingo_shelley_start_time"`
 	DingoEpochLengthSlots uint64 `json:"dingo_epoch_length_slots"`
+	DingoBuildVersion     string `json:"dingo_build_info_version"`
+	DingoBuildCommit      string `json:"dingo_build_info_commit"`
+	DingoBuildGoVersion   string `json:"dingo_build_info_goversion"`
 
 	// Dingo-native metrics
-	DingoDbSizeBytes       uint64 `json:"dingo_database_size_bytes"`
-	DingoChainCachedBlocks uint64 `json:"dingo_chain_manager_cached_blocks"`
-	DingoTipGapSlots       uint64 `json:"dingo_tip_gap_slots"`
-	DingoForgeTipGapSlots  uint64 `json:"dingo_forge_tip_gap_slots"`
-	DingoSlotClockFallback uint64 `json:"dingo_ledger_slot_clock_fallback_total"`
-	DingoForgeSlotClockErr uint64 `json:"dingo_forge_slot_clock_errors_total"`
-	DingoForgeSyncSkip     uint64 `json:"dingo_forge_sync_skip_total"`
+	DingoDbSizeBytes          uint64  `json:"dingo_database_size_bytes"`
+	DingoDbBlobSizeBytes      uint64  `json:"dingo_database_size_bytes_blob"`
+	DingoDbMetadataSizeBytes  uint64  `json:"dingo_database_size_bytes_metadata"`
+	DingoChainCachedBlocks    uint64  `json:"dingo_chain_manager_cached_blocks"`
+	DingoChainsyncSeenHeaders uint64  `json:"dingo_chainsync_seen_headers"`
+	DingoTipGapSlots          uint64  `json:"dingo_tip_gap_slots"`
+	DingoForgeTipGapSlots     uint64  `json:"dingo_forge_tip_gap_slots"`
+	DingoSlotClockFallback    uint64  `json:"dingo_ledger_slot_clock_fallback_total"`
+	DingoForgeSlotClockErr    uint64  `json:"dingo_forge_slot_clock_errors_total"`
+	DingoForgeSyncSkip        uint64  `json:"dingo_forge_sync_skip_total"`
+	DingoTxsEvicted           uint64  `json:"dingo_metrics_txsEvictedNum_int"`
+	DingoTxsExpired           uint64  `json:"dingo_metrics_txsExpiredNum_int"`
+	DingoBlockForgingLatencyN uint64  `json:"dingo_metrics_blockForgingLatency_seconds_count"`
+	DingoBlockForgingLatencyS float64 `json:"dingo_metrics_blockForgingLatency_seconds_sum"`
+	DingoInboundArrivalsTotal uint64  `json:"dingo_metrics_peerSelection_InboundArrivalsTotal"`
+	DingoInboundDuplexHeld    uint64  `json:"dingo_metrics_peerSelection_InboundDuplexHeld"`
+	DingoInboundHotHeld       uint64  `json:"dingo_metrics_peerSelection_InboundHotHeld"`
+	DingoInboundHotQuota      uint64  `json:"dingo_metrics_peerSelection_InboundHotQuota"`
+	DingoInboundHotQuotaUsage float64 `json:"dingo_metrics_peerSelection_InboundHotQuotaUsage"`
+	DingoInboundPruned        uint64  `json:"dingo_metrics_peerSelection_InboundPruned"`
+	DingoInboundTopologyMatch uint64  `json:"dingo_metrics_peerSelection_InboundTopologyMatched"`
+	DingoInboundWarmHeld      uint64  `json:"dingo_metrics_peerSelection_InboundWarmHeld"`
+	DingoInboundWarmTarget    uint64  `json:"dingo_metrics_peerSelection_InboundWarmTarget"`
+	DingoInboundWarmOccupancy float64 `json:"dingo_metrics_peerSelection_InboundWarmTargetOccupancy"`
+	DingoPeersBySourceLedger  uint64  `json:"dingo_metrics_peerSelection_peers_by_source_ledger"`
+	DingoPeersBySourceInbound uint64  `json:"dingo_metrics_peerSelection_peers_by_source_inbound"`
+	DingoPeersBySourceGossip  uint64  `json:"dingo_metrics_peerSelection_peers_by_source_gossip"`
+	DingoPeerPromotionsLedger uint64  `json:"dingo_metrics_peerSelection_churn_promotions_by_source_ledger"`
+	DingoPeerDemotionsLedger  uint64  `json:"dingo_metrics_peerSelection_churn_demotions_by_source_ledger"`
 
 	// CBOR cache counters (cumulative)
 	DingoCacheUtxoHotHits  uint64 `json:"dingo_cbor_cache_utxo_hot_hits_total"`
@@ -107,6 +148,19 @@ type PromMetrics struct {
 	DingoCacheBlockLruHits uint64 `json:"dingo_cbor_cache_block_lru_hits_total"`
 	DingoCacheBlockLruMiss uint64 `json:"dingo_cbor_cache_block_lru_misses_total"`
 	DingoCacheColdExtract  uint64 `json:"dingo_cbor_cache_cold_extractions_total"`
+
+	// Mini-protocol activity
+	DingoProtocolBlockfetchMessages uint64  `json:"dingo_protocol_messages_received_total_blockfetch"`
+	DingoProtocolChainsyncMessages  uint64  `json:"dingo_protocol_messages_received_total_chainsync"`
+	DingoProtocolKeepaliveMessages  uint64  `json:"dingo_protocol_messages_received_total_keepalive"`
+	DingoProtocolTxSubmitMessages   uint64  `json:"dingo_protocol_messages_received_total_txsubmission"`
+	DingoProtocolBlockfetchCount    uint64  `json:"dingo_protocol_message_duration_seconds_blockfetch_count"`
+	DingoProtocolBlockfetchSum      float64 `json:"dingo_protocol_message_duration_seconds_blockfetch_sum"`
+	DingoProtocolChainsyncCount     uint64  `json:"dingo_protocol_message_duration_seconds_chainsync_count"`
+	DingoProtocolChainsyncSum       float64 `json:"dingo_protocol_message_duration_seconds_chainsync_sum"`
+	DingoBlockfetchGateDispatched   uint64  `json:"dingo_blockfetch_shadow_gate_decisions_total_dispatched"`
+	DingoBlockfetchGateSkippedFast  uint64  `json:"dingo_blockfetch_shadow_gate_decisions_total_skipped_fast"`
+	DingoBlockfetchGateSkippedPeer  uint64  `json:"dingo_blockfetch_shadow_gate_decisions_total_skipped_no_peer"`
 
 	// Event bus
 	EventTotal            uint64 `json:"event_total"`
@@ -147,6 +201,15 @@ type PromMetrics struct {
 
 	// Governance metrics
 	DingoGovernanceDecodeFailures uint64 `json:"dingo_governance_proposal_decode_failures_total"`
+	DingoStakeSnapshotSuccess     uint64 `json:"dingo_metrics_stake_snapshot_capture_success_total"`
+	DingoStakeSnapshotFailure     uint64 `json:"dingo_metrics_stake_snapshot_capture_failure_total"`
+	DingoStakeSnapshotLastEpoch   uint64 `json:"dingo_metrics_stake_snapshot_last_successful_epoch_int"`
+	DingoStakeSnapshotPoolCount   uint64 `json:"dingo_metrics_stake_snapshot_pool_count_int"`
+	DingoStakeSnapshotActiveStake uint64 `json:"dingo_metrics_stake_snapshot_total_active_stake_lovelace"`
+
+	// Generic future protocol metrics. Current Dingo scrapes do not expose
+	// Leios, but any metric family containing "leios" is collected here.
+	LeiosMetrics map[string]float64 `json:"leios_metrics"`
 }
 
 type MithrilLedgerImportStage struct {
@@ -248,17 +311,23 @@ func prom2json(prom []byte) ([]byte, error) {
 			name := val.GetName()
 			switch val.GetType() {
 			case dto.MetricType_COUNTER:
-				setPromMetricValue(out, name, m.GetCounter().GetValue())
+				setPromMetricValueWithLabels(out, name, m.GetCounter().GetValue(), m.GetLabel())
 			case dto.MetricType_GAUGE:
 				setPromMetricValueWithLabels(out, name, m.GetGauge().GetValue(), m.GetLabel())
 			case dto.MetricType_UNTYPED:
 				setPromMetricValueWithLabels(out, name, m.GetUntyped().GetValue(), m.GetLabel())
 			case dto.MetricType_SUMMARY:
 				// Extract count from SUMMARY metrics (e.g. go_gc_duration_seconds_count)
-				out[name+"_count"] = m.GetSummary().GetSampleCount()
+				setPromMetricValue(out, name+"_count", float64(m.GetSummary().GetSampleCount()))
 			case dto.MetricType_HISTOGRAM,
 				dto.MetricType_GAUGE_HISTOGRAM:
-				// Skip unsupported metric types
+				setPromHistogramValueWithLabels(
+					out,
+					name,
+					histogramSampleCount(m.GetHistogram()),
+					m.GetHistogram().GetSampleSum(),
+					m.GetLabel(),
+				)
 			default:
 				// Skip unknown types
 			}
@@ -272,7 +341,7 @@ func prom2json(prom []byte) ([]byte, error) {
 }
 
 func setPromMetricValue(out map[string]any, name string, value float64) {
-	if strings.HasPrefix(name, "event_") {
+	if shouldAggregatePromMetric(name) {
 		if prev, ok := out[name].(float64); ok {
 			value += prev
 		}
@@ -281,6 +350,44 @@ func setPromMetricValue(out map[string]any, name string, value float64) {
 }
 
 func setPromMetricValueWithLabels(out map[string]any, name string, value float64, labels []*dto.LabelPair) {
+	if network := strings.TrimSpace(labelValue(labels, "network")); network != "" {
+		if existing, ok := out["network"].(string); !ok || existing == "" {
+			out["network"] = network
+		}
+	}
+	if isLeiosPromMetric(name) {
+		setNamedMetricValue(out, "leios_metrics", name, value, labels)
+	}
+	if name == "dingo_build_info" {
+		for _, label := range []string{"version", "commit", "goversion"} {
+			if value := strings.TrimSpace(labelValue(labels, label)); value != "" {
+				out[name+"_"+label] = value
+			}
+		}
+		setPromMetricValue(out, name, value)
+		return
+	}
+	if name == "dingo_protocol_messages_received_total" {
+		bucketByLabel(out, name, value, labels, "protocol", true)
+		return
+	}
+	if name == "dingo_blockfetch_shadow_gate_decisions_total" {
+		bucketByLabel(out, name, value, labels, "path", true)
+		return
+	}
+	if name == "dingo_database_size_bytes" {
+		bucketByLabel(out, name, value, labels, "store", true)
+		return
+	}
+	if name == "dingo_metrics_peerSelection_peers_by_source" {
+		bucketByLabel(out, name, value, labels, "source", false)
+		return
+	}
+	if name == "dingo_metrics_peerSelection_churn_promotions_by_source" ||
+		name == "dingo_metrics_peerSelection_churn_demotions_by_source" {
+		bucketByLabel(out, name, value, labels, "source", true)
+		return
+	}
 	if name == "dingo_mithril_sync_phase_active" {
 		if phase := labelValue(labels, "phase"); phase != "" {
 			setPromMetricValue(out, name+"_"+phase, value)
@@ -296,6 +403,112 @@ func setPromMetricValueWithLabels(out map[string]any, name string, value float64
 	setPromMetricValue(out, name, value)
 }
 
+func histogramSampleCount(histogram *dto.Histogram) float64 {
+	if histogram == nil {
+		return 0
+	}
+	if count := histogram.GetSampleCountFloat(); count > 0 {
+		return count
+	}
+	return float64(histogram.GetSampleCount())
+}
+
+func bucketByLabel(
+	out map[string]any,
+	name string,
+	value float64,
+	labels []*dto.LabelPair,
+	labelName string,
+	includeTotal bool,
+) {
+	if label := normalizedLabelValue(labels, labelName); label != "" {
+		setPromMetricValue(out, name+"_"+label, value)
+	}
+	if includeTotal {
+		setPromMetricValue(out, name, value)
+	}
+}
+
+func setPromHistogramValueWithLabels(
+	out map[string]any,
+	name string,
+	count float64,
+	sum float64,
+	labels []*dto.LabelPair,
+) {
+	if isLeiosPromMetric(name) {
+		setNamedMetricValue(out, "leios_metrics", name+"_count", count, labels)
+		setNamedMetricValue(out, "leios_metrics", name+"_sum", sum, labels)
+	}
+	if name == "dingo_protocol_message_duration_seconds" {
+		if protocol := normalizedLabelValue(labels, "protocol"); protocol != "" {
+			setPromMetricValue(out, name+"_"+protocol+"_count", count)
+			setPromMetricValue(out, name+"_"+protocol+"_sum", sum)
+		}
+	}
+	setPromMetricValue(out, name+"_count", count)
+	setPromMetricValue(out, name+"_sum", sum)
+}
+
+func isLeiosPromMetric(name string) bool {
+	return strings.Contains(strings.ToLower(name), "leios")
+}
+
+func setNamedMetricValue(
+	out map[string]any,
+	bucket string,
+	name string,
+	value float64,
+	labels []*dto.LabelPair,
+) {
+	metrics, _ := out[bucket].(map[string]float64)
+	if metrics == nil {
+		metrics = make(map[string]float64)
+		out[bucket] = metrics
+	}
+	metrics[name+metricLabelSuffix(labels)] += value
+}
+
+func metricLabelSuffix(labels []*dto.LabelPair) string {
+	parts := make([]string, 0, len(labels))
+	for _, label := range labels {
+		labelName := strings.TrimSpace(label.GetName())
+		if labelName == "" || labelName == "network" {
+			continue
+		}
+		labelValue := strings.TrimSpace(label.GetValue())
+		if labelValue == "" {
+			continue
+		}
+		parts = append(parts, labelName+"="+normalizedMetricLabelPart(labelValue))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	slices.Sort(parts)
+	return "{" + strings.Join(parts, ",") + "}"
+}
+
+func normalizedMetricLabelPart(value string) string {
+	replacer := strings.NewReplacer(" ", "_", "-", "_", ".", "_", "/", "_")
+	return strings.ToLower(replacer.Replace(value))
+}
+
+func shouldAggregatePromMetric(name string) bool {
+	return strings.HasPrefix(name, "event_") ||
+		name == "dingo_database_size_bytes" ||
+		name == "dingo_protocol_messages_received_total" ||
+		name == "dingo_blockfetch_shadow_gate_decisions_total" ||
+		name == "dingo_protocol_message_duration_seconds_count" ||
+		name == "dingo_protocol_message_duration_seconds_sum" ||
+		name == "dingo_metrics_peerSelection_churn_promotions_by_source" ||
+		name == "dingo_metrics_peerSelection_churn_demotions_by_source" ||
+		strings.HasPrefix(name, "dingo_metrics_peerSelection_peers_by_source_") ||
+		strings.HasPrefix(name, "dingo_protocol_messages_received_total_") ||
+		strings.HasPrefix(name, "dingo_blockfetch_shadow_gate_decisions_total_") ||
+		strings.HasPrefix(name, "dingo_protocol_message_duration_seconds_")
+}
+
 func labelValue(labels []*dto.LabelPair, name string) string {
 	for _, lp := range labels {
 		if lp.GetName() == name {
@@ -303,6 +516,13 @@ func labelValue(labels []*dto.LabelPair, name string) string {
 		}
 	}
 	return ""
+}
+
+func normalizedLabelValue(labels []*dto.LabelPair, name string) string {
+	value := labelValue(labels, name)
+	value = strings.ToLower(strings.TrimSpace(value))
+	value = strings.NewReplacer("-", "_", ".", "_", " ", "_").Replace(value)
+	return value
 }
 
 func setMithrilLedgerImportStageValue(out map[string]any, name, stage string, value float64) {

@@ -82,6 +82,11 @@ The following environment variables control the behavior of the application.
   Cardano Node, default is 12798
 - `PROM_TIMEOUT` - Sets the maximum number of seconds to wait for response
   when polling a Cardano Node for Prometheus metrics, default is 3
+- `NVIEW_VISUAL_MODE` - Controls optional terminal glyphs for the TUI:
+  `auto`, `unicode`, `plain`, or `nerd`. The default is `auto`.
+- `NVIEW_IMAGE_PROTOCOL` - Controls terminal image protocol detection for
+  future enhanced visuals: `auto`, `none`, `kitty`, `iterm2`, or `sixel`.
+  The default is `auto`.
 
 #### Configuration (YAML)
 
