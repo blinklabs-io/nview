@@ -4005,7 +4005,7 @@ func getCoreText(ctx context.Context) string {
 		if promMetrics.AboutToLead > 0 {
 			missedSlotsPct = float32(
 				promMetrics.MissedSlots,
-			) / (float32(promMetrics.AboutToLead + promMetrics.MissedSlots)) * 100
+			) / float32(promMetrics.AboutToLead+promMetrics.MissedSlots) * 100
 		}
 		missedSeverity := uiSeverityOK
 		if promMetrics.MissedSlots > 0 {

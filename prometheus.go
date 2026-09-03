@@ -295,6 +295,7 @@ func getEffectiveNodeName() string {
 	}
 	return cfg.App.NodeName
 } // Converts a prometheus http response byte array into a JSON byte array
+
 func prom2json(prom []byte) ([]byte, error) {
 	// {"name": 0}
 	out := make(map[string]any)
