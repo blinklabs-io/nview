@@ -22,6 +22,7 @@ import (
 	"slices"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/blinklabs-io/nview/internal/config"
 	dto "github.com/prometheus/client_model/go"
@@ -32,12 +33,46 @@ import (
 // Track current epoch
 var currentEpoch uint64 = 0
 
+// epochRetryDelay bounds how often the epoch update loop retries while the
+// current epoch is unavailable (zero), so a failed or not-yet-ready
+// Prometheus fetch cannot spin the loop continuously and consume a CPU core.
+const epochRetryDelay = time.Second * 5
+
 // Thread-safe node type detection
 var detectedNodeBinary atomic.Value // stores string
 
 func setCurrentEpoch() {
 	if promMetrics != nil {
 		currentEpoch = promMetrics.EpochNum
+	}
+}
+
+// runEpochUpdateLoop repeatedly calls update to refresh currentEpoch. It
+// waits refreshDelay between calls once a valid (nonzero) epoch has been
+// observed, but falls back to the shorter retryDelay while the epoch is
+// zero, so it backs off instead of busy-looping.
+func runEpochUpdateLoop(
+	ctx context.Context,
+	refreshDelay time.Duration,
+	retryDelay time.Duration,
+	update func(),
+) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		update()
+		delay := refreshDelay
+		if currentEpoch == 0 {
+			delay = retryDelay
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(delay):
+		}
 	}
 }
 

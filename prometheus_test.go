@@ -15,8 +15,10 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/blinklabs-io/nview/internal/config"
 	dto "github.com/prometheus/client_model/go"
@@ -784,5 +786,110 @@ func TestGetEffectiveNodeName(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+// TestRunEpochUpdateLoopBacksOffOnZeroEpoch verifies that the epoch update
+// loop applies the bounded retry delay, rather than busy-looping, while the
+// observed epoch stays zero. The timed measurement window starts only after
+// the first call is observed, so a scheduling stall before the loop's first
+// iteration cannot be mistaken for the retry backoff under test.
+func TestRunEpochUpdateLoopBacksOffOnZeroEpoch(t *testing.T) {
+	originalCurrentEpoch := currentEpoch
+	defer func() { currentEpoch = originalCurrentEpoch }()
+	currentEpoch = 0
+
+	calls := make(chan struct{}, 1000)
+	update := func() {
+		// currentEpoch stays 0, simulating an unavailable epoch.
+		// Non-blocking: if a busy-loop regression fills the buffer faster
+		// than the test drains it, update must still return so the loop
+		// can observe ctx cancellation instead of hanging on the send.
+		select {
+		case calls <- struct{}{}:
+		default:
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		runEpochUpdateLoop(ctx, time.Second*20, 50*time.Millisecond, update)
+	}()
+	defer func() { <-done }()
+	defer cancel()
+
+	select {
+	case <-calls:
+	case <-time.After(2 * time.Second):
+		t.Fatal("update was never called")
+	}
+
+	callCount := 1
+	timer := time.NewTimer(220 * time.Millisecond)
+	defer timer.Stop()
+countLoop:
+	for {
+		select {
+		case <-calls:
+			callCount++
+		case <-timer.C:
+			break countLoop
+		}
+	}
+
+	// Without the retry backoff, a zero epoch would spin the loop
+	// continuously, producing thousands of calls in this window.
+	if callCount > 10 {
+		t.Fatalf(
+			"expected a bounded call count due to the retry delay, got %d calls in ~220ms",
+			callCount,
+		)
+	}
+}
+
+// TestRunEpochUpdateLoopPreservesRefreshCadenceAfterValidEpoch verifies that
+// once a nonzero epoch is observed, the loop reverts to the normal (longer)
+// refresh cadence instead of continuing to retry quickly. It measures the
+// gap after the first observed call, rather than racing a fixed deadline
+// against that first call, so scheduling variance cannot fail the assertion.
+func TestRunEpochUpdateLoopPreservesRefreshCadenceAfterValidEpoch(t *testing.T) {
+	originalCurrentEpoch := currentEpoch
+	defer func() { currentEpoch = originalCurrentEpoch }()
+	currentEpoch = 0
+
+	calls := make(chan struct{}, 10)
+	update := func() {
+		currentEpoch = 100
+		// Non-blocking for the same reason as the sibling test: a cadence
+		// regression must not be able to hang the deferred goroutine wait.
+		select {
+		case calls <- struct{}{}:
+		default:
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		runEpochUpdateLoop(ctx, 5*time.Second, 20*time.Millisecond, update)
+	}()
+	defer func() { <-done }()
+	defer cancel()
+
+	select {
+	case <-calls:
+	case <-time.After(2 * time.Second):
+		t.Fatal("update was never called")
+	}
+
+	// Once a valid epoch is observed, the loop should be sleeping for the
+	// long refresh delay, so no further call should arrive quickly.
+	select {
+	case <-calls:
+		t.Fatal("expected no further call once the refresh cadence takes over")
+	case <-time.After(200 * time.Millisecond):
 	}
 }
