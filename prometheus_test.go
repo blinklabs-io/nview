@@ -802,7 +802,13 @@ func TestRunEpochUpdateLoopBacksOffOnZeroEpoch(t *testing.T) {
 	calls := make(chan struct{}, 1000)
 	update := func() {
 		// currentEpoch stays 0, simulating an unavailable epoch.
-		calls <- struct{}{}
+		// Non-blocking: if a busy-loop regression fills the buffer faster
+		// than the test drains it, update must still return so the loop
+		// can observe ctx cancellation instead of hanging on the send.
+		select {
+		case calls <- struct{}{}:
+		default:
+		}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -856,7 +862,12 @@ func TestRunEpochUpdateLoopPreservesRefreshCadenceAfterValidEpoch(t *testing.T) 
 	calls := make(chan struct{}, 10)
 	update := func() {
 		currentEpoch = 100
-		calls <- struct{}{}
+		// Non-blocking for the same reason as the sibling test: a cadence
+		// regression must not be able to hang the deferred goroutine wait.
+		select {
+		case calls <- struct{}{}:
+		default:
+		}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
