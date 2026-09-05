@@ -15,8 +15,10 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/blinklabs-io/nview/internal/config"
 	dto "github.com/prometheus/client_model/go"
@@ -784,5 +786,64 @@ func TestGetEffectiveNodeName(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+// TestRunEpochUpdateLoopBacksOffOnZeroEpoch verifies that the epoch update
+// loop applies the bounded retry delay, rather than busy-looping, while the
+// observed epoch stays zero.
+func TestRunEpochUpdateLoopBacksOffOnZeroEpoch(t *testing.T) {
+	originalCurrentEpoch := currentEpoch
+	defer func() { currentEpoch = originalCurrentEpoch }()
+	currentEpoch = 0
+
+	var callCount int
+	update := func() {
+		callCount++
+		// currentEpoch stays 0, simulating an unavailable epoch.
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 220*time.Millisecond)
+	defer cancel()
+
+	runEpochUpdateLoop(ctx, time.Second*20, 50*time.Millisecond, update)
+
+	if callCount == 0 {
+		t.Fatal("expected update to be called at least once")
+	}
+	// Without the retry backoff, a zero epoch would spin the loop
+	// continuously, producing thousands of calls in this window.
+	if callCount > 10 {
+		t.Fatalf(
+			"expected a bounded call count due to the retry delay, got %d calls in 220ms",
+			callCount,
+		)
+	}
+}
+
+// TestRunEpochUpdateLoopPreservesRefreshCadenceAfterValidEpoch verifies that
+// once a nonzero epoch is observed, the loop reverts to the normal (longer)
+// refresh cadence instead of continuing to retry quickly.
+func TestRunEpochUpdateLoopPreservesRefreshCadenceAfterValidEpoch(t *testing.T) {
+	originalCurrentEpoch := currentEpoch
+	defer func() { currentEpoch = originalCurrentEpoch }()
+	currentEpoch = 0
+
+	var callCount int
+	update := func() {
+		callCount++
+		currentEpoch = 100
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	runEpochUpdateLoop(ctx, 5*time.Second, 20*time.Millisecond, update)
+
+	if callCount != 1 {
+		t.Fatalf(
+			"expected exactly 1 call once a valid epoch is observed and the refresh cadence takes over, got %d",
+			callCount,
+		)
 	}
 }

@@ -2750,23 +2750,7 @@ func main() {
 	}()
 
 	// Set Epoch
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-			setCurrentEpoch()
-			if currentEpoch != 0 {
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(time.Second * 20):
-				}
-			}
-		}
-	}()
+	go runEpochUpdateLoop(ctx, time.Second*20, epochRetryDelay, setCurrentEpoch)
 
 	// Update Process metrics
 	go func() {
