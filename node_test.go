@@ -90,6 +90,37 @@ func TestP2PFromNodeConfigCmdlineRepeatedConfigUsesLast(t *testing.T) {
 	}
 }
 
+// --config appears twice: the first occurrence is valid, but the second
+// (last) is missing its value. The earlier valid parse must not leak
+// through — the last occurrence is authoritative, so the result should
+// fall back to the incoming current value, not the first --config's file.
+func TestP2PFromNodeConfigCmdlineRepeatedConfigLastMissingValue(t *testing.T) {
+	firstPath := writeNodeConfigFixture(t, true)
+	cmd := "--config " + firstPath + " --config"
+	got, err := p2pFromNodeConfigCmdline(cmd, false)
+	if !errors.Is(err, errMissingConfigValue) {
+		t.Fatalf("p2pFromNodeConfigCmdline() error = %v, want errMissingConfigValue", err)
+	}
+	if got != false {
+		t.Fatalf("p2pFromNodeConfigCmdline() = %v, want incoming current value false", got)
+	}
+}
+
+// --config appears twice: the first occurrence is valid, but the second
+// (last) names a file that does not exist. As above, the last occurrence's
+// failure must win over the earlier valid parse.
+func TestP2PFromNodeConfigCmdlineRepeatedConfigLastUnreadable(t *testing.T) {
+	firstPath := writeNodeConfigFixture(t, true)
+	cmd := "--config " + firstPath + " --config /nonexistent/path/config.json"
+	got, err := p2pFromNodeConfigCmdline(cmd, false)
+	if err == nil {
+		t.Fatal("p2pFromNodeConfigCmdline() error = nil, want a read error for the missing file")
+	}
+	if got != false {
+		t.Fatalf("p2pFromNodeConfigCmdline() = %v, want incoming current value false", got)
+	}
+}
+
 // --config is followed by an empty string instead of a real path (not
 // missing, just blank). Reading that "file" fails, so the current P2P
 // value should be left unchanged rather than being reset.

@@ -83,8 +83,9 @@ func getP2P(ctx context.Context, processMetrics *process.Process) bool {
 // "--config <path>" argument and returns the EnableP2P setting from that
 // config file. It validates that "--config" has a following value before
 // indexing the argument list, returning errMissingConfigValue instead of
-// panicking on a trailing "--config". current is returned unchanged when a
-// "--config" occurrence is missing its value or names an unreadable file.
+// panicking on a trailing "--config". The last "--config" occurrence is
+// authoritative: current is returned when it is missing its value or names
+// an unreadable file, even if an earlier occurrence parsed successfully.
 func p2pFromNodeConfigCmdline(cmd string, current bool) (bool, error) {
 	cmdArray := strings.Split(cmd, " ")
 	result := current
@@ -94,12 +95,14 @@ func p2pFromNodeConfigCmdline(cmd string, current bool) (bool, error) {
 			continue
 		}
 		if p+1 >= len(cmdArray) {
+			result = current
 			err = errMissingConfigValue
 			continue
 		}
 		nodeConfigFile := cmdArray[p+1]
 		buf, readErr := os.ReadFile(nodeConfigFile)
 		if readErr != nil {
+			result = current
 			err = readErr
 			continue
 		}
