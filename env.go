@@ -37,6 +37,11 @@ var errMetricsResponseTooLarge = errors.New(
 	"metrics response exceeds maximum allowed size",
 )
 
+// httpClient is the client used to fetch node metrics. It is a var, scoped
+// to this file, so tests can substitute a client with an instrumented
+// transport without mutating the process-wide http.DefaultClient.
+var httpClient = http.DefaultClient
+
 // Fetches the node metrics and return a byte array
 func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 	// Load our config and get host/port
@@ -65,7 +70,7 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 	defer cancel()
 	req = req.WithContext(ctx)
 	// Get metrics from the node
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return respBodyBytes, http.StatusInternalServerError, err
 	}

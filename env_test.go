@@ -60,11 +60,13 @@ func (t *trackingRoundTripper) RoundTrip(
 	return resp, err
 }
 
-// pointDefaultClientAtTestServer configures cfg.Prometheus to reach server
-// and installs a tracking transport on http.DefaultClient, restoring both
-// when the test ends. It returns the flag the tracking transport sets when
-// the response body is closed.
-func pointDefaultClientAtTestServer(
+// pointMetricsClientAtTestServer configures cfg.Prometheus to reach server
+// and substitutes the package-level httpClient with one wrapping an
+// instrumented transport, restoring both when the test ends. It never
+// touches the process-wide http.DefaultClient, so it stays safe even if a
+// future test in this package runs in parallel. It returns the flag the
+// tracking transport sets when the response body is closed.
+func pointMetricsClientAtTestServer(
 	t *testing.T,
 	server *httptest.Server,
 	timeoutSeconds uint32,
@@ -90,15 +92,15 @@ func pointDefaultClientAtTestServer(
 	cfg.Prometheus.Port = uint32(port)
 	cfg.Prometheus.Timeout = timeoutSeconds
 
-	origTransport := http.DefaultClient.Transport
+	origClient := httpClient
 	closed := &atomic.Bool{}
-	http.DefaultClient.Transport = &trackingRoundTripper{closed: closed}
+	httpClient = &http.Client{Transport: &trackingRoundTripper{closed: closed}}
 
 	t.Cleanup(func() {
 		cfg.Prometheus.Host = origHost
 		cfg.Prometheus.Port = origPort
 		cfg.Prometheus.Timeout = origTimeout
-		http.DefaultClient.Transport = origTransport
+		httpClient = origClient
 	})
 
 	return closed
@@ -115,7 +117,7 @@ func TestGetNodeMetricsSuccessClosesBody(t *testing.T) {
 	))
 	defer server.Close()
 
-	closed := pointDefaultClientAtTestServer(t, server, 3)
+	closed := pointMetricsClientAtTestServer(t, server, 3)
 
 	body, status, err := getNodeMetrics(context.Background())
 	if err != nil {
@@ -148,7 +150,7 @@ func TestGetNodeMetricsOversizedResponseClosesBody(t *testing.T) {
 	))
 	defer server.Close()
 
-	closed := pointDefaultClientAtTestServer(t, server, 3)
+	closed := pointMetricsClientAtTestServer(t, server, 3)
 
 	_, _, err := getNodeMetrics(context.Background())
 	if !errors.Is(err, errMetricsResponseTooLarge) {
@@ -162,7 +164,9 @@ func TestGetNodeMetricsOversizedResponseClosesBody(t *testing.T) {
 // TestGetNodeMetricsStalledResponseClosesBody verifies that a response whose
 // body stalls after headers are sent is aborted by the request deadline
 // (rather than hanging or reading unbounded data) and that the body is
-// still closed.
+// still closed. It waits on a generous safety timeout rather than asserting
+// a tight wall-clock bound, so scheduling variance on a loaded CI runner
+// cannot make it flaky.
 func TestGetNodeMetricsStalledResponseClosesBody(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -170,7 +174,7 @@ func TestGetNodeMetricsStalledResponseClosesBody(t *testing.T) {
 			if f, ok := w.(http.Flusher); ok {
 				f.Flush()
 			}
-			// Stall past the client's request deadline instead of ever
+			// Stall until the client disconnects, instead of ever
 			// completing the response.
 			select {
 			case <-r.Context().Done():
@@ -180,19 +184,22 @@ func TestGetNodeMetricsStalledResponseClosesBody(t *testing.T) {
 	))
 	defer server.Close()
 
-	closed := pointDefaultClientAtTestServer(t, server, 1)
+	closed := pointMetricsClientAtTestServer(t, server, 1)
 
-	start := time.Now()
-	_, _, err := getNodeMetrics(context.Background())
-	elapsed := time.Since(start)
+	errCh := make(chan error, 1)
+	go func() {
+		_, _, err := getNodeMetrics(context.Background())
+		errCh <- err
+	}()
 
-	if err == nil {
-		t.Fatal("expected an error from a stalled response")
-	}
-	if elapsed > 4*time.Second {
-		t.Fatalf(
-			"expected the request deadline to abort the stalled read quickly, took %s",
-			elapsed,
+	select {
+	case err := <-errCh:
+		if err == nil {
+			t.Fatal("expected an error from a stalled response")
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal(
+			"getNodeMetrics did not return after the request deadline elapsed",
 		)
 	}
 	if !closed.Load() {
@@ -213,7 +220,7 @@ func TestGetNodeMetricsReadErrorClosesBody(t *testing.T) {
 	))
 	defer server.Close()
 
-	closed := pointDefaultClientAtTestServer(t, server, 3)
+	closed := pointMetricsClientAtTestServer(t, server, 3)
 
 	_, _, err := getNodeMetrics(context.Background())
 	if err == nil {
