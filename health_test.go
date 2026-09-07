@@ -16,12 +16,20 @@ package main
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"testing"
 
 	"github.com/blinklabs-io/nview/internal/config"
 )
+
+type failingMetricsTransport struct{}
+
+func (failingMetricsTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errors.New("metrics endpoint unavailable")
+}
 
 // resetSubsystemFailuresForTest zeroes every subsystem's consecutive-failure
 // count and returns the prior values so a test can restore them.
@@ -140,10 +148,10 @@ func TestGetPromMetricsAppliesResultExactlyOnce(t *testing.T) {
 		cfg.Prometheus.Port = originalPort
 		cfg.Prometheus.Timeout = originalTimeout
 	}()
-	// Port 0 is never a listening Prometheus endpoint, so the request fails
-	// immediately instead of depending on network timing.
-	cfg.Prometheus.Host = "127.0.0.1"
-	cfg.Prometheus.Port = 0
+	// Use a deterministic transport failure instead of opening a loopback socket.
+	originalClient := httpClient
+	httpClient = &http.Client{Transport: failingMetricsTransport{}}
+	defer func() { httpClient = originalClient }()
 	cfg.Prometheus.Timeout = 1
 
 	ctx := context.Background()

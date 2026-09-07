@@ -2777,6 +2777,15 @@ func main() {
 				}
 				continue
 			}
+			if proc == nil || proc.Pid <= 0 {
+				recordSubsystemFailure(healthSubsystemProcess)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second * 1):
+				}
+				continue
+			}
 			processMetrics = proc
 			recordSubsystemSuccess(healthSubsystemProcess)
 			select {
@@ -3740,14 +3749,12 @@ func getEpochProgress() float32 {
 	return epochProgress
 }
 
-func currentEpochTiming() (epochLengthSlots uint64, slotLengthMs uint64, ok bool) {
-	cfg := config.GetConfig()
-	promMetrics := promMetrics.Load()
-	if promMetrics == nil {
+func currentEpochTimingForMetrics(cfg *config.Config, metrics *PromMetrics) (epochLengthSlots uint64, slotLengthMs uint64, ok bool) {
+	if metrics == nil {
 		return 0, 0, false
 	}
 	if cfg.Node.ShelleyTransEpoch >= 0 &&
-		promMetrics.EpochNum >= uint64(cfg.Node.ShelleyTransEpoch) {
+		metrics.EpochNum >= uint64(cfg.Node.ShelleyTransEpoch) {
 		return cfg.Node.ShelleyGenesis.EpochLength, cfg.Node.ShelleyGenesis.SlotLength, cfg.Node.ShelleyGenesis.EpochLength > 0 && cfg.Node.ShelleyGenesis.SlotLength > 0
 	}
 	return cfg.Node.ByronGenesis.EpochLength, cfg.Node.ByronGenesis.SlotLength, cfg.Node.ByronGenesis.EpochLength > 0 && cfg.Node.ByronGenesis.SlotLength > 0
@@ -3806,15 +3813,15 @@ func getEpochRemainingSeconds() (uint64, bool) {
 		return uint64(remaining / time.Second), true
 	}
 
-	epochLength, slotLengthMs, ok := currentEpochTiming()
-	promMetrics := promMetrics.Load()
-	if !ok || promMetrics == nil {
+	metrics := promMetrics.Load()
+	epochLength, slotLengthMs, ok := currentEpochTimingForMetrics(config.GetConfig(), metrics)
+	if !ok || metrics == nil {
 		return 0, false
 	}
-	if promMetrics.SlotInEpoch >= epochLength {
+	if metrics.SlotInEpoch >= epochLength {
 		return 0, true
 	}
-	remainingSlots := epochLength - promMetrics.SlotInEpoch
+	remainingSlots := epochLength - metrics.SlotInEpoch
 	return (remainingSlots * slotLengthMs) / 1000, true
 }
 
