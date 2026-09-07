@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/blinklabs-io/nview/internal/config"
@@ -159,10 +160,19 @@ func TestGetPromMetricsAppliesResultExactlyOnce(t *testing.T) {
 
 // TestConcurrentPromMetricsPublicationAndRendering exercises the scrape
 // goroutine's snapshot publication concurrently with renderer goroutines
-// reading it, under the race detector. Before promMetrics became an
-// atomic.Pointer[PromMetrics], this same access pattern (an unsynchronized
-// package-level *PromMetrics written by one goroutine and read by others)
-// raced. Run with `go test -race` to verify no race is reported.
+// reading it. Run with `go test -race` to additionally verify no data race
+// is reported; before promMetrics became an atomic.Pointer[PromMetrics],
+// this same access pattern (an unsynchronized package-level *PromMetrics
+// written by one goroutine and read by others) raced.
+//
+// The race detector alone would make this test a silent no-op under a plain
+// `go test ./...` (the CI workflow does not pass -race), so a consistency
+// reader also asserts, on every observed snapshot, that BlockNum, SlotNum,
+// and EpochNum still satisfy the writer's invariant. That fails
+// deterministically, with or without -race, if publication ever stopped
+// being a whole-struct replacement (for example a future change that
+// mutated fields on the shared struct in place, which could let a reader
+// observe some fields from one write and some from the next).
 func TestConcurrentPromMetricsPublicationAndRendering(t *testing.T) {
 	originalPromMetrics := promMetrics.Load()
 	defer promMetrics.Store(originalPromMetrics)
@@ -177,9 +187,12 @@ func TestConcurrentPromMetricsPublicationAndRendering(t *testing.T) {
 
 	const iterations = 200
 	var wg sync.WaitGroup
+	var inconsistent atomic.Bool
 
 	// Writer: mimics the scrape goroutine publishing a fresh, complete
-	// snapshot on every attempt.
+	// snapshot on every attempt. BlockNum and SlotNum always match, and
+	// EpochNum is always BlockNum/10, so a reader observing a mix of old and
+	// new field values would trip the consistency check below.
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -189,6 +202,20 @@ func TestConcurrentPromMetricsPublicationAndRendering(t *testing.T) {
 				SlotNum:  i,
 				EpochNum: i / 10,
 			})
+		}
+	}()
+
+	// Consistency reader: deterministically checks the writer's invariant
+	// holds on every snapshot observed, regardless of race-detector mode.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			if m := promMetrics.Load(); m != nil {
+				if m.BlockNum != m.SlotNum || m.EpochNum != m.BlockNum/10 {
+					inconsistent.Store(true)
+				}
+			}
 		}
 	}()
 
@@ -212,4 +239,8 @@ func TestConcurrentPromMetricsPublicationAndRendering(t *testing.T) {
 	}
 
 	wg.Wait()
+
+	if inconsistent.Load() {
+		t.Fatal("observed a promMetrics snapshot with inconsistent fields, expected whole-struct replacement")
+	}
 }

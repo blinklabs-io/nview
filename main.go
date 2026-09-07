@@ -2826,6 +2826,7 @@ func main() {
 				}
 				continue
 			}
+			recordSubsystemSuccess(healthSubsystemPeers)
 			select {
 			case <-ctx.Done():
 				return

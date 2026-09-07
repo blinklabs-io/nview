@@ -326,3 +326,61 @@ func TestResetPeersClearsFilteredAndStats(t *testing.T) {
 		t.Fatalf("peerStats collections were not reset: %#v", peerStats)
 	}
 }
+
+// TestPingPeersDoesNotResetPeersHealthWhenViewInactive guards against a
+// regression where pingPeers reset the peers subsystem's consecutive-failure
+// count on every call, including its early return for an inactive peer
+// view. That let an unrelated, frequently-running loop mask a persistent
+// filterPeers failure: the peers subsystem would report healthy even while
+// the actual peer-filtering attempt kept failing. Only a successful
+// filterPeers(ctx) call may now clear that count.
+func TestPingPeersDoesNotResetPeersHealthWhenViewInactive(t *testing.T) {
+	original := resetSubsystemFailuresForTest()
+	defer restoreSubsystemFailuresForTest(original)
+
+	// Force dashboardShowsPeers() to false and the active view to something
+	// other than viewPeers, so pingPeers takes its early-return path.
+	originalDetected := detectedNodeBinary.Load()
+	detectedNodeBinary.Store(CARDANO_BINARY)
+	defer func() {
+		if originalDetected != nil {
+			if s, ok := originalDetected.(string); ok {
+				detectedNodeBinary.Store(s)
+			}
+		}
+	}()
+
+	originalPeerOverlay := peerOverlayActive.Load()
+	peerOverlayActive.Store(false)
+	defer peerOverlayActive.Store(originalPeerOverlay)
+
+	originalActive := activeSecondary.Load()
+	setActiveSecondaryView(viewNone)
+	defer activeSecondary.Store(originalActive)
+
+	if dashboardShowsPeers() || getActiveSecondaryView() == viewPeers {
+		t.Fatal("test setup did not produce an inactive peer view")
+	}
+
+	// Simulate a persistent filterPeers failure, the way the main peer-filter
+	// loop records it.
+	originalProcessMetrics := processMetrics
+	processMetrics = nil
+	defer func() { processMetrics = originalProcessMetrics }()
+
+	ctx := context.Background()
+	if err := filterPeers(ctx); err == nil {
+		t.Fatal("expected filterPeers to fail with processMetrics unset")
+	}
+	recordSubsystemFailure(healthSubsystemPeers)
+	recordSubsystemFailure(healthSubsystemPeers)
+
+	pingPeers(ctx)
+
+	if got := subsystemFailures[healthSubsystemPeers].Load(); got != 2 {
+		t.Fatalf(
+			"peers failure count = %d after an inactive-view pingPeers call, expected 2 to remain untouched",
+			got,
+		)
+	}
+}
