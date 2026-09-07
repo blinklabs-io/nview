@@ -26,6 +26,22 @@ import (
 	"github.com/blinklabs-io/nview/internal/config"
 )
 
+// maxMetricsResponseBytes bounds how much of the node's metrics response is
+// read into memory. It is a var rather than a const so tests can lower it
+// without generating multi-megabyte payloads.
+var maxMetricsResponseBytes int64 = 10 * 1024 * 1024 // 10 MiB
+
+// errMetricsResponseTooLarge is returned when the node's metrics response
+// exceeds maxMetricsResponseBytes.
+var errMetricsResponseTooLarge = errors.New(
+	"metrics response exceeds maximum allowed size",
+)
+
+// httpClient is the client used to fetch node metrics. It is a var, scoped
+// to this file, so tests can substitute a client with an instrumented
+// transport without mutating the process-wide http.DefaultClient.
+var httpClient = http.DefaultClient
+
 // Fetches the node metrics and return a byte array
 func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 	// Load our config and get host/port
@@ -46,7 +62,7 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 	if err != nil {
 		return respBodyBytes, http.StatusInternalServerError, err
 	}
-	// Set a 3 second timeout
+	// Set a deadline covering the whole request, including reading the body
 	ctx, cancel := context.WithTimeout(
 		ctx,
 		time.Second*time.Duration(cfg.Prometheus.Timeout),
@@ -54,7 +70,7 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 	defer cancel()
 	req = req.WithContext(ctx)
 	// Get metrics from the node
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return respBodyBytes, http.StatusInternalServerError, err
 	}
@@ -63,12 +79,20 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 			"empty response",
 		)
 	}
-	// Read the entire response body and close it to prevent a memory leak
-	respBodyBytes, err = io.ReadAll(resp.Body)
+	// Close the body as soon as the request succeeds, regardless of what
+	// happens while reading it, so a read error or an oversized response
+	// cannot leave the connection open.
+	defer resp.Body.Close()
+	// Read one byte past the limit so an oversized response can be
+	// distinguished from one that lands exactly on the limit.
+	limitedBody := io.LimitReader(resp.Body, maxMetricsResponseBytes+1)
+	respBodyBytes, err = io.ReadAll(limitedBody)
 	if err != nil {
 		return respBodyBytes, http.StatusInternalServerError, err
 	}
-	defer resp.Body.Close()
+	if int64(len(respBodyBytes)) > maxMetricsResponseBytes {
+		return respBodyBytes, http.StatusInternalServerError, errMetricsResponseTooLarge
+	}
 	return respBodyBytes, resp.StatusCode, nil
 }
 
