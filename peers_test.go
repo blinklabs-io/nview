@@ -85,7 +85,7 @@ func TestPeerRTTResultsSortStableWhenRTTUnavailable(t *testing.T) {
 }
 
 func TestGetPeerTextRendersPartialLazyResults(t *testing.T) {
-	originalPromMetrics := promMetrics
+	originalPromMetrics := promMetrics.Load()
 	originalPeerText := peerText
 	peerStatsMu.Lock()
 	originalPeerStats := peerStats
@@ -94,7 +94,7 @@ func TestGetPeerTextRendersPartialLazyResults(t *testing.T) {
 	originalPeersFiltered := peersFiltered
 	peersFilteredMu.Unlock()
 	defer func() {
-		promMetrics = originalPromMetrics
+		promMetrics.Store(originalPromMetrics)
 		peerText = originalPeerText
 		peerStatsMu.Lock()
 		peerStats = originalPeerStats
@@ -104,13 +104,13 @@ func TestGetPeerTextRendersPartialLazyResults(t *testing.T) {
 		peersFilteredMu.Unlock()
 	}()
 
-	promMetrics = &PromMetrics{
+	promMetrics.Store(&PromMetrics{
 		PeersKnown:       2,
 		PeersEstablished: 1,
 		PeersActive:      1,
 		PeersHot:         1,
 		PeersCold:        1,
-	}
+	})
 	peersFilteredMu.Lock()
 	peersFiltered = []string{
 		"198.51.100.10;3001;o",

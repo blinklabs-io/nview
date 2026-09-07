@@ -284,9 +284,6 @@ var blockText, chainText, coreText, connectionText, dingoConsoleText, dingoText,
 // Metrics variables
 var processMetrics *process.Process
 
-// Track our failures
-var failCount atomic.Uint32
-
 func getActiveSecondaryView() secondaryView {
 	return secondaryView(activeSecondary.Load())
 }
@@ -383,6 +380,7 @@ func newPeerOverlayPrimitive(width, rows int) tview.Primitive {
 }
 
 func currentNetworkName() string {
+	promMetrics := promMetrics.Load()
 	if getEffectiveNodeBinary() == DINGO_BINARY && promMetrics != nil {
 		if network := strings.TrimSpace(promMetrics.Network); network != "" {
 			return formatNetworkName(network)
@@ -418,14 +416,14 @@ func visualModeName(mode terminalVisualMode) string {
 }
 
 func dashboardHealth() (string, uiSeverity) {
-	failures := failCount.Load()
+	failures := failCount()
 	if failures >= 5 {
 		return "degraded", uiSeverityCritical
 	}
 	if failures > 0 {
 		return "retrying", uiSeverityWarn
 	}
-	if promMetrics == nil {
+	if promMetrics.Load() == nil {
 		return "waiting", uiSeverityMuted
 	}
 	return "online", uiSeverityOK
@@ -639,6 +637,7 @@ func dashboardHealthSeverity() uiSeverity {
 }
 
 func chainPaneSeverity() uiSeverity {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return uiSeverityMuted
 	}
@@ -650,6 +649,7 @@ func chainPaneSeverity() uiSeverity {
 }
 
 func blockPaneSeverity() uiSeverity {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return uiSeverityMuted
 	}
@@ -663,6 +663,7 @@ func blockPaneSeverity() uiSeverity {
 }
 
 func activityPaneSeverity() uiSeverity {
+	promMetrics := promMetrics.Load()
 	if isMithrilSyncActive() {
 		if promMetrics == nil {
 			return uiSeverityMuted
@@ -679,6 +680,7 @@ func activityPaneSeverity() uiSeverity {
 }
 
 func corePaneSeverity() uiSeverity {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil || !hasForgeMetrics(promMetrics) {
 		return uiSeverityMuted
 	}
@@ -701,6 +703,7 @@ func corePaneSeverity() uiSeverity {
 }
 
 func runtimePaneSeverity() uiSeverity {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return uiSeverityMuted
 	}
@@ -728,6 +731,7 @@ func dingoPaneSeverity() uiSeverity {
 	if !dashboardShowsDingoSystems() {
 		return dashboardHealthSeverity()
 	}
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return uiSeverityMuted
 	}
@@ -744,6 +748,7 @@ func dingoPaneSeverity() uiSeverity {
 }
 
 func peerPaneSeverity() uiSeverity {
+	promMetrics := promMetrics.Load()
 	peersFilteredMu.RLock()
 	peerCount := len(peersFiltered)
 	peersFilteredMu.RUnlock()
@@ -786,6 +791,7 @@ func dingoPanelTitle() string {
 }
 
 func currentTipGap() (uint64, uiSeverity) {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil || promMetrics.SlotNum == 0 {
 		return 0, uiSeverityMuted
 	}
@@ -842,6 +848,7 @@ func getOverviewText(ctx context.Context) string {
 	}
 
 	healthLabel, healthSeverity := dashboardHealth()
+	promMetrics := promMetrics.Load()
 	var sb strings.Builder
 	fmt.Fprintf(&sb, " %s   %s   %s   %s\n",
 		uiPill("impl", getEffectiveNodeBinary(), uiSeverityNeutral),
@@ -896,6 +903,7 @@ func getOperatorFocusText(ctx context.Context) string {
 		return ""
 	default:
 	}
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return " " + uiMuted("waiting for metrics") + "\n"
 	}
@@ -1302,6 +1310,7 @@ func getDingoConsoleText(ctx context.Context) string {
 
 	cols, rows := dashboardTerminalSize()
 	width := dashboardContentWidth()
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return fmt.Sprintf(
 			"\n %s  %s\n",
@@ -2705,7 +2714,6 @@ func main() {
 			prom, err := getPromMetrics(ctx)
 			if err != nil && prom != nil {
 				logger.Warn("Failed to fetch Prometheus metrics", "error", err)
-				failCount.Add(1)
 				select {
 				case <-ctx.Done():
 					return
@@ -2713,10 +2721,9 @@ func main() {
 				}
 				continue
 			} else if prom == nil {
-				if promMetrics == nil {
-					promMetrics = &PromMetrics{}
+				if promMetrics.Load() == nil {
+					promMetrics.Store(&PromMetrics{})
 				}
-				failCount.Add(1)
 				select {
 				case <-ctx.Done():
 					return
@@ -2739,7 +2746,7 @@ func main() {
 				}
 			}
 			applyDefaultSecondaryView()
-			promMetrics = prom
+			promMetrics.Store(prom)
 			updateMithrilView()
 			select {
 			case <-ctx.Done():
@@ -2762,7 +2769,7 @@ func main() {
 			}
 			proc, err := getProcessMetrics(ctx)
 			if err != nil {
-				failCount.Add(1)
+				recordSubsystemFailure(healthSubsystemProcess)
 				select {
 				case <-ctx.Done():
 					return
@@ -2771,6 +2778,7 @@ func main() {
 				continue
 			}
 			processMetrics = proc
+			recordSubsystemSuccess(healthSubsystemProcess)
 			select {
 			case <-ctx.Done():
 				return
@@ -2810,7 +2818,7 @@ func main() {
 			err := filterPeers(ctx)
 			if err != nil {
 				logger.Warn("Failed to filter peers", "error", err)
-				failCount.Add(1)
+				recordSubsystemFailure(healthSubsystemPeers)
 				select {
 				case <-ctx.Done():
 					return
@@ -2958,11 +2966,11 @@ func main() {
 				return
 			default:
 			}
-			if failCount.Load() >= cfg.App.Retries {
+			if failCount() >= cfg.App.Retries {
 				panic(
 					fmt.Errorf(
 						"COULD NOT CONNECT TO A RUNNING INSTANCE, %d FAILED ATTEMPTS IN A ROW",
-						failCount.Load(),
+						failCount(),
 					),
 				)
 			}
@@ -3171,6 +3179,7 @@ func formatSeverityPercentRatio(value uint64, percent float32, severity uiSeveri
 }
 
 func getDingoStats() string {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return ""
 	}
@@ -3345,6 +3354,7 @@ func getDingoStats() string {
 }
 
 func isMithrilSyncActive() bool {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return false
 	}
@@ -3410,6 +3420,7 @@ func updateMithrilView() {
 }
 
 func getMithrilOverlayText(width int) string {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return ""
 	}
@@ -3525,6 +3536,7 @@ func formatMithrilProgressLine(
 }
 
 func getMithrilStats() string {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return ""
 	}
@@ -3702,6 +3714,7 @@ func getEpochProgress() float32 {
 	if cfg.Node.ShelleyTransEpoch < 0 {
 		return float32(0.0)
 	}
+	promMetrics := promMetrics.Load()
 	var epochProgress float32
 	if promMetrics == nil {
 		epochProgress = float32(0.0)
@@ -3728,6 +3741,7 @@ func getEpochProgress() float32 {
 
 func currentEpochTiming() (epochLengthSlots uint64, slotLengthMs uint64, ok bool) {
 	cfg := config.GetConfig()
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return 0, 0, false
 	}
@@ -3740,6 +3754,7 @@ func currentEpochTiming() (epochLengthSlots uint64, slotLengthMs uint64, ok bool
 
 func currentEpochSwitchTime() (time.Time, bool) {
 	cfg := config.GetConfig()
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil || cfg.Node.ByronGenesis.StartTime == 0 {
 		return time.Time{}, false
 	}
@@ -3791,6 +3806,7 @@ func getEpochRemainingSeconds() (uint64, bool) {
 	}
 
 	epochLength, slotLengthMs, ok := currentEpochTiming()
+	promMetrics := promMetrics.Load()
 	if !ok || promMetrics == nil {
 		return 0, false
 	}
@@ -3838,6 +3854,7 @@ func getChainText(ctx context.Context) string {
 	default:
 	}
 
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return chainText
 	}
@@ -3896,6 +3913,7 @@ func getChainText(ctx context.Context) string {
 func getConnectionText(ctx context.Context) string {
 	cfg := config.GetConfig()
 	var sb strings.Builder
+	promMetrics := promMetrics.Load()
 
 	if p2p {
 		if promMetrics == nil {
@@ -3962,6 +3980,7 @@ func getCoreText(ctx context.Context) string {
 	default:
 	}
 
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return coreText
 	}
@@ -4054,7 +4073,6 @@ func getCoreText(ctx context.Context) string {
 	} else {
 		fmt.Fprintf(&sb, " %s\n", uiMuted("observing only"))
 	}
-	failCount.Store(0)
 	return sb.String()
 }
 
@@ -4065,11 +4083,11 @@ func getBlockText(ctx context.Context) string {
 	default:
 	}
 
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return blockText
 	}
 	if getEffectiveNodeBinary() == DINGO_BINARY && hasDingoPropagationMetrics(promMetrics) {
-		failCount.Store(0)
 		return getDingoPropagationText()
 	}
 
@@ -4079,12 +4097,10 @@ func getBlockText(ctx context.Context) string {
 	// Get our terminal size
 	fd := os.Stdout.Fd()
 	if fd > math.MaxInt {
-		failCount.Add(1)
 		return "ERROR: invalid file descriptor"
 	}
 	tcols, tlines, err := terminal.GetSize(int(fd)) //nolint:gosec // fd validated above
 	if err != nil {
-		failCount.Add(1)
 		return fmt.Sprintf("ERROR: %v", err)
 	}
 	// Validate size
@@ -4143,7 +4159,6 @@ func getBlockText(ctx context.Context) string {
 		uiMuted("1s 3s 5s"),
 	)
 
-	failCount.Store(0)
 	return sb.String()
 }
 
@@ -4163,6 +4178,7 @@ func hasDingoPropagationMetrics(metrics *PromMetrics) bool {
 }
 
 func getDingoPropagationText() string {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return ""
 	}
@@ -4305,6 +4321,7 @@ func formatBlockPropagationPercent(value float64) string {
 }
 
 func currentNodeVersionInfo() (string, string) {
+	promMetrics := promMetrics.Load()
 	if promMetrics != nil && getEffectiveNodeBinary() == DINGO_BINARY {
 		version := strings.TrimSpace(promMetrics.DingoBuildVersion)
 		revision := strings.TrimSpace(promMetrics.DingoBuildCommit)
@@ -4377,6 +4394,7 @@ func getPeerText(ctx context.Context) string {
 	default:
 	}
 
+	promMetrics := promMetrics.Load()
 	var sb strings.Builder
 
 	// Style / UI
@@ -4547,11 +4565,11 @@ func getPeerText(ctx context.Context) string {
 	}
 	sb.WriteString("[white]\n")
 
-	failCount.Store(0)
 	return sb.String()
 }
 
 func getResourceText(ctx context.Context) string {
+	promMetrics := promMetrics.Load()
 	if processMetrics == nil || promMetrics == nil {
 		return resourceText
 	}
@@ -4565,12 +4583,10 @@ func getResourceText(ctx context.Context) string {
 	if processMetrics != nil && processMetrics.Pid != 0 {
 		cpuPercent, err = processMetrics.CPUPercentWithContext(ctx)
 		if err != nil {
-			failCount.Add(1)
 			return fmt.Sprintf("cannot parse CPU usage: %s", err)
 		}
 		processMemory, err = processMetrics.MemoryInfoWithContext(ctx)
 		if err != nil {
-			failCount.Add(1)
 			return fmt.Sprintf("cannot parse memory usage: %s", err)
 		}
 		rss = processMemory.RSS

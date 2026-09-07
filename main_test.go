@@ -639,9 +639,9 @@ func TestGetEpochProgress(t *testing.T) {
 			cfg.Node.ByronGenesis.EpochLength = tt.epochLength
 
 			// Set global promMetrics
-			originalPromMetrics := promMetrics
-			promMetrics = tt.promMetrics
-			defer func() { promMetrics = originalPromMetrics }()
+			originalPromMetrics := promMetrics.Load()
+			promMetrics.Store(tt.promMetrics)
+			defer func() { promMetrics.Store(originalPromMetrics) }()
 
 			result := getEpochProgress()
 			if result != tt.expected {
@@ -688,12 +688,12 @@ func TestGetEpochText(t *testing.T) {
 			cfg.Node.ByronGenesis.EpochLength = 216000
 
 			// Set globals
-			originalPromMetrics := promMetrics
+			originalPromMetrics := promMetrics.Load()
 			originalCurrentEpoch := currentEpoch
-			promMetrics = tt.promMetrics
+			promMetrics.Store(tt.promMetrics)
 			currentEpoch = tt.currentEpoch
 			defer func() {
-				promMetrics = originalPromMetrics
+				promMetrics.Store(originalPromMetrics)
 				currentEpoch = originalCurrentEpoch
 			}()
 
@@ -718,7 +718,7 @@ func TestFormatEpochRemaining(t *testing.T) {
 	originalByronStartTime := cfg.Node.ByronGenesis.StartTime
 	originalByronEpochLength := cfg.Node.ByronGenesis.EpochLength
 	originalByronSlotLength := cfg.Node.ByronGenesis.SlotLength
-	originalPromMetrics := promMetrics
+	originalPromMetrics := promMetrics.Load()
 	defer func() {
 		cfg.Node.ShelleyTransEpoch = originalShelleyTransEpoch
 		cfg.Node.ShelleyGenesis.EpochLength = originalShelleyEpochLength
@@ -726,7 +726,7 @@ func TestFormatEpochRemaining(t *testing.T) {
 		cfg.Node.ByronGenesis.StartTime = originalByronStartTime
 		cfg.Node.ByronGenesis.EpochLength = originalByronEpochLength
 		cfg.Node.ByronGenesis.SlotLength = originalByronSlotLength
-		promMetrics = originalPromMetrics
+		promMetrics.Store(originalPromMetrics)
 	}()
 
 	cfg.Node.ShelleyTransEpoch = 0
@@ -735,10 +735,10 @@ func TestFormatEpochRemaining(t *testing.T) {
 	cfg.Node.ByronGenesis.StartTime = uint64(time.Now().Unix()) - 1040
 	cfg.Node.ByronGenesis.EpochLength = 100
 	cfg.Node.ByronGenesis.SlotLength = 1000
-	promMetrics = &PromMetrics{
+	promMetrics.Store(&PromMetrics{
 		EpochNum:    10,
 		SlotInEpoch: 40,
-	}
+	})
 
 	remaining, ok := getEpochRemainingSeconds()
 	if !ok {
@@ -920,18 +920,25 @@ func TestDingoSeverityThresholds(t *testing.T) {
 }
 
 func TestDashboardPaneSeverities(t *testing.T) {
-	originalPromMetrics := promMetrics
+	originalPromMetrics := promMetrics.Load()
 	originalRole := role
-	originalFailCount := failCount.Load()
+	var originalFailures [healthSubsystemCount]uint32
+	for i := range subsystemFailures {
+		originalFailures[i] = subsystemFailures[i].Load()
+	}
 	defer func() {
-		promMetrics = originalPromMetrics
+		promMetrics.Store(originalPromMetrics)
 		role = originalRole
-		failCount.Store(originalFailCount)
+		for i := range subsystemFailures {
+			subsystemFailures[i].Store(originalFailures[i])
+		}
 	}()
 
-	failCount.Store(0)
+	for i := range subsystemFailures {
+		subsystemFailures[i].Store(0)
+	}
 	role = "Core"
-	promMetrics = &PromMetrics{
+	promMetrics.Store(&PromMetrics{
 		SlotNum:      90,
 		BlockDelay:   5,
 		BlocksLate:   1,
@@ -942,7 +949,7 @@ func TestDashboardPaneSeverities(t *testing.T) {
 		SlotInEpoch:  90,
 		EpochNum:     1,
 		BlocksServed: 10,
-	}
+	})
 
 	cfg := config.GetConfig()
 	originalShelleyTransEpoch := cfg.Node.ShelleyTransEpoch
@@ -964,11 +971,11 @@ func TestDashboardPaneSeverities(t *testing.T) {
 		t.Errorf("corePaneSeverity() = %d, expected %d", got, uiSeverityCritical)
 	}
 
-	failCount.Store(1)
+	subsystemFailures[healthSubsystemPrometheus].Store(1)
 	if _, got := dashboardHealth(); got != uiSeverityWarn {
 		t.Errorf("dashboardHealth severity = %d, expected %d", got, uiSeverityWarn)
 	}
-	failCount.Store(5)
+	subsystemFailures[healthSubsystemPrometheus].Store(5)
 	if _, got := dashboardHealth(); got != uiSeverityCritical {
 		t.Errorf("dashboardHealth severity = %d, expected %d", got, uiSeverityCritical)
 	}
@@ -1072,16 +1079,16 @@ func TestGetBlockTextRendersDingoProtocolPropagation(t *testing.T) {
 	cfg := config.GetConfig()
 	originalBinary := cfg.Node.Binary
 	originalDetectedBinary, _ := detectedNodeBinary.Load().(string)
-	originalPromMetrics := promMetrics
+	originalPromMetrics := promMetrics.Load()
 	defer func() {
 		cfg.Node.Binary = originalBinary
 		detectedNodeBinary.Store(originalDetectedBinary)
-		promMetrics = originalPromMetrics
+		promMetrics.Store(originalPromMetrics)
 	}()
 
 	cfg.Node.Binary = ""
 	detectedNodeBinary.Store(DINGO_BINARY)
-	promMetrics = &PromMetrics{
+	promMetrics.Store(&PromMetrics{
 		DingoProtocolBlockfetchMessages: 123,
 		DingoProtocolChainsyncMessages:  456,
 		DingoProtocolKeepaliveMessages:  7,
@@ -1093,7 +1100,7 @@ func TestGetBlockTextRendersDingoProtocolPropagation(t *testing.T) {
 		DingoBlockfetchGateDispatched:   3,
 		DingoBlockfetchGateSkippedFast:  8,
 		DingoBlockfetchGateSkippedPeer:  2,
-	}
+	})
 
 	result := getBlockText(context.Background())
 	for _, expected := range []string{
@@ -1117,7 +1124,7 @@ func TestGetDingoConsoleTextRendersUnboxedLanes(t *testing.T) {
 	cfg := config.GetConfig()
 	originalBinary := cfg.Node.Binary
 	originalDetectedBinary, _ := detectedNodeBinary.Load().(string)
-	originalPromMetrics := promMetrics
+	originalPromMetrics := promMetrics.Load()
 	originalCurrentEpoch := currentEpoch
 	originalRole := role
 	originalShelleyTransEpoch := cfg.Node.ShelleyTransEpoch
@@ -1139,7 +1146,7 @@ func TestGetDingoConsoleTextRendersUnboxedLanes(t *testing.T) {
 		cfg.Node.ByronGenesis.EpochLength = originalByronEpochLength
 		cfg.Node.ByronGenesis.SlotLength = originalByronSlotLength
 		detectedNodeBinary.Store(originalDetectedBinary)
-		promMetrics = originalPromMetrics
+		promMetrics.Store(originalPromMetrics)
 		currentEpoch = originalCurrentEpoch
 		role = originalRole
 		peersFilteredMu.Lock()
@@ -1159,7 +1166,7 @@ func TestGetDingoConsoleTextRendersUnboxedLanes(t *testing.T) {
 	detectedNodeBinary.Store(DINGO_BINARY)
 	currentEpoch = 1339
 	role = "Relay"
-	promMetrics = &PromMetrics{
+	promMetrics.Store(&PromMetrics{
 		Network:                         "preview",
 		DingoBuildVersion:               "v0.57.0",
 		DingoBuildCommit:                "62809b98",
@@ -1212,7 +1219,7 @@ func TestGetDingoConsoleTextRendersUnboxedLanes(t *testing.T) {
 		DingoStakeSnapshotPoolCount:     658,
 		DingoStakeSnapshotActiveStake:   1496610126371652,
 		LeiosMetrics:                    map[string]float64{"dingo_leios_blocks_total": 2},
-	}
+	})
 	peersFilteredMu.Lock()
 	peersFiltered = []string{"1.2.3.4:3001"}
 	peersFilteredMu.Unlock()
@@ -1325,7 +1332,7 @@ func TestGetDingoConsoleTextKeepsDingoViewDuringMithrilSync(t *testing.T) {
 	cfg := config.GetConfig()
 	originalBinary := cfg.Node.Binary
 	originalDetectedBinary, _ := detectedNodeBinary.Load().(string)
-	originalPromMetrics := promMetrics
+	originalPromMetrics := promMetrics.Load()
 	originalCurrentEpoch := currentEpoch
 	originalRole := role
 	originalShelleyTransEpoch := cfg.Node.ShelleyTransEpoch
@@ -1341,7 +1348,7 @@ func TestGetDingoConsoleTextKeepsDingoViewDuringMithrilSync(t *testing.T) {
 		cfg.Node.ByronGenesis.EpochLength = originalByronEpochLength
 		cfg.Node.ByronGenesis.SlotLength = originalByronSlotLength
 		detectedNodeBinary.Store(originalDetectedBinary)
-		promMetrics = originalPromMetrics
+		promMetrics.Store(originalPromMetrics)
 		currentEpoch = originalCurrentEpoch
 		role = originalRole
 	}()
@@ -1355,7 +1362,7 @@ func TestGetDingoConsoleTextKeepsDingoViewDuringMithrilSync(t *testing.T) {
 	detectedNodeBinary.Store(DINGO_BINARY)
 	currentEpoch = 42
 	role = "Relay"
-	promMetrics = &PromMetrics{
+	promMetrics.Store(&PromMetrics{
 		Network:                         "preview",
 		BlockNum:                        1000,
 		SlotNum:                         2000,
@@ -1372,7 +1379,7 @@ func TestGetDingoConsoleTextKeepsDingoViewDuringMithrilSync(t *testing.T) {
 		MithrilSyncLedgerImportCurrent:  25,
 		MithrilSyncLedgerImportTotal:    100,
 		MithrilSyncSnapshotSize:         1024,
-	}
+	})
 
 	result := getDingoConsoleText(context.Background())
 	for _, expected := range []string{
@@ -1447,19 +1454,19 @@ func TestCurrentNetworkNamePrefersDingoMetricLabel(t *testing.T) {
 	originalNodeNetwork := cfg.Node.Network
 	originalBinary := cfg.Node.Binary
 	originalDetectedBinary, _ := detectedNodeBinary.Load().(string)
-	originalPromMetrics := promMetrics
+	originalPromMetrics := promMetrics.Load()
 	defer func() {
 		cfg.App.Network = originalAppNetwork
 		cfg.Node.Network = originalNodeNetwork
 		cfg.Node.Binary = originalBinary
 		detectedNodeBinary.Store(originalDetectedBinary)
-		promMetrics = originalPromMetrics
+		promMetrics.Store(originalPromMetrics)
 	}()
 
 	cfg.App.Network = ""
 	cfg.Node.Network = "mainnet"
 	cfg.Node.Binary = ""
-	promMetrics = &PromMetrics{Network: "preview"}
+	promMetrics.Store(&PromMetrics{Network: "preview"})
 
 	detectedNodeBinary.Store(DINGO_BINARY)
 	if got := currentNetworkName(); got != "Preview" {
@@ -1476,19 +1483,19 @@ func TestCurrentNodeVersionInfoPrefersDingoBuildInfo(t *testing.T) {
 	cfg := config.GetConfig()
 	originalBinary := cfg.Node.Binary
 	originalDetectedBinary, _ := detectedNodeBinary.Load().(string)
-	originalPromMetrics := promMetrics
+	originalPromMetrics := promMetrics.Load()
 	defer func() {
 		cfg.Node.Binary = originalBinary
 		detectedNodeBinary.Store(originalDetectedBinary)
-		promMetrics = originalPromMetrics
+		promMetrics.Store(originalPromMetrics)
 	}()
 
 	cfg.Node.Binary = ""
 	detectedNodeBinary.Store(DINGO_BINARY)
-	promMetrics = &PromMetrics{
+	promMetrics.Store(&PromMetrics{
 		DingoBuildVersion: "v0.57.0 (commit 62809b98)",
 		DingoBuildCommit:  "62809b98abcdef",
-	}
+	})
 
 	version, revision := currentNodeVersionInfo()
 	if version != "v0.57.0" {
@@ -1585,14 +1592,14 @@ func TestApplyDefaultSecondaryView(t *testing.T) {
 // TestGetDingoStatsRendersDiagnostics verifies the diagnostics pane renders
 // Dingo-native values plus derived cache ratios and event/cold-extract rates.
 func TestGetDingoStatsRendersDiagnostics(t *testing.T) {
-	originalPromMetrics := promMetrics
+	originalPromMetrics := promMetrics.Load()
 	originalLastDingoSample := lastDingoSample
 	originalLastDingoSampleAt := lastDingoSampleAt
 	originalLastDingoRateBase := lastDingoRateBase
 	originalLastDingoRateBaseAt := lastDingoRateBaseAt
 	originalLastDingoSampleSrc := lastDingoSampleSrc
 	defer func() {
-		promMetrics = originalPromMetrics
+		promMetrics.Store(originalPromMetrics)
 		lastDingoSample = originalLastDingoSample
 		lastDingoSampleAt = originalLastDingoSampleAt
 		lastDingoRateBase = originalLastDingoRateBase
@@ -1615,7 +1622,7 @@ func TestGetDingoStatsRendersDiagnostics(t *testing.T) {
 		EventDeliveryTimeouts:  2,
 	}
 	lastDingoSampleAt = time.Now().Add(-10 * time.Second)
-	promMetrics = &PromMetrics{
+	promMetrics.Store(&PromMetrics{
 		DingoDbSizeBytes:              BytesInGigabyte,
 		DingoDbBlobSizeBytes:          512 * 1024 * 1024,
 		DingoDbMetadataSizeBytes:      512 * 1024 * 1024,
@@ -1654,7 +1661,7 @@ func TestGetDingoStatsRendersDiagnostics(t *testing.T) {
 		GoThreads:                     22,
 		ProcessOpenFDs:                965,
 		ProcessMaxFDs:                 122880,
-	}
+	})
 
 	result := getDingoStats()
 	expectedParts := []string{
@@ -1709,14 +1716,14 @@ func TestGetDingoStatsRendersDiagnostics(t *testing.T) {
 }
 
 func TestGetDingoStatsFirstSampleShowsUnavailableDeltas(t *testing.T) {
-	originalPromMetrics := promMetrics
+	originalPromMetrics := promMetrics.Load()
 	originalLastDingoSample := lastDingoSample
 	originalLastDingoSampleAt := lastDingoSampleAt
 	originalLastDingoRateBase := lastDingoRateBase
 	originalLastDingoRateBaseAt := lastDingoRateBaseAt
 	originalLastDingoSampleSrc := lastDingoSampleSrc
 	defer func() {
-		promMetrics = originalPromMetrics
+		promMetrics.Store(originalPromMetrics)
 		lastDingoSample = originalLastDingoSample
 		lastDingoSampleAt = originalLastDingoSampleAt
 		lastDingoRateBase = originalLastDingoRateBase
@@ -1729,14 +1736,14 @@ func TestGetDingoStatsFirstSampleShowsUnavailableDeltas(t *testing.T) {
 	lastDingoRateBase = nil
 	lastDingoRateBaseAt = time.Time{}
 	lastDingoSampleSrc = nil
-	promMetrics = &PromMetrics{
+	promMetrics.Store(&PromMetrics{
 		DingoCacheUtxoHotHits:  100,
 		DingoCacheTxHotHits:    100,
 		DingoCacheBlockLruHits: 100,
 		DingoCacheColdExtract:  100,
 		EventDeliveryErrors:    100,
 		EventDeliveryTimeouts:  100,
-	}
+	})
 
 	result := getDingoStats()
 	expectedParts := []string{
@@ -1758,10 +1765,10 @@ func TestGetDingoStatsFirstSampleShowsUnavailableDeltas(t *testing.T) {
 // TestGetMithrilStatsRendersView verifies the Mithril sync pane renders all
 // key fields including progress bars and error highlighting.
 func TestGetMithrilStatsRendersView(t *testing.T) {
-	originalPromMetrics := promMetrics
-	defer func() { promMetrics = originalPromMetrics }()
+	originalPromMetrics := promMetrics.Load()
+	defer func() { promMetrics.Store(originalPromMetrics) }()
 
-	promMetrics = &PromMetrics{
+	promMetrics.Store(&PromMetrics{
 		MithrilSyncCompleted:             0,
 		MithrilSyncStartedAt:             1700000000,
 		MithrilSyncErrorsTotal:           1,
@@ -1788,7 +1795,7 @@ func TestGetMithrilStatsRendersView(t *testing.T) {
 		MithrilSyncImmutableTipSlot:       112985271,
 		MithrilSyncGapBlocks:              1200,
 		MithrilPhaseImmutable:             1,
-	}
+	})
 
 	result := getMithrilStats()
 
@@ -1833,10 +1840,10 @@ func TestGetMithrilStatsRendersView(t *testing.T) {
 }
 
 func TestGetMithrilStatsNilMetrics(t *testing.T) {
-	originalPromMetrics := promMetrics
-	defer func() { promMetrics = originalPromMetrics }()
+	originalPromMetrics := promMetrics.Load()
+	defer func() { promMetrics.Store(originalPromMetrics) }()
 
-	promMetrics = nil
+	promMetrics.Store(nil)
 	result := getMithrilStats()
 	if result != "" {
 		t.Errorf("getMithrilStats() with nil metrics = %q, expected empty string", result)
@@ -2010,9 +2017,9 @@ func TestIsMithrilSyncActive(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			originalPromMetrics := promMetrics
-			defer func() { promMetrics = originalPromMetrics }()
-			promMetrics = tt.metrics
+			originalPromMetrics := promMetrics.Load()
+			defer func() { promMetrics.Store(originalPromMetrics) }()
+			promMetrics.Store(tt.metrics)
 
 			got := isMithrilSyncActive()
 			if got != tt.want {
@@ -2025,13 +2032,13 @@ func TestIsMithrilSyncActive(t *testing.T) {
 // TestUpdateMithrilViewOverlayState verifies that active Mithril sync produces
 // overlay content without moving the operator away from the normal Dingo view.
 func TestUpdateMithrilViewOverlayState(t *testing.T) {
-	originalPromMetrics := promMetrics
+	originalPromMetrics := promMetrics.Load()
 	originalMithrilAutoActive := mithrilViewAutoActive.Load()
 	originalActive := getActiveSecondaryView()
 	originalDetectedBinary, _ := detectedNodeBinary.Load().(string)
 	originalOverlayText := mithrilOverlayText
 	defer func() {
-		promMetrics = originalPromMetrics
+		promMetrics.Store(originalPromMetrics)
 		mithrilViewAutoActive.Store(originalMithrilAutoActive)
 		setActiveSecondaryView(originalActive)
 		detectedNodeBinary.Store(originalDetectedBinary)
@@ -2042,10 +2049,10 @@ func TestUpdateMithrilViewOverlayState(t *testing.T) {
 	mithrilViewAutoActive.Store(false)
 	setActiveSecondaryView(viewDingo)
 
-	promMetrics = &PromMetrics{
+	promMetrics.Store(&PromMetrics{
 		MithrilSyncCompleted:    0,
 		MithrilSyncSnapshotSize: BytesInGigabyte,
-	}
+	})
 	updateMithrilView()
 	if getActiveSecondaryView() != viewDingo {
 		t.Errorf("expected viewDingo to remain active during sync, got %d", getActiveSecondaryView())
@@ -2057,7 +2064,7 @@ func TestUpdateMithrilViewOverlayState(t *testing.T) {
 		t.Fatalf("expected overlay text to contain Mithril content, got:\n%s", mithrilOverlayText)
 	}
 
-	promMetrics = &PromMetrics{MithrilSyncCompleted: 1}
+	promMetrics.Store(&PromMetrics{MithrilSyncCompleted: 1})
 	updateMithrilView()
 	if getActiveSecondaryView() != viewDingo {
 		t.Errorf("expected viewDingo after sync completion, got %d", getActiveSecondaryView())
@@ -2073,14 +2080,14 @@ func TestUpdateMithrilViewOverlayState(t *testing.T) {
 // TestGetDingoStatsShowsGovernanceFailures verifies the governance decode
 // failures counter appears in the diagnostics pane.
 func TestGetDingoStatsShowsGovernanceFailures(t *testing.T) {
-	originalPromMetrics := promMetrics
+	originalPromMetrics := promMetrics.Load()
 	originalLastDingoSample := lastDingoSample
 	originalLastDingoSampleAt := lastDingoSampleAt
 	originalLastDingoSampleSrc := lastDingoSampleSrc
 	originalLastDingoRateBase := lastDingoRateBase
 	originalLastDingoRateBaseAt := lastDingoRateBaseAt
 	defer func() {
-		promMetrics = originalPromMetrics
+		promMetrics.Store(originalPromMetrics)
 		lastDingoSample = originalLastDingoSample
 		lastDingoSampleAt = originalLastDingoSampleAt
 		lastDingoSampleSrc = originalLastDingoSampleSrc
@@ -2093,9 +2100,9 @@ func TestGetDingoStatsShowsGovernanceFailures(t *testing.T) {
 	lastDingoSample = nil
 	lastDingoSampleAt = time.Time{}
 	lastDingoSampleSrc = nil
-	promMetrics = &PromMetrics{
+	promMetrics.Store(&PromMetrics{
 		DingoGovernanceDecodeFailures: 7,
-	}
+	})
 
 	result := getDingoStats()
 	if !strings.Contains(result, "Gov Failures") {
@@ -2114,10 +2121,10 @@ func BenchmarkGetEpochProgress(b *testing.B) {
 	cfg.Node.ByronGenesis.EpochLength = 216000
 
 	// Set promMetrics
-	promMetrics = &PromMetrics{
+	promMetrics.Store(&PromMetrics{
 		EpochNum:    150,
 		SlotInEpoch: 216000,
-	}
+	})
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -2277,12 +2284,12 @@ func TestGetConnectionText(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set globals
 			originalP2p := p2p
-			originalPromMetrics := promMetrics
+			originalPromMetrics := promMetrics.Load()
 			p2p = tt.p2p
-			promMetrics = tt.promMetrics
+			promMetrics.Store(tt.promMetrics)
 			defer func() {
 				p2p = originalP2p
-				promMetrics = originalPromMetrics
+				promMetrics.Store(originalPromMetrics)
 			}()
 
 			ctx := context.Background()
@@ -2343,17 +2350,17 @@ func TestGetCoreText(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set globals
 			originalRole := role
-			originalPromMetrics := promMetrics
+			originalPromMetrics := promMetrics.Load()
 			cfg := config.GetConfig()
 			originalBinary := cfg.Node.Binary
 			originalDetectedBinary, _ := detectedNodeBinary.Load().(string)
 			role = tt.role
-			promMetrics = tt.promMetrics
+			promMetrics.Store(tt.promMetrics)
 			cfg.Node.Binary = ""
 			detectedNodeBinary.Store(tt.binary)
 			defer func() {
 				role = originalRole
-				promMetrics = originalPromMetrics
+				promMetrics.Store(originalPromMetrics)
 				cfg.Node.Binary = originalBinary
 				detectedNodeBinary.Store(originalDetectedBinary)
 			}()
@@ -2375,21 +2382,21 @@ func TestGetCoreTextMutesDisabledDingoForgeCounters(t *testing.T) {
 	cfg := config.GetConfig()
 	originalBinary := cfg.Node.Binary
 	originalDetectedBinary, _ := detectedNodeBinary.Load().(string)
-	originalPromMetrics := promMetrics
+	originalPromMetrics := promMetrics.Load()
 	originalRole := role
 	defer func() {
 		cfg.Node.Binary = originalBinary
 		detectedNodeBinary.Store(originalDetectedBinary)
-		promMetrics = originalPromMetrics
+		promMetrics.Store(originalPromMetrics)
 		role = originalRole
 	}()
 
 	cfg.Node.Binary = ""
 	detectedNodeBinary.Store(DINGO_BINARY)
 	role = "Relay"
-	promMetrics = &PromMetrics{
+	promMetrics.Store(&PromMetrics{
 		ForgingEnabled: 0,
-	}
+	})
 
 	result := getCoreText(context.Background())
 	for _, expected := range []string{

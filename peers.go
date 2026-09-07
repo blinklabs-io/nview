@@ -86,7 +86,7 @@ func filterPeers(ctx context.Context) error {
 	// Skip everything if we have no peers
 	if len(peers) == 0 {
 		resetPeers()
-		failCount.Store(0)
+		recordSubsystemSuccess(healthSubsystemPeers)
 		return nil
 	}
 
@@ -159,7 +159,7 @@ func mergePeerDirections(existing, next string) string {
 
 func pingPeers(ctx context.Context) {
 	if !dashboardShowsPeers() && getActiveSecondaryView() != viewPeers {
-		failCount.Store(0)
+		recordSubsystemSuccess(healthSubsystemPeers)
 		return
 	}
 
@@ -212,7 +212,7 @@ func pingPeers(ctx context.Context) {
 	for _, probe := range probes {
 		go probePeer(ctx, probe)
 	}
-	failCount.Store(0)
+	recordSubsystemSuccess(healthSubsystemPeers)
 }
 
 func schedulePeerProbeLocked(probe peerProbe, scheduledAt time.Time) peerProbe {
