@@ -167,15 +167,17 @@ func TestGetPromMetricsAppliesResultExactlyOnce(t *testing.T) {
 //
 // The race detector alone would make this test a silent no-op under a plain
 // `go test ./...` (the CI workflow does not pass -race), so a consistency
-// reader also asserts, on every observed snapshot, that BlockNum, SlotNum,
-// and EpochNum still satisfy the writer's invariant. That fails
-// deterministically, with or without -race, if publication ever stopped
-// being a whole-struct replacement (for example a future change that
-// mutated fields on the shared struct in place, which could let a reader
-// observe some fields from one write and some from the next).
+// reader also asserts, on every test-produced snapshot, that BlockNum,
+// SlotNum, and EpochNum still satisfy the writer's invariant. That catches a
+// publication change that mutates fields on a shared struct in place, which
+// could let a reader observe some fields from one write and some from the
+// next.
 func TestConcurrentPromMetricsPublicationAndRendering(t *testing.T) {
 	originalPromMetrics := promMetrics.Load()
 	defer promMetrics.Store(originalPromMetrics)
+	// Seed a valid test snapshot so the reader cannot inspect an unrelated
+	// snapshot published by another test before this writer runs.
+	promMetrics.Store(&PromMetrics{})
 
 	// chainPaneSeverity consults the slot tip gap, which divides by the
 	// configured slot length; give it a non-zero value so this test
@@ -205,8 +207,8 @@ func TestConcurrentPromMetricsPublicationAndRendering(t *testing.T) {
 		}
 	}()
 
-	// Consistency reader: deterministically checks the writer's invariant
-	// holds on every snapshot observed, regardless of race-detector mode.
+	// Consistency reader checks the writer's invariant on every snapshot
+	// observed, regardless of race-detector mode.
 	wg.Add(1)
 	go func() {
 		defer wg.Done()

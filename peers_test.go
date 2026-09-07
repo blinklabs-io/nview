@@ -340,14 +340,10 @@ func TestPingPeersDoesNotResetPeersHealthWhenViewInactive(t *testing.T) {
 
 	// Force dashboardShowsPeers() to false and the active view to something
 	// other than viewPeers, so pingPeers takes its early-return path.
-	originalDetected := detectedNodeBinary.Load()
+	originalDetected, _ := detectedNodeBinary.Load().(string)
 	detectedNodeBinary.Store(CARDANO_BINARY)
 	defer func() {
-		if originalDetected != nil {
-			if s, ok := originalDetected.(string); ok {
-				detectedNodeBinary.Store(s)
-			}
-		}
+		detectedNodeBinary.Store(originalDetected)
 	}()
 
 	originalPeerOverlay := peerOverlayActive.Load()
