@@ -284,9 +284,6 @@ var blockText, chainText, coreText, connectionText, dingoConsoleText, dingoText,
 // Metrics variables
 var processMetrics *process.Process
 
-// Track our failures
-var failCount atomic.Uint32
-
 func getActiveSecondaryView() secondaryView {
 	return secondaryView(activeSecondary.Load())
 }
@@ -383,6 +380,7 @@ func newPeerOverlayPrimitive(width, rows int) tview.Primitive {
 }
 
 func currentNetworkName() string {
+	promMetrics := promMetrics.Load()
 	if getEffectiveNodeBinary() == DINGO_BINARY && promMetrics != nil {
 		if network := strings.TrimSpace(promMetrics.Network); network != "" {
 			return formatNetworkName(network)
@@ -418,14 +416,14 @@ func visualModeName(mode terminalVisualMode) string {
 }
 
 func dashboardHealth() (string, uiSeverity) {
-	failures := failCount.Load()
+	failures := failCount()
 	if failures >= 5 {
 		return "degraded", uiSeverityCritical
 	}
 	if failures > 0 {
 		return "retrying", uiSeverityWarn
 	}
-	if promMetrics == nil {
+	if promMetrics.Load() == nil {
 		return "waiting", uiSeverityMuted
 	}
 	return "online", uiSeverityOK
@@ -639,17 +637,19 @@ func dashboardHealthSeverity() uiSeverity {
 }
 
 func chainPaneSeverity() uiSeverity {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return uiSeverityMuted
 	}
 	if promMetrics.SlotNum == 0 {
 		return uiSeverityMuted
 	}
-	_, severity := currentTipGap()
+	_, severity := currentTipGap(promMetrics)
 	return severity
 }
 
 func blockPaneSeverity() uiSeverity {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return uiSeverityMuted
 	}
@@ -663,6 +663,7 @@ func blockPaneSeverity() uiSeverity {
 }
 
 func activityPaneSeverity() uiSeverity {
+	promMetrics := promMetrics.Load()
 	if isMithrilSyncActive() {
 		if promMetrics == nil {
 			return uiSeverityMuted
@@ -679,6 +680,7 @@ func activityPaneSeverity() uiSeverity {
 }
 
 func corePaneSeverity() uiSeverity {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil || !hasForgeMetrics(promMetrics) {
 		return uiSeverityMuted
 	}
@@ -701,6 +703,7 @@ func corePaneSeverity() uiSeverity {
 }
 
 func runtimePaneSeverity() uiSeverity {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return uiSeverityMuted
 	}
@@ -728,6 +731,7 @@ func dingoPaneSeverity() uiSeverity {
 	if !dashboardShowsDingoSystems() {
 		return dashboardHealthSeverity()
 	}
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return uiSeverityMuted
 	}
@@ -744,6 +748,7 @@ func dingoPaneSeverity() uiSeverity {
 }
 
 func peerPaneSeverity() uiSeverity {
+	promMetrics := promMetrics.Load()
 	peersFilteredMu.RLock()
 	peerCount := len(peersFiltered)
 	peersFilteredMu.RUnlock()
@@ -785,15 +790,15 @@ func dingoPanelTitle() string {
 	}
 }
 
-func currentTipGap() (uint64, uiSeverity) {
-	if promMetrics == nil || promMetrics.SlotNum == 0 {
+func currentTipGap(metrics *PromMetrics) (uint64, uiSeverity) {
+	if metrics == nil || metrics.SlotNum == 0 {
 		return 0, uiSeverityMuted
 	}
 	tipRef := getSlotTipRef()
-	if tipRef < promMetrics.SlotNum {
+	if tipRef < metrics.SlotNum {
 		return 0, uiSeverityOK
 	}
-	gap := tipRef - promMetrics.SlotNum
+	gap := tipRef - metrics.SlotNum
 	return gap, dingoTipGapSeverity(gap)
 }
 
@@ -842,6 +847,7 @@ func getOverviewText(ctx context.Context) string {
 	}
 
 	healthLabel, healthSeverity := dashboardHealth()
+	promMetrics := promMetrics.Load()
 	var sb strings.Builder
 	fmt.Fprintf(&sb, " %s   %s   %s   %s\n",
 		uiPill("impl", getEffectiveNodeBinary(), uiSeverityNeutral),
@@ -857,8 +863,8 @@ func getOverviewText(ctx context.Context) string {
 		return sb.String()
 	}
 
-	tipGap, tipSeverity := currentTipGap()
-	epochProgress := float64(getEpochProgress())
+	tipGap, tipSeverity := currentTipGap(promMetrics)
+	epochProgress := float64(getEpochProgress(promMetrics))
 	fmt.Fprintf(&sb, " %s   %s   %s\n",
 		uiKV("Block", uiValue(strconv.FormatUint(promMetrics.BlockNum, 10))),
 		uiKV("Slot", uiValue(strconv.FormatUint(promMetrics.SlotNum, 10))),
@@ -870,7 +876,7 @@ func getOverviewText(ctx context.Context) string {
 	)
 	fmt.Fprintf(&sb, " %s   %s   %s\n",
 		uiPercentBar("Epoch", epochProgress, mithrilProgressSeverity(epochProgress), 20),
-		uiKVAligned(9, "Remaining", uiValue(formatEpochRemaining())),
+		uiKVAligned(9, "Remaining", uiValue(formatEpochRemaining(promMetrics))),
 		uiKVAligned(9, "Peers", peerStateSegmentBar(promMetrics, 12)),
 	)
 	if getEffectiveNodeBinary() == DINGO_BINARY {
@@ -896,13 +902,14 @@ func getOperatorFocusText(ctx context.Context) string {
 		return ""
 	default:
 	}
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return " " + uiMuted("waiting for metrics") + "\n"
 	}
 
 	var sb strings.Builder
 	sb.WriteString(uiSection("Node Signals"))
-	tipGap, tipSeverity := currentTipGap()
+	tipGap, tipSeverity := currentTipGap(promMetrics)
 	fmt.Fprintf(&sb, " %s   %s\n",
 		uiKV("Health", uiSeverityValue(dashboardHealthLabel(), dashboardHealthSeverity())),
 		uiKV(
@@ -1274,19 +1281,19 @@ func dingoConsoleTipGap(metrics *PromMetrics) (uint64, uiSeverity) {
 		metrics.DingoEpochLengthSlots > 0 {
 		return metrics.DingoTipGapSlots, dingoTipGapSeverity(metrics.DingoTipGapSlots)
 	}
-	return currentTipGap()
+	return currentTipGap(metrics)
 }
 
-func formatEpochSwitchTime() string {
-	switchTime, ok := currentEpochSwitchTime()
+func formatEpochSwitchTime(metrics *PromMetrics) string {
+	switchTime, ok := currentEpochSwitchTime(metrics)
 	if !ok {
 		return "n/a"
 	}
 	return switchTime.Format("2006-01-02 15:04:05 MST")
 }
 
-func formatEpochSwitchClock() string {
-	switchTime, ok := currentEpochSwitchTime()
+func formatEpochSwitchClock(metrics *PromMetrics) string {
+	switchTime, ok := currentEpochSwitchTime(metrics)
 	if !ok {
 		return "n/a"
 	}
@@ -1302,6 +1309,7 @@ func getDingoConsoleText(ctx context.Context) string {
 
 	cols, rows := dashboardTerminalSize()
 	width := dashboardContentWidth()
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return fmt.Sprintf(
 			"\n %s  %s\n",
@@ -1398,7 +1406,7 @@ func dingoConsoleHero(metrics *PromMetrics, width int) string {
 						uiUnit("/")+
 						uiValue(strconv.FormatUint(metrics.PeersEstablished, 10)),
 				),
-				dingoMetric("Remaining", uiValue(formatEpochRemaining())),
+				dingoMetric("Remaining", uiValue(formatEpochRemaining(metrics))),
 			),
 		},
 	)
@@ -1459,7 +1467,7 @@ func dingoConsoleDashboardCompact(metrics *PromMetrics, width int) string {
 					uiSeverityValue(strconv.FormatUint(tipGap, 10), tipSeverity)+uiUnit(" slots"),
 					tipSeverity,
 				),
-				dingoMetric("Remaining", uiValue(formatEpochRemaining())),
+				dingoMetric("Remaining", uiValue(formatEpochRemaining(metrics))),
 			),
 			dingoMetricRowColumns(
 				innerWidth,
@@ -1760,7 +1768,7 @@ func dingoConsoleChainLane(metrics *PromMetrics, width int) string {
 		epoch = currentEpoch
 	}
 	mempoolKBytes := metrics.MempoolBytes / 1024
-	epochProgress := float64(getEpochProgress())
+	epochProgress := float64(getEpochProgress(metrics))
 	progressSeverity := mithrilProgressSeverity(epochProgress)
 	innerWidth := dingoPanelInnerWidth(width)
 
@@ -1791,8 +1799,8 @@ func dingoConsoleChainLane(metrics *PromMetrics, width int) string {
 			dingoMetricRow(
 				innerWidth,
 				dingoMetric("Epoch No.", uiValue(strconv.FormatUint(epoch, 10))),
-				dingoMetric("Remaining", uiValue(formatEpochRemaining())),
-				dingoMetricSpan("Switch", uiValue(formatEpochSwitchTime()), 2),
+				dingoMetric("Remaining", uiValue(formatEpochRemaining(metrics))),
+				dingoMetricSpan("Switch", uiValue(formatEpochSwitchTime(metrics)), 2),
 			),
 			dingoMetricRow(
 				innerWidth,
@@ -1843,7 +1851,7 @@ func dingoConsoleChainCompact(metrics *PromMetrics, width int) string {
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
-				dingoMetric("Remain", uiValue(formatEpochRemaining())),
+				dingoMetric("Remain", uiValue(formatEpochRemaining(metrics))),
 				dingoMetric(
 					"Mempool",
 					uiValue(strconv.FormatUint(metrics.MempoolTx, 10))+
@@ -2705,7 +2713,6 @@ func main() {
 			prom, err := getPromMetrics(ctx)
 			if err != nil && prom != nil {
 				logger.Warn("Failed to fetch Prometheus metrics", "error", err)
-				failCount.Add(1)
 				select {
 				case <-ctx.Done():
 					return
@@ -2713,10 +2720,9 @@ func main() {
 				}
 				continue
 			} else if prom == nil {
-				if promMetrics == nil {
-					promMetrics = &PromMetrics{}
+				if promMetrics.Load() == nil {
+					promMetrics.Store(&PromMetrics{})
 				}
-				failCount.Add(1)
 				select {
 				case <-ctx.Done():
 					return
@@ -2739,7 +2745,7 @@ func main() {
 				}
 			}
 			applyDefaultSecondaryView()
-			promMetrics = prom
+			promMetrics.Store(prom)
 			updateMithrilView()
 			select {
 			case <-ctx.Done():
@@ -2762,7 +2768,16 @@ func main() {
 			}
 			proc, err := getProcessMetrics(ctx)
 			if err != nil {
-				failCount.Add(1)
+				recordSubsystemFailure(healthSubsystemProcess)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second * 1):
+				}
+				continue
+			}
+			if proc == nil || proc.Pid <= 0 {
+				recordSubsystemFailure(healthSubsystemProcess)
 				select {
 				case <-ctx.Done():
 					return
@@ -2771,6 +2786,7 @@ func main() {
 				continue
 			}
 			processMetrics = proc
+			recordSubsystemSuccess(healthSubsystemProcess)
 			select {
 			case <-ctx.Done():
 				return
@@ -2810,7 +2826,7 @@ func main() {
 			err := filterPeers(ctx)
 			if err != nil {
 				logger.Warn("Failed to filter peers", "error", err)
-				failCount.Add(1)
+				recordSubsystemFailure(healthSubsystemPeers)
 				select {
 				case <-ctx.Done():
 					return
@@ -2818,6 +2834,7 @@ func main() {
 				}
 				continue
 			}
+			recordSubsystemSuccess(healthSubsystemPeers)
 			select {
 			case <-ctx.Done():
 				return
@@ -2958,11 +2975,11 @@ func main() {
 				return
 			default:
 			}
-			if failCount.Load() >= cfg.App.Retries {
+			if failCount() >= cfg.App.Retries {
 				panic(
 					fmt.Errorf(
 						"COULD NOT CONNECT TO A RUNNING INSTANCE, %d FAILED ATTEMPTS IN A ROW",
-						failCount.Load(),
+						failCount(),
 					),
 				)
 			}
@@ -3171,6 +3188,7 @@ func formatSeverityPercentRatio(value uint64, percent float32, severity uiSeveri
 }
 
 func getDingoStats() string {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return ""
 	}
@@ -3345,6 +3363,7 @@ func getDingoStats() string {
 }
 
 func isMithrilSyncActive() bool {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return false
 	}
@@ -3410,13 +3429,14 @@ func updateMithrilView() {
 }
 
 func getMithrilOverlayText(width int) string {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return ""
 	}
 	m := promMetrics
 	innerWidth := dingoPanelInnerWidth(width)
 	tipGap, tipSeverity := dingoConsoleTipGap(m)
-	epochProgress := float64(getEpochProgress())
+	epochProgress := float64(getEpochProgress(m))
 	progressSeverity := mithrilProgressSeverity(epochProgress)
 
 	startedAgo := "n/a"
@@ -3472,8 +3492,8 @@ func getMithrilOverlayText(width int) string {
 					uiProgressBar(epochProgress, 34, progressSeverity),
 				2,
 			),
-			dingoMetric("Remaining", uiValue(formatEpochRemaining())),
-			dingoMetric("Switch", uiValue(formatEpochSwitchClock())),
+			dingoMetric("Remaining", uiValue(formatEpochRemaining(m))),
+			dingoMetric("Switch", uiValue(formatEpochSwitchClock(m))),
 		),
 	)
 
@@ -3525,6 +3545,7 @@ func formatMithrilProgressLine(
 }
 
 func getMithrilStats() string {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return ""
 	}
@@ -3697,21 +3718,21 @@ func getMithrilStats() string {
 	return sb.String()
 }
 
-func getEpochProgress() float32 {
+func getEpochProgress(metrics *PromMetrics) float32 {
 	cfg := config.GetConfig()
 	if cfg.Node.ShelleyTransEpoch < 0 {
 		return float32(0.0)
 	}
 	var epochProgress float32
-	if promMetrics == nil {
+	if metrics == nil {
 		epochProgress = float32(0.0)
 		// #nosec G115
-	} else if promMetrics.EpochNum >= uint64(cfg.Node.ShelleyTransEpoch) {
+	} else if metrics.EpochNum >= uint64(cfg.Node.ShelleyTransEpoch) {
 		if cfg.Node.ShelleyGenesis.EpochLength == 0 {
 			epochProgress = 0.0
 		} else {
 			epochProgress = float32(
-				(float32(promMetrics.SlotInEpoch) / float32(cfg.Node.ShelleyGenesis.EpochLength)) * 100,
+				(float32(metrics.SlotInEpoch) / float32(cfg.Node.ShelleyGenesis.EpochLength)) * 100,
 			)
 		}
 	} else {
@@ -3719,32 +3740,31 @@ func getEpochProgress() float32 {
 			epochProgress = 0.0
 		} else {
 			epochProgress = float32(
-				(float32(promMetrics.SlotInEpoch) / float32(cfg.Node.ByronGenesis.EpochLength)) * 100,
+				(float32(metrics.SlotInEpoch) / float32(cfg.Node.ByronGenesis.EpochLength)) * 100,
 			)
 		}
 	}
 	return epochProgress
 }
 
-func currentEpochTiming() (epochLengthSlots uint64, slotLengthMs uint64, ok bool) {
-	cfg := config.GetConfig()
-	if promMetrics == nil {
+func currentEpochTimingForMetrics(cfg *config.Config, metrics *PromMetrics) (epochLengthSlots uint64, slotLengthMs uint64, ok bool) {
+	if metrics == nil {
 		return 0, 0, false
 	}
 	if cfg.Node.ShelleyTransEpoch >= 0 &&
-		promMetrics.EpochNum >= uint64(cfg.Node.ShelleyTransEpoch) {
+		metrics.EpochNum >= uint64(cfg.Node.ShelleyTransEpoch) {
 		return cfg.Node.ShelleyGenesis.EpochLength, cfg.Node.ShelleyGenesis.SlotLength, cfg.Node.ShelleyGenesis.EpochLength > 0 && cfg.Node.ShelleyGenesis.SlotLength > 0
 	}
 	return cfg.Node.ByronGenesis.EpochLength, cfg.Node.ByronGenesis.SlotLength, cfg.Node.ByronGenesis.EpochLength > 0 && cfg.Node.ByronGenesis.SlotLength > 0
 }
 
-func currentEpochSwitchTime() (time.Time, bool) {
+func currentEpochSwitchTime(metrics *PromMetrics) (time.Time, bool) {
 	cfg := config.GetConfig()
-	if promMetrics == nil || cfg.Node.ByronGenesis.StartTime == 0 {
+	if metrics == nil || cfg.Node.ByronGenesis.StartTime == 0 {
 		return time.Time{}, false
 	}
 
-	epoch := promMetrics.EpochNum
+	epoch := metrics.EpochNum
 	if cfg.Node.ShelleyTransEpoch >= 0 &&
 		epoch >= uint64(cfg.Node.ShelleyTransEpoch) {
 		if cfg.Node.ByronGenesis.EpochLength == 0 ||
@@ -3781,8 +3801,8 @@ func unixTimeFromUint64(seconds uint64) (time.Time, bool) {
 	return time.Unix(int64(seconds), 0), true //nolint:gosec // bounds checked above
 }
 
-func getEpochRemainingSeconds() (uint64, bool) {
-	if switchTime, ok := currentEpochSwitchTime(); ok {
+func getEpochRemainingSeconds(metrics *PromMetrics) (uint64, bool) {
+	if switchTime, ok := currentEpochSwitchTime(metrics); ok {
 		remaining := time.Until(switchTime)
 		if remaining <= 0 {
 			return 0, true
@@ -3790,19 +3810,19 @@ func getEpochRemainingSeconds() (uint64, bool) {
 		return uint64(remaining / time.Second), true
 	}
 
-	epochLength, slotLengthMs, ok := currentEpochTiming()
-	if !ok || promMetrics == nil {
+	epochLength, slotLengthMs, ok := currentEpochTimingForMetrics(config.GetConfig(), metrics)
+	if !ok || metrics == nil {
 		return 0, false
 	}
-	if promMetrics.SlotInEpoch >= epochLength {
+	if metrics.SlotInEpoch >= epochLength {
 		return 0, true
 	}
-	remainingSlots := epochLength - promMetrics.SlotInEpoch
+	remainingSlots := epochLength - metrics.SlotInEpoch
 	return (remainingSlots * slotLengthMs) / 1000, true
 }
 
-func formatEpochRemaining() string {
-	remaining, ok := getEpochRemainingSeconds()
+func formatEpochRemaining(metrics *PromMetrics) string {
+	remaining, ok := getEpochRemainingSeconds(metrics)
 	if !ok {
 		return "n/a"
 	}
@@ -3816,14 +3836,15 @@ func getEpochText(ctx context.Context) string {
 	default:
 	}
 
+	promMetrics := promMetrics.Load()
 	var sb strings.Builder
 
-	epochProgress := getEpochProgress()
+	epochProgress := getEpochProgress(promMetrics)
 	severity := mithrilProgressSeverity(float64(epochProgress))
 
 	fmt.Fprintf(&sb, " %s   %s\n",
 		uiKV("Epoch", uiValue(strconv.FormatUint(currentEpoch, 10))),
-		uiKV("Remaining", uiValue(formatEpochRemaining())),
+		uiKV("Remaining", uiValue(formatEpochRemaining(promMetrics))),
 	)
 	fmt.Fprintf(&sb, " %s\n",
 		uiPercentBar("Progress", float64(epochProgress), severity, 50),
@@ -3838,6 +3859,7 @@ func getChainText(ctx context.Context) string {
 	default:
 	}
 
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return chainText
 	}
@@ -3896,6 +3918,7 @@ func getChainText(ctx context.Context) string {
 func getConnectionText(ctx context.Context) string {
 	cfg := config.GetConfig()
 	var sb strings.Builder
+	promMetrics := promMetrics.Load()
 
 	if p2p {
 		if promMetrics == nil {
@@ -3962,6 +3985,7 @@ func getCoreText(ctx context.Context) string {
 	default:
 	}
 
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return coreText
 	}
@@ -4054,7 +4078,6 @@ func getCoreText(ctx context.Context) string {
 	} else {
 		fmt.Fprintf(&sb, " %s\n", uiMuted("observing only"))
 	}
-	failCount.Store(0)
 	return sb.String()
 }
 
@@ -4065,11 +4088,11 @@ func getBlockText(ctx context.Context) string {
 	default:
 	}
 
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return blockText
 	}
 	if getEffectiveNodeBinary() == DINGO_BINARY && hasDingoPropagationMetrics(promMetrics) {
-		failCount.Store(0)
 		return getDingoPropagationText()
 	}
 
@@ -4079,12 +4102,10 @@ func getBlockText(ctx context.Context) string {
 	// Get our terminal size
 	fd := os.Stdout.Fd()
 	if fd > math.MaxInt {
-		failCount.Add(1)
 		return "ERROR: invalid file descriptor"
 	}
 	tcols, tlines, err := terminal.GetSize(int(fd)) //nolint:gosec // fd validated above
 	if err != nil {
-		failCount.Add(1)
 		return fmt.Sprintf("ERROR: %v", err)
 	}
 	// Validate size
@@ -4143,7 +4164,6 @@ func getBlockText(ctx context.Context) string {
 		uiMuted("1s 3s 5s"),
 	)
 
-	failCount.Store(0)
 	return sb.String()
 }
 
@@ -4163,6 +4183,7 @@ func hasDingoPropagationMetrics(metrics *PromMetrics) bool {
 }
 
 func getDingoPropagationText() string {
+	promMetrics := promMetrics.Load()
 	if promMetrics == nil {
 		return ""
 	}
@@ -4305,6 +4326,7 @@ func formatBlockPropagationPercent(value float64) string {
 }
 
 func currentNodeVersionInfo() (string, string) {
+	promMetrics := promMetrics.Load()
 	if promMetrics != nil && getEffectiveNodeBinary() == DINGO_BINARY {
 		version := strings.TrimSpace(promMetrics.DingoBuildVersion)
 		revision := strings.TrimSpace(promMetrics.DingoBuildCommit)
@@ -4377,6 +4399,7 @@ func getPeerText(ctx context.Context) string {
 	default:
 	}
 
+	promMetrics := promMetrics.Load()
 	var sb strings.Builder
 
 	// Style / UI
@@ -4547,11 +4570,11 @@ func getPeerText(ctx context.Context) string {
 	}
 	sb.WriteString("[white]\n")
 
-	failCount.Store(0)
 	return sb.String()
 }
 
 func getResourceText(ctx context.Context) string {
+	promMetrics := promMetrics.Load()
 	if processMetrics == nil || promMetrics == nil {
 		return resourceText
 	}
@@ -4565,12 +4588,10 @@ func getResourceText(ctx context.Context) string {
 	if processMetrics != nil && processMetrics.Pid != 0 {
 		cpuPercent, err = processMetrics.CPUPercentWithContext(ctx)
 		if err != nil {
-			failCount.Add(1)
 			return fmt.Sprintf("cannot parse CPU usage: %s", err)
 		}
 		processMemory, err = processMetrics.MemoryInfoWithContext(ctx)
 		if err != nil {
-			failCount.Add(1)
 			return fmt.Sprintf("cannot parse memory usage: %s", err)
 		}
 		rss = processMemory.RSS

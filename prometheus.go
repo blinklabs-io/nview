@@ -42,8 +42,8 @@ const epochRetryDelay = time.Second * 5
 var detectedNodeBinary atomic.Value // stores string
 
 func setCurrentEpoch() {
-	if promMetrics != nil {
-		currentEpoch = promMetrics.EpochNum
+	if m := promMetrics.Load(); m != nil {
+		currentEpoch = m.EpochNum
 	}
 }
 
@@ -76,7 +76,12 @@ func runEpochUpdateLoop(
 	}
 }
 
-var promMetrics *PromMetrics
+// promMetrics holds the current immutable metrics snapshot. It is written
+// only by the scrape goroutine (via Store, replacing the pointer with a
+// freshly parsed *PromMetrics rather than mutating fields in place) and read
+// by renderer goroutines via Load, so every reader observes a complete,
+// self-consistent snapshot instead of racing with in-progress publication.
+var promMetrics atomic.Pointer[PromMetrics]
 
 // PromMetrics holds all the Prometheus metrics collected from a Cardano node.
 // It includes metrics for blocks, epochs, slots, memory, connections, and more.
@@ -259,22 +264,22 @@ func getPromMetrics(ctx context.Context) (*PromMetrics, error) {
 	var respBodyBytes []byte
 	respBodyBytes, statusCode, err := getNodeMetrics(ctx)
 	if err != nil {
-		failCount.Add(1)
+		recordSubsystemFailure(healthSubsystemPrometheus)
 		return metrics, fmt.Errorf("failed getNodeMetrics: %w", err)
 	}
 	if statusCode != http.StatusOK {
-		failCount.Add(1)
+		recordSubsystemFailure(healthSubsystemPrometheus)
 		return metrics, fmt.Errorf("failed HTTP: %d", statusCode)
 	}
 
 	b, err := prom2json(respBodyBytes)
 	if err != nil {
-		failCount.Add(1)
+		recordSubsystemFailure(healthSubsystemPrometheus)
 		return metrics, fmt.Errorf("failed prom2json: %w", err)
 	}
 
 	if err := json.Unmarshal(b, &metrics); err != nil {
-		failCount.Add(1)
+		recordSubsystemFailure(healthSubsystemPrometheus)
 		return metrics, fmt.Errorf("failed JSON unmarshal: %w", err)
 	}
 
@@ -282,7 +287,7 @@ func getPromMetrics(ctx context.Context) (*PromMetrics, error) {
 	detectNodeType(metrics)
 
 	// panic(string(b))
-	failCount.Store(0)
+	recordSubsystemSuccess(healthSubsystemPrometheus)
 	return metrics, nil
 }
 

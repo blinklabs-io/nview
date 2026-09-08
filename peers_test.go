@@ -85,7 +85,7 @@ func TestPeerRTTResultsSortStableWhenRTTUnavailable(t *testing.T) {
 }
 
 func TestGetPeerTextRendersPartialLazyResults(t *testing.T) {
-	originalPromMetrics := promMetrics
+	originalPromMetrics := promMetrics.Load()
 	originalPeerText := peerText
 	peerStatsMu.Lock()
 	originalPeerStats := peerStats
@@ -94,7 +94,7 @@ func TestGetPeerTextRendersPartialLazyResults(t *testing.T) {
 	originalPeersFiltered := peersFiltered
 	peersFilteredMu.Unlock()
 	defer func() {
-		promMetrics = originalPromMetrics
+		promMetrics.Store(originalPromMetrics)
 		peerText = originalPeerText
 		peerStatsMu.Lock()
 		peerStats = originalPeerStats
@@ -104,13 +104,13 @@ func TestGetPeerTextRendersPartialLazyResults(t *testing.T) {
 		peersFilteredMu.Unlock()
 	}()
 
-	promMetrics = &PromMetrics{
+	promMetrics.Store(&PromMetrics{
 		PeersKnown:       2,
 		PeersEstablished: 1,
 		PeersActive:      1,
 		PeersHot:         1,
 		PeersCold:        1,
-	}
+	})
 	peersFilteredMu.Lock()
 	peersFiltered = []string{
 		"198.51.100.10;3001;o",
@@ -324,5 +324,59 @@ func TestResetPeersClearsFilteredAndStats(t *testing.T) {
 		len(peerStats.RTTresultsSlice) != 0 ||
 		len(peerStats.InFlight) != 0 {
 		t.Fatalf("peerStats collections were not reset: %#v", peerStats)
+	}
+}
+
+// TestPingPeersDoesNotResetPeersHealthWhenViewInactive guards against a
+// regression where pingPeers reset the peers subsystem's consecutive-failure
+// count on every call, including its early return for an inactive peer
+// view. That let an unrelated, frequently-running loop mask a persistent
+// filterPeers failure: the peers subsystem would report healthy even while
+// the actual peer-filtering attempt kept failing. Only a successful
+// filterPeers(ctx) call may now clear that count.
+func TestPingPeersDoesNotResetPeersHealthWhenViewInactive(t *testing.T) {
+	original := resetSubsystemFailuresForTest()
+	defer restoreSubsystemFailuresForTest(original)
+
+	// Force dashboardShowsPeers() to false and the active view to something
+	// other than viewPeers, so pingPeers takes its early-return path.
+	originalDetected, _ := detectedNodeBinary.Load().(string)
+	detectedNodeBinary.Store(CARDANO_BINARY)
+	defer func() {
+		detectedNodeBinary.Store(originalDetected)
+	}()
+
+	originalPeerOverlay := peerOverlayActive.Load()
+	peerOverlayActive.Store(false)
+	defer peerOverlayActive.Store(originalPeerOverlay)
+
+	originalActive := activeSecondary.Load()
+	setActiveSecondaryView(viewNone)
+	defer activeSecondary.Store(originalActive)
+
+	if dashboardShowsPeers() || getActiveSecondaryView() == viewPeers {
+		t.Fatal("test setup did not produce an inactive peer view")
+	}
+
+	// Simulate a persistent filterPeers failure, the way the main peer-filter
+	// loop records it.
+	originalProcessMetrics := processMetrics
+	processMetrics = nil
+	defer func() { processMetrics = originalProcessMetrics }()
+
+	ctx := context.Background()
+	if err := filterPeers(ctx); err == nil {
+		t.Fatal("expected filterPeers to fail with processMetrics unset")
+	}
+	recordSubsystemFailure(healthSubsystemPeers)
+	recordSubsystemFailure(healthSubsystemPeers)
+
+	pingPeers(ctx)
+
+	if got := subsystemFailures[healthSubsystemPeers].Load(); got != 2 {
+		t.Fatalf(
+			"peers failure count = %d after an inactive-view pingPeers call, expected 2 to remain untouched",
+			got,
+		)
 	}
 }

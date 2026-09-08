@@ -40,7 +40,7 @@ func setRole() {
 	r := "Relay"
 	if cfg.Node.BlockProducer {
 		r = "Core"
-	} else if promMetrics != nil && promMetrics.AboutToLead > 0 {
+	} else if m := promMetrics.Load(); m != nil && m.AboutToLead > 0 {
 		r = "Core"
 	}
 	if role != r {
