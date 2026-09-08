@@ -638,12 +638,7 @@ func TestGetEpochProgress(t *testing.T) {
 			cfg.Node.ShelleyGenesis.EpochLength = tt.epochLength
 			cfg.Node.ByronGenesis.EpochLength = tt.epochLength
 
-			// Set global promMetrics
-			originalPromMetrics := promMetrics.Load()
-			promMetrics.Store(tt.promMetrics)
-			defer func() { promMetrics.Store(originalPromMetrics) }()
-
-			result := getEpochProgress()
+			result := getEpochProgress(tt.promMetrics)
 			if result != tt.expected {
 				t.Errorf(
 					"getEpochProgress() = %v, expected %v",
@@ -718,7 +713,6 @@ func TestFormatEpochRemaining(t *testing.T) {
 	originalByronStartTime := cfg.Node.ByronGenesis.StartTime
 	originalByronEpochLength := cfg.Node.ByronGenesis.EpochLength
 	originalByronSlotLength := cfg.Node.ByronGenesis.SlotLength
-	originalPromMetrics := promMetrics.Load()
 	defer func() {
 		cfg.Node.ShelleyTransEpoch = originalShelleyTransEpoch
 		cfg.Node.ShelleyGenesis.EpochLength = originalShelleyEpochLength
@@ -726,7 +720,6 @@ func TestFormatEpochRemaining(t *testing.T) {
 		cfg.Node.ByronGenesis.StartTime = originalByronStartTime
 		cfg.Node.ByronGenesis.EpochLength = originalByronEpochLength
 		cfg.Node.ByronGenesis.SlotLength = originalByronSlotLength
-		promMetrics.Store(originalPromMetrics)
 	}()
 
 	cfg.Node.ShelleyTransEpoch = 0
@@ -735,12 +728,12 @@ func TestFormatEpochRemaining(t *testing.T) {
 	cfg.Node.ByronGenesis.StartTime = uint64(time.Now().Unix()) - 1040
 	cfg.Node.ByronGenesis.EpochLength = 100
 	cfg.Node.ByronGenesis.SlotLength = 1000
-	promMetrics.Store(&PromMetrics{
+	metrics := &PromMetrics{
 		EpochNum:    10,
 		SlotInEpoch: 40,
-	})
+	}
 
-	remaining, ok := getEpochRemainingSeconds()
+	remaining, ok := getEpochRemainingSeconds(metrics)
 	if !ok {
 		t.Fatal("getEpochRemainingSeconds() returned !ok")
 	}
@@ -2120,15 +2113,14 @@ func BenchmarkGetEpochProgress(b *testing.B) {
 	cfg.Node.ShelleyGenesis.EpochLength = 432000
 	cfg.Node.ByronGenesis.EpochLength = 216000
 
-	// Set promMetrics
-	promMetrics.Store(&PromMetrics{
+	metrics := &PromMetrics{
 		EpochNum:    150,
 		SlotInEpoch: 216000,
-	})
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		getEpochProgress()
+		getEpochProgress(metrics)
 	}
 }
 
@@ -2450,5 +2442,51 @@ func TestFormatMemoryBytesUsesMegabytesBelowGigabyte(t *testing.T) {
 				t.Fatalf("formatMemoryBytes(%d) = %q, expected %q", tt.bytes, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestRenderHelpersUseArgumentSnapshotNotGlobal guards against a regression
+// where a composite renderer like getOverviewText loaded its own promMetrics
+// snapshot but then called helpers such as currentTipGap and
+// getEpochProgress that reloaded the package-level promMetrics
+// independently. If a scrape landed between those loads, one render could
+// mix fields from two different snapshots. These helpers now take the
+// caller's snapshot as a parameter and never touch the global themselves, so
+// a differing global value must not affect their output.
+func TestRenderHelpersUseArgumentSnapshotNotGlobal(t *testing.T) {
+	originalPromMetrics := promMetrics.Load()
+	defer promMetrics.Store(originalPromMetrics)
+
+	cfg := config.GetConfig()
+	originalShelleyTransEpoch := cfg.Node.ShelleyTransEpoch
+	originalShelleyEpochLength := cfg.Node.ShelleyGenesis.EpochLength
+	originalByronEpochLength := cfg.Node.ByronGenesis.EpochLength
+	defer func() {
+		cfg.Node.ShelleyTransEpoch = originalShelleyTransEpoch
+		cfg.Node.ShelleyGenesis.EpochLength = originalShelleyEpochLength
+		cfg.Node.ByronGenesis.EpochLength = originalByronEpochLength
+	}()
+	cfg.Node.ShelleyTransEpoch = 0
+	cfg.Node.ShelleyGenesis.EpochLength = 100
+	cfg.Node.ByronGenesis.EpochLength = 100
+
+	// The global holds a wildly different snapshot than the one passed
+	// explicitly below, so any accidental reload of the global is caught.
+	promMetrics.Store(&PromMetrics{SlotNum: 999999, EpochNum: 999, SlotInEpoch: 99})
+
+	argMetrics := &PromMetrics{SlotNum: 0, EpochNum: 5, SlotInEpoch: 50}
+
+	if gap, severity := currentTipGap(argMetrics); gap != 0 || severity != uiSeverityMuted {
+		t.Fatalf(
+			"currentTipGap(argMetrics) = (%d, %d), expected (0, uiSeverityMuted) from the argument's zero SlotNum, not the global's",
+			gap, severity,
+		)
+	}
+
+	if progress := getEpochProgress(argMetrics); progress != 50.0 {
+		t.Fatalf(
+			"getEpochProgress(argMetrics) = %v, expected 50 from the argument's SlotInEpoch, not the global's",
+			progress,
+		)
 	}
 }
