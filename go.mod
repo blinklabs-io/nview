@@ -1,8 +1,6 @@
 module github.com/blinklabs-io/nview
 
-go 1.25.0
-
-toolchain go1.25.4
+go 1.26.0
 
 require (
 	github.com/gdamore/tcell/v2 v2.13.10
@@ -14,7 +12,7 @@ require (
 	github.com/prometheus/common v0.71.0
 	github.com/rivo/tview v0.42.0
 	github.com/shirou/gopsutil/v3 v3.24.5
-	golang.org/x/term v0.45.0
+	golang.org/x/term v0.46.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -32,7 +30,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
