@@ -1,7 +1,6 @@
 # nview
 
 [![CI](https://github.com/blinklabs-io/nview/actions/workflows/go-test.yml/badge.svg)](https://github.com/blinklabs-io/nview/actions/workflows/go-test.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/blinklabs-io/nview)](https://goreportcard.com/report/github.com/blinklabs-io/nview)
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://golang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/blinklabs-io/nview/blob/main/LICENSE)
 
