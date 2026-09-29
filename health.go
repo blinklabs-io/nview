@@ -48,8 +48,7 @@ func recordSubsystemSuccess(s healthSubsystem) {
 }
 
 // failCount reports the worst consecutive-failure streak across all
-// tracked subsystems. It drives the overall dashboard health indicator and
-// the connect-retry panic threshold.
+// tracked subsystems. It drives the overall dashboard health indicator.
 func failCount() uint32 {
 	var worst uint32
 	for i := range subsystemFailures {

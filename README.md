@@ -81,6 +81,9 @@ The following environment variables control the behavior of the application.
   Cardano Node, default is 12798
 - `PROM_TIMEOUT` - Sets the maximum number of seconds to wait for response
   when polling a Cardano Node for Prometheus metrics, default is 3
+- `RETRIES` - Consecutive failures in any monitoring subsystem before health
+  is shown as degraded, default is 3. Monitoring continues and automatically
+  recovers after successful attempts; this is not an exit threshold.
 - `NVIEW_VISUAL_MODE` - Controls optional terminal glyphs for the TUI:
   `auto`, `unicode`, `plain`, or `nerd`. The default is `auto`.
 - `NVIEW_IMAGE_PROTOCOL` - Controls terminal image protocol detection for
@@ -148,6 +151,15 @@ PROM_HOST=192.168.1.100 PROM_PORT=12798 ./nview
 ```
 
 ## Troubleshooting
+
+Scrape, process discovery, and peer discovery failures are tracked separately.
+The dashboard keeps its last successful metrics while retrying and shows
+`retrying` or `degraded` health. Failed Prometheus scrapes include their cause
+in the application logs shown when quitting with `q`.
+
+cardano-node 11.1.2's `info` declarations and renamed peer/connection metrics
+are supported. Other unsupported or malformed formats still produce an explicit
+scrape error, but do not terminate the dashboard.
 
 ### Node Not Detected
 

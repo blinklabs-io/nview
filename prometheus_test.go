@@ -17,12 +17,92 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/blinklabs-io/nview/internal/config"
 	dto "github.com/prometheus/client_model/go"
 )
+
+func TestPromMetricsCardanoNode1112(t *testing.T) {
+	prom, err := os.ReadFile("testdata/cardano-node-11.1.2.prom")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := prom2json(prom)
+	if err != nil {
+		t.Fatalf("real cardano-node 11.1.2 scrape: %v", err)
+	}
+	var metrics PromMetrics
+	if err := json.Unmarshal(b, &metrics); err != nil {
+		t.Fatal(err)
+	}
+	if metrics.BlockNum != 14004704 || metrics.EpochNum != 658 || metrics.SlotNum != 199146375 {
+		t.Fatalf("chain metrics lost: block=%d epoch=%d slot=%d", metrics.BlockNum, metrics.EpochNum, metrics.SlotNum)
+	}
+	if metrics.PeersKnown != 150 || metrics.PeersEstablished != 30 || metrics.PeersActive != 20 {
+		t.Fatalf("peer metrics lost: known=%d established=%d active=%d", metrics.PeersKnown, metrics.PeersEstablished, metrics.PeersActive)
+	}
+	if metrics.ConnOutgoing != 39 || metrics.ConnBiDir != 39 || metrics.PeersCold != 120 || metrics.PeersWarm != 10 || metrics.PeersHot != 20 {
+		t.Fatalf("connection/peer state metrics lost: %+v", metrics)
+	}
+	if metrics.BlockDelay != 0.100927326 || metrics.BlocksW1s != 1 || metrics.BlocksW3s != 1 || metrics.BlocksW5s != 1 {
+		t.Fatalf("block fetch metrics lost: delay=%v cdf=%v/%v/%v", metrics.BlockDelay, metrics.BlocksW1s, metrics.BlocksW3s, metrics.BlocksW5s)
+	}
+	if metrics.NodeStartTime != 1790711690 {
+		t.Fatalf("node start time = %d, want 1790711690", metrics.NodeStartTime)
+	}
+}
+
+func TestPromMetricsInfoPreservesLabels(t *testing.T) {
+	prom := []byte(`# HELP dingo_build_info Compiler and version info
+# TYPE dingo_build_info info
+dingo_build_info{version="0.9.0",commit="abc123",goversion="go1.26",network="preview"} 1
+# TYPE cardano_node_metrics_epoch_int gauge
+cardano_node_metrics_epoch_int 658
+# EOF
+`)
+	b, err := prom2json(prom)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var metrics PromMetrics
+	if err := json.Unmarshal(b, &metrics); err != nil {
+		t.Fatal(err)
+	}
+	if metrics.DingoBuildVersion != "0.9.0" || metrics.DingoBuildCommit != "abc123" || metrics.DingoBuildGoVersion != "go1.26" || metrics.Network != "preview" || metrics.EpochNum != 658 {
+		t.Fatalf("info labels or following gauge lost: %+v", metrics)
+	}
+}
+
+func TestPromMetricsCardanoAliasesPreferCanonicalValues(t *testing.T) {
+	prom := []byte(`cardano_node_metrics_peerSelection_KnownPeers_int 150
+cardano_node_metrics_peerSelection_KnownPeers 151
+cardano_node_metrics_node_start_time_int 1790711690
+cardano_node_metrics_nodeStartTime_int 1790711689
+cardano_node_metrics_forging_enabled_int 1
+cardano_node_metrics_connectionManager_inboundConns_int 4
+cardano_node_metrics_connectionManager_unidirectionalConns_int 5
+cardano_node_metrics_connectionManager_fullDuplexConns_int 6
+cardano_node_metrics_peerSelection_WarmPeersPromotions_int 7
+cardano_node_metrics_peerSelection_WarmPeersDemotions_int 8
+`)
+	b, err := prom2json(prom)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var metrics PromMetrics
+	if err := json.Unmarshal(b, &metrics); err != nil {
+		t.Fatal(err)
+	}
+	if metrics.PeersKnown != 151 || metrics.NodeStartTime != 1790711689 {
+		t.Fatalf("canonical values were overwritten: known=%d start=%d", metrics.PeersKnown, metrics.NodeStartTime)
+	}
+	if metrics.ForgingEnabled != 1 || metrics.ConnIncoming != 4 || metrics.ConnUniDir != 5 || metrics.ConnFullDuplex != 6 || metrics.PeerWarmPromotions != 7 || metrics.PeerWarmDemotions != 8 {
+		t.Fatalf("nonzero aliases lost: %+v", metrics)
+	}
+}
 
 func TestDetectNodeType(t *testing.T) {
 	tests := []struct {

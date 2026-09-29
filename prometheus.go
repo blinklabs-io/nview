@@ -342,7 +342,7 @@ func prom2json(prom []byte) ([]byte, error) {
 	b := []byte{}
 	parser := expfmt.NewTextParser(model.UTF8Validation)
 	families, err := parser.TextToMetricFamilies(
-		strings.NewReader(string(prom)),
+		strings.NewReader(prometheusText(prom)),
 	)
 	if err != nil {
 		return b, err
@@ -374,11 +374,58 @@ func prom2json(prom []byte) ([]byte, error) {
 			}
 		}
 	}
+	applyCardanoMetricAliases(out)
 	b, err = json.MarshalIndent(out, "", "    ")
 	if err != nil {
 		return b, err
 	}
 	return b, nil
+}
+
+// prometheusText adapts the info declarations emitted by cardano-node 11.1.2
+// to labeled gauges. expfmt's text parser rejects the OpenMetrics info type;
+// changing only the declaration preserves sample names, labels and values.
+func prometheusText(prom []byte) string {
+	lines := strings.Split(string(prom), "\n")
+	for i, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) == 4 && fields[0] == "#" && fields[1] == "TYPE" && fields[3] == "info" {
+			lines[i] = "# TYPE " + fields[2] + " gauge"
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+func applyCardanoMetricAliases(out map[string]any) {
+	aliases := map[string]string{
+		"cardano_node_metrics_forging_enabled_int":                       "cardano_node_metrics_forging_enabled",
+		"cardano_node_metrics_node_start_time_int":                       "cardano_node_metrics_nodeStartTime_int",
+		"cardano_node_metrics_blockfetchclient_blockdelay_real":          "cardano_node_metrics_blockfetchclient_blockdelay_s",
+		"cardano_node_metrics_blockfetchclient_blockdelay_cdfOne_real":   "cardano_node_metrics_blockfetchclient_blockdelay_cdfOne",
+		"cardano_node_metrics_blockfetchclient_blockdelay_cdfThree_real": "cardano_node_metrics_blockfetchclient_blockdelay_cdfThree",
+		"cardano_node_metrics_blockfetchclient_blockdelay_cdfFive_real":  "cardano_node_metrics_blockfetchclient_blockdelay_cdfFive",
+		"cardano_node_metrics_peerSelection_Cold_int":                    "cardano_node_metrics_peerSelection_cold",
+		"cardano_node_metrics_peerSelection_Warm_int":                    "cardano_node_metrics_peerSelection_warm",
+		"cardano_node_metrics_peerSelection_Hot_int":                     "cardano_node_metrics_peerSelection_hot",
+		"cardano_node_metrics_peerSelection_KnownPeers_int":              "cardano_node_metrics_peerSelection_KnownPeers",
+		"cardano_node_metrics_peerSelection_EstablishedPeers_int":        "cardano_node_metrics_peerSelection_EstablishedPeers",
+		"cardano_node_metrics_peerSelection_ActivePeers_int":             "cardano_node_metrics_peerSelection_ActivePeers",
+		"cardano_node_metrics_peerSelection_WarmPeersPromotions_int":     "cardano_node_metrics_peerSelection_WarmPeersPromotions",
+		"cardano_node_metrics_peerSelection_WarmPeersDemotions_int":      "cardano_node_metrics_peerSelection_WarmPeersDemotions",
+		"cardano_node_metrics_connectionManager_inboundConns_int":        "cardano_node_metrics_connectionManager_incomingConns",
+		"cardano_node_metrics_connectionManager_outboundConns_int":       "cardano_node_metrics_connectionManager_outgoingConns",
+		"cardano_node_metrics_connectionManager_unidirectionalConns_int": "cardano_node_metrics_connectionManager_unidirectionalConns",
+		"cardano_node_metrics_connectionManager_duplexConns_int":         "cardano_node_metrics_connectionManager_duplexConns",
+		"cardano_node_metrics_connectionManager_fullDuplexConns_int":     "cardano_node_metrics_connectionManager_fullDuplexConns",
+	}
+	for source, target := range aliases {
+		if value, ok := out[source]; ok {
+			// Prefer an existing canonical value, independent of family iteration order.
+			if _, exists := out[target]; !exists {
+				out[target] = value
+			}
+		}
+	}
 }
 
 func setPromMetricValue(out map[string]any, name string, value float64) {

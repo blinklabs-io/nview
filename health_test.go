@@ -92,7 +92,7 @@ func TestSubsystemFailuresAreIndependent(t *testing.T) {
 }
 
 // TestFailCountReportsWorstSubsystem verifies the aggregate failCount used
-// for the dashboard health indicator and the connect-retry panic threshold
+// for the dashboard health indicator
 // reports the worst consecutive-failure streak across all subsystems, not a
 // sum or a single subsystem's view.
 func TestFailCountReportsWorstSubsystem(t *testing.T) {

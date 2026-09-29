@@ -417,7 +417,7 @@ func visualModeName(mode terminalVisualMode) string {
 
 func dashboardHealth() (string, uiSeverity) {
 	failures := failCount()
-	if failures >= 5 {
+	if failures > 0 && failures >= config.GetConfig().App.Retries {
 		return "degraded", uiSeverityCritical
 	}
 	if failures > 0 {
@@ -2710,43 +2710,7 @@ func main() {
 				return
 			default:
 			}
-			prom, err := getPromMetrics(ctx)
-			if err != nil && prom != nil {
-				logger.Warn("Failed to fetch Prometheus metrics", "error", err)
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(time.Second * time.Duration(cfg.Prometheus.Refresh)):
-				}
-				continue
-			} else if prom == nil {
-				if promMetrics.Load() == nil {
-					promMetrics.Store(&PromMetrics{})
-				}
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(time.Second * time.Duration(cfg.Prometheus.Refresh)):
-				}
-				continue
-			}
-			if getEffectiveNodeBinary() == DINGO_BINARY && prom != nil {
-				if config.ApplyDingoGenesisOverride(
-					prom.DingoShelleyStartTime,
-					prom.DingoEpochLengthSlots,
-				) {
-					logger.Info(
-						"genesis params overridden from Dingo metrics",
-						"shelleyStart",
-						prom.DingoShelleyStartTime,
-						"epochLengthSlots",
-						prom.DingoEpochLengthSlots,
-					)
-				}
-			}
-			applyDefaultSecondaryView()
-			promMetrics.Store(prom)
-			updateMithrilView()
+			refreshPrometheusMetrics(ctx)
 			select {
 			case <-ctx.Done():
 				return
@@ -2967,33 +2931,10 @@ func main() {
 	pages.AddPage("Main", flex, true, true)
 	refreshDashboardText(ctx)
 
-	// Start our background refresh timer
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-			if failCount() >= cfg.App.Retries {
-				panic(
-					fmt.Errorf(
-						"COULD NOT CONNECT TO A RUNNING INSTANCE, %d FAILED ATTEMPTS IN A ROW",
-						failCount(),
-					),
-				)
-			}
-
-			// Refresh all the things
-			setRole()
-			refreshDashboardText(ctx)
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(time.Second * time.Duration(cfg.App.Refresh)):
-			}
-		}
-	}()
+	go runDashboardRefreshLoop(ctx, time.Second*time.Duration(cfg.App.Refresh), func() {
+		setRole()
+		refreshDashboardText(ctx)
+	})
 
 	if err := app.SetRoot(pages, true).EnableMouse(false).Run(); err != nil {
 		panic(err)
