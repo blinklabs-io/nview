@@ -188,10 +188,29 @@ cardano_node_metrics_connectionManager_prunableConns 2
 func TestPromMetricsInfoDeclaration(t *testing.T) {
 	prom := []byte(`# TYPE cardano_node_metrics_basicInfo info
 cardano_node_metrics_basicInfo{network="preview"} 1
+# TYPE cardano_node_metrics_Epoch_int gauge
 cardano_node_metrics_Epoch_int 658
+# EOF
 `)
 
-	metrics := decodePromMetrics(t, prom)
+	b, err := prom2jsonWithContentType(
+		prom,
+		"application/openmetrics-text; version=1.0.0",
+	)
+	if err != nil {
+		t.Fatalf("prom2jsonWithContentType() error = %v", err)
+	}
+	var metrics PromMetrics
+	if err := json.Unmarshal(b, &metrics); err != nil {
+		t.Fatalf("JSON unmarshal error = %v", err)
+	}
+	var values map[string]any
+	if err := json.Unmarshal(b, &values); err != nil {
+		t.Fatalf("metrics unmarshal error = %v", err)
+	}
+	if values["cardano_node_metrics_basicInfo"] != float64(1) {
+		t.Errorf("info metric value = %v, expected 1", values["cardano_node_metrics_basicInfo"])
+	}
 	if metrics.Network != "preview" {
 		t.Errorf("Network = %q, expected preview", metrics.Network)
 	}

@@ -17,7 +17,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"mime"
 	"net/http"
 	"slices"
 	"strings"
@@ -28,6 +31,8 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
+	"github.com/prometheus/prometheus/model/labels"
+	"github.com/prometheus/prometheus/model/textparse"
 )
 
 // Track current epoch
@@ -262,7 +267,7 @@ type MithrilLedgerImportStage struct {
 func getPromMetrics(ctx context.Context) (*PromMetrics, error) {
 	var metrics *PromMetrics
 	var respBodyBytes []byte
-	respBodyBytes, statusCode, err := getNodeMetrics(ctx)
+	respBodyBytes, statusCode, contentType, err := getNodeMetrics(ctx)
 	if err != nil {
 		recordSubsystemFailure(healthSubsystemPrometheus)
 		return metrics, fmt.Errorf("failed getNodeMetrics: %w", err)
@@ -272,7 +277,7 @@ func getPromMetrics(ctx context.Context) (*PromMetrics, error) {
 		return metrics, fmt.Errorf("failed HTTP: %d", statusCode)
 	}
 
-	b, err := prom2json(respBodyBytes)
+	b, err := prom2jsonWithContentType(respBodyBytes, contentType)
 	if err != nil {
 		recordSubsystemFailure(healthSubsystemPrometheus)
 		return metrics, fmt.Errorf("failed prom2json: %w", err)
@@ -337,12 +342,24 @@ func getEffectiveNodeName() string {
 } // Converts a prometheus http response byte array into a JSON byte array
 
 func prom2json(prom []byte) ([]byte, error) {
+	return prom2jsonWithContentType(prom, "text/plain; version=0.0.4")
+}
+
+func prom2jsonWithContentType(prom []byte, contentType string) ([]byte, error) {
+	mediaType, _, mediaTypeErr := mime.ParseMediaType(contentType)
+	if mediaTypeErr == nil && mediaType == expfmt.OpenMetricsType {
+		return openMetrics2json(prom, contentType)
+	}
+	return prometheusText2json(prom)
+}
+
+func prometheusText2json(prom []byte) ([]byte, error) {
 	// {"name": 0}
 	out := make(map[string]any)
 	b := []byte{}
 	parser := expfmt.NewTextParser(model.UTF8Validation)
 	families, err := parser.TextToMetricFamilies(
-		strings.NewReader(prometheusText(prom)),
+		strings.NewReader(string(prom)),
 	)
 	if err != nil {
 		return b, err
@@ -381,15 +398,42 @@ func prom2json(prom []byte) ([]byte, error) {
 	return b, nil
 }
 
-func prometheusText(prom []byte) string {
-	lines := strings.Split(string(prom), "\n")
-	for i, line := range lines {
-		fields := strings.Fields(line)
-		if len(fields) == 4 && fields[0] == "#" && fields[1] == "TYPE" && fields[3] == "info" {
-			lines[i] = "# TYPE " + fields[2] + " gauge"
-		}
+func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
+	var symbols labels.SymbolTable
+	parser, err := textparse.New(prom, contentType, "", true, false, &symbols)
+	if err != nil {
+		return nil, err
 	}
-	return strings.Join(lines, "\n")
+	if parser == nil {
+		return nil, errors.New("unsupported OpenMetrics format")
+	}
+	out := make(map[string]any)
+	var parsedLabels labels.Labels
+	for {
+		entry, err := parser.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		if entry != textparse.EntrySeries {
+			continue
+		}
+		_, _, value := parser.Series()
+		parser.Labels(&parsedLabels)
+		name := parsedLabels.Get(labels.MetricName)
+		metricLabels := make([]*dto.LabelPair, 0, parsedLabels.Len()-1)
+		parsedLabels.Range(func(label labels.Label) {
+			if label.Name == labels.MetricName {
+				return
+			}
+			name, labelValue := label.Name, label.Value
+			metricLabels = append(metricLabels, &dto.LabelPair{Name: &name, Value: &labelValue})
+		})
+		setPromMetricValueWithLabels(out, name, value, metricLabels)
+	}
+	return json.MarshalIndent(out, "", "    ")
 }
 
 func setPromMetricValue(out map[string]any, name string, value float64) {
