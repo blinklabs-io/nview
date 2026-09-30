@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/blinklabs-io/nview/internal/config"
+	"github.com/prometheus/common/expfmt"
 )
 
 // bodyCloseTracker wraps a response body and records whether Close was
@@ -109,8 +110,11 @@ func pointMetricsClientAtTestServer(
 // TestGetNodeMetricsSuccessClosesBody is a sanity check that the happy path
 // still returns the response body and closes it.
 func TestGetNodeMetricsSuccessClosesBody(t *testing.T) {
+	acceptHeader := make(chan string, 1)
 	server := httptest.NewServer(http.HandlerFunc(
-		func(w http.ResponseWriter, _ *http.Request) {
+		func(w http.ResponseWriter, r *http.Request) {
+			acceptHeader <- r.Header.Get("Accept")
+			w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("metric_a 1\n"))
 		},
@@ -119,7 +123,7 @@ func TestGetNodeMetricsSuccessClosesBody(t *testing.T) {
 
 	closed := pointMetricsClientAtTestServer(t, server, 3)
 
-	body, status, err := getNodeMetrics(context.Background())
+	body, status, contentType, err := getNodeMetrics(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -128,6 +132,14 @@ func TestGetNodeMetricsSuccessClosesBody(t *testing.T) {
 	}
 	if string(body) != "metric_a 1\n" {
 		t.Fatalf("unexpected body: %q", body)
+	}
+	if contentType != "text/plain; version=0.0.4" {
+		t.Fatalf("unexpected Content-Type: %q", contentType)
+	}
+	got := <-acceptHeader
+	if !strings.Contains(got, string(expfmt.FmtOpenMetrics_1_0_0)) ||
+		!strings.Contains(got, string(expfmt.FmtText)) {
+		t.Fatalf("unexpected Accept header: %q", got)
 	}
 	if !closed.Load() {
 		t.Fatal("expected response body to be closed")
@@ -152,7 +164,7 @@ func TestGetNodeMetricsOversizedResponseClosesBody(t *testing.T) {
 
 	closed := pointMetricsClientAtTestServer(t, server, 3)
 
-	_, _, err := getNodeMetrics(context.Background())
+	_, _, _, err := getNodeMetrics(context.Background())
 	if !errors.Is(err, errMetricsResponseTooLarge) {
 		t.Fatalf("expected errMetricsResponseTooLarge, got %v", err)
 	}
@@ -188,7 +200,7 @@ func TestGetNodeMetricsStalledResponseClosesBody(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		_, _, err := getNodeMetrics(context.Background())
+		_, _, _, err := getNodeMetrics(context.Background())
 		errCh <- err
 	}()
 
@@ -222,7 +234,7 @@ func TestGetNodeMetricsReadErrorClosesBody(t *testing.T) {
 
 	closed := pointMetricsClientAtTestServer(t, server, 3)
 
-	_, _, err := getNodeMetrics(context.Background())
+	_, _, _, err := getNodeMetrics(context.Background())
 	if err == nil {
 		t.Fatal("expected a read error from a truncated response")
 	}

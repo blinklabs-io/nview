@@ -21,9 +21,11 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/blinklabs-io/nview/internal/config"
+	"github.com/prometheus/common/expfmt"
 )
 
 // maxMetricsResponseBytes bounds how much of the node's metrics response is
@@ -43,7 +45,7 @@ var errMetricsResponseTooLarge = errors.New(
 var httpClient = http.DefaultClient
 
 // Fetches the node metrics and return a byte array
-func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
+func getNodeMetrics(ctx context.Context) ([]byte, int, string, error) {
 	// Load our config and get host/port
 	cfg := config.GetConfig()
 	url := fmt.Sprintf(
@@ -60,8 +62,13 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 		nil,
 	)
 	if err != nil {
-		return respBodyBytes, http.StatusInternalServerError, err
+		return respBodyBytes, http.StatusInternalServerError, "", err
 	}
+	accept := strings.Join([]string{
+		string(expfmt.NewFormat(expfmt.TypeOpenMetrics)) + "; q=1.0",
+		string(expfmt.NewFormat(expfmt.TypeTextPlain)) + "; q=0.9",
+	}, ", ")
+	req.Header.Set("Accept", accept)
 	// Set a deadline covering the whole request, including reading the body
 	ctx, cancel := context.WithTimeout(
 		ctx,
@@ -72,10 +79,10 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 	// Get metrics from the node
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return respBodyBytes, http.StatusInternalServerError, err
+		return respBodyBytes, http.StatusInternalServerError, "", err
 	}
 	if resp == nil {
-		return respBodyBytes, http.StatusInternalServerError, errors.New(
+		return respBodyBytes, http.StatusInternalServerError, "", errors.New(
 			"empty response",
 		)
 	}
@@ -88,12 +95,15 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, error) {
 	limitedBody := io.LimitReader(resp.Body, maxMetricsResponseBytes+1)
 	respBodyBytes, err = io.ReadAll(limitedBody)
 	if err != nil {
-		return respBodyBytes, http.StatusInternalServerError, err
+		return respBodyBytes, http.StatusInternalServerError, "", err
 	}
 	if int64(len(respBodyBytes)) > maxMetricsResponseBytes {
-		return respBodyBytes, http.StatusInternalServerError, errMetricsResponseTooLarge
+		return respBodyBytes,
+			http.StatusInternalServerError,
+			"",
+			errMetricsResponseTooLarge
 	}
-	return respBodyBytes, resp.StatusCode, nil
+	return respBodyBytes, resp.StatusCode, resp.Header.Get("Content-Type"), nil
 }
 
 // Calculate slot number

@@ -185,6 +185,40 @@ cardano_node_metrics_connectionManager_prunableConns 2
 	}
 }
 
+func TestPromMetricsInfoDeclaration(t *testing.T) {
+	prom := []byte(`# TYPE cardano_node_metrics_basicInfo info
+cardano_node_metrics_basicInfo{network="preview"} 1
+# TYPE cardano_node_metrics_Epoch_int gauge
+cardano_node_metrics_Epoch_int 658
+# EOF
+`)
+
+	b, err := prom2jsonWithContentType(
+		prom,
+		"application/openmetrics-text; version=1.0.0",
+	)
+	if err != nil {
+		t.Fatalf("prom2jsonWithContentType() error = %v", err)
+	}
+	var metrics PromMetrics
+	if err := json.Unmarshal(b, &metrics); err != nil {
+		t.Fatalf("JSON unmarshal error = %v", err)
+	}
+	var values map[string]any
+	if err := json.Unmarshal(b, &values); err != nil {
+		t.Fatalf("metrics unmarshal error = %v", err)
+	}
+	if values["cardano_node_metrics_basicInfo"] != float64(1) {
+		t.Errorf("info metric value = %v, expected 1", values["cardano_node_metrics_basicInfo"])
+	}
+	if metrics.Network != "preview" {
+		t.Errorf("Network = %q, expected preview", metrics.Network)
+	}
+	if metrics.EpochNum != 658 {
+		t.Errorf("EpochNum = %d, expected 658", metrics.EpochNum)
+	}
+}
+
 func TestPromMetricsMissingFullDuplexConns(t *testing.T) {
 	prom := []byte(`
 cardano_node_metrics_connectionManager_unidirectionalConns 4
@@ -621,7 +655,7 @@ dingo_governance_proposal_decode_failures_total 3
 func decodePromMetrics(t *testing.T, prom []byte) PromMetrics {
 	t.Helper()
 
-	b, err := prom2json(prom)
+	b, err := prom2jsonWithContentType(prom, "text/plain; version=0.0.4")
 	if err != nil {
 		t.Fatalf("prom2json() error = %v", err)
 	}
