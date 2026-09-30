@@ -21,9 +21,11 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/blinklabs-io/nview/internal/config"
+	"github.com/prometheus/common/expfmt"
 )
 
 // maxMetricsResponseBytes bounds how much of the node's metrics response is
@@ -62,6 +64,11 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, string, error) {
 	if err != nil {
 		return respBodyBytes, http.StatusInternalServerError, "", err
 	}
+	accept := strings.Join([]string{
+		string(expfmt.FmtOpenMetrics_1_0_0) + "; q=1.0",
+		string(expfmt.FmtText) + "; q=0.9",
+	}, ", ")
+	req.Header.Set("Accept", accept)
 	// Set a deadline covering the whole request, including reading the body
 	ctx, cancel := context.WithTimeout(
 		ctx,
@@ -91,7 +98,10 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, string, error) {
 		return respBodyBytes, http.StatusInternalServerError, "", err
 	}
 	if int64(len(respBodyBytes)) > maxMetricsResponseBytes {
-		return respBodyBytes, http.StatusInternalServerError, "", errMetricsResponseTooLarge
+		return respBodyBytes,
+			http.StatusInternalServerError,
+			"",
+			errMetricsResponseTooLarge
 	}
 	return respBodyBytes, resp.StatusCode, resp.Header.Get("Content-Type"), nil
 }
