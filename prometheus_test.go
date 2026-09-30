@@ -655,7 +655,7 @@ dingo_governance_proposal_decode_failures_total 3
 func decodePromMetrics(t *testing.T, prom []byte) PromMetrics {
 	t.Helper()
 
-	b, err := prom2json(prom)
+	b, err := prom2jsonWithContentType(prom, "text/plain; version=0.0.4")
 	if err != nil {
 		t.Fatalf("prom2json() error = %v", err)
 	}

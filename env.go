@@ -65,8 +65,8 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, string, error) {
 		return respBodyBytes, http.StatusInternalServerError, "", err
 	}
 	accept := strings.Join([]string{
-		string(expfmt.FmtOpenMetrics_1_0_0) + "; q=1.0",
-		string(expfmt.FmtText) + "; q=0.9",
+		string(expfmt.NewFormat(expfmt.TypeOpenMetrics)) + "; q=1.0",
+		string(expfmt.NewFormat(expfmt.TypeTextPlain)) + "; q=0.9",
 	}, ", ")
 	req.Header.Set("Accept", accept)
 	// Set a deadline covering the whole request, including reading the body

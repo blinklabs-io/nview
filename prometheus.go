@@ -339,10 +339,6 @@ func getEffectiveNodeName() string {
 		return AmaruNodeName
 	}
 	return cfg.App.NodeName
-} // Converts a prometheus http response byte array into a JSON byte array
-
-func prom2json(prom []byte) ([]byte, error) {
-	return prom2jsonWithContentType(prom, "text/plain; version=0.0.4")
 }
 
 func prom2jsonWithContentType(prom []byte, contentType string) ([]byte, error) {
