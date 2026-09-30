@@ -342,7 +342,7 @@ func prom2json(prom []byte) ([]byte, error) {
 	b := []byte{}
 	parser := expfmt.NewTextParser(model.UTF8Validation)
 	families, err := parser.TextToMetricFamilies(
-		strings.NewReader(string(prom)),
+		strings.NewReader(prometheusText(prom)),
 	)
 	if err != nil {
 		return b, err
@@ -379,6 +379,17 @@ func prom2json(prom []byte) ([]byte, error) {
 		return b, err
 	}
 	return b, nil
+}
+
+func prometheusText(prom []byte) string {
+	lines := strings.Split(string(prom), "\n")
+	for i, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) == 4 && fields[0] == "#" && fields[1] == "TYPE" && fields[3] == "info" {
+			lines[i] = "# TYPE " + fields[2] + " gauge"
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 func setPromMetricValue(out map[string]any, name string, value float64) {

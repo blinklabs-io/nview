@@ -185,6 +185,21 @@ cardano_node_metrics_connectionManager_prunableConns 2
 	}
 }
 
+func TestPromMetricsInfoDeclaration(t *testing.T) {
+	prom := []byte(`# TYPE cardano_node_metrics_basicInfo info
+cardano_node_metrics_basicInfo{network="preview"} 1
+cardano_node_metrics_Epoch_int 658
+`)
+
+	metrics := decodePromMetrics(t, prom)
+	if metrics.Network != "preview" {
+		t.Errorf("Network = %q, expected preview", metrics.Network)
+	}
+	if metrics.EpochNum != 658 {
+		t.Errorf("EpochNum = %d, expected 658", metrics.EpochNum)
+	}
+}
+
 func TestPromMetricsMissingFullDuplexConns(t *testing.T) {
 	prom := []byte(`
 cardano_node_metrics_connectionManager_unidirectionalConns 4
