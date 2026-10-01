@@ -868,23 +868,48 @@ func TestDingoSeverityThresholds(t *testing.T) {
 		},
 		{
 			name:     "cache ratio unavailable",
-			got:      dingoCacheSeverity(0, false),
+			got:      dingoCacheSeverity(false),
 			expected: uiSeverityMuted,
 		},
 		{
-			name:     "cache ratio healthy",
-			got:      dingoCacheSeverity(98, true),
-			expected: uiSeverityOK,
+			name:     "cache ratio available",
+			got:      dingoCacheSeverity(true),
+			expected: uiSeverityNeutral,
 		},
 		{
-			name:     "cache ratio warning",
-			got:      dingoCacheSeverity(90, true),
+			name:     "cache ratio low",
+			got:      dingoCacheSeverity(true),
+			expected: uiSeverityNeutral,
+		},
+		{
+			name:     "propagation below healthy threshold",
+			got:      dingoPropagationSeverity(94),
 			expected: uiSeverityWarn,
 		},
 		{
-			name:     "cache ratio critical",
-			got:      dingoCacheSeverity(75, true),
+			name:     "propagation at healthy threshold",
+			got:      dingoPropagationSeverity(95),
+			expected: uiSeverityOK,
+		},
+		{
+			name:     "propagation above healthy threshold",
+			got:      dingoPropagationSeverity(96),
+			expected: uiSeverityOK,
+		},
+		{
+			name:     "propagation below warning threshold",
+			got:      dingoPropagationSeverity(84),
 			expected: uiSeverityCritical,
+		},
+		{
+			name:     "propagation at warning threshold",
+			got:      dingoPropagationSeverity(85),
+			expected: uiSeverityWarn,
+		},
+		{
+			name:     "propagation above warning threshold",
+			got:      dingoPropagationSeverity(86),
+			expected: uiSeverityWarn,
 		},
 		{
 			name:     "event rate unavailable",

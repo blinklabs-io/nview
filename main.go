@@ -1577,7 +1577,7 @@ func dingoForgeCounterSeverities(metrics *PromMetrics) (uiSeverity, uiSeverity, 
 
 func dingoConsoleCacheValue(hits, misses uint64) (string, uiSeverity) {
 	percent, ok := dingoLifetimeHitRatio(hits, misses)
-	severity := dingoCacheSeverity(percent, ok)
+	severity := dingoCacheSeverity(ok)
 	if !ok {
 		return uiMuted("n/a") + " " + uiProgressBar(0, 10, severity), severity
 	}
@@ -2364,7 +2364,7 @@ func dingoConsoleFlowLane(metrics *PromMetrics, width int) string {
 				dingoMetric("Late >5s", formatSeverityCount(metrics.BlocksLate, lateSeverity)),
 				dingoMetric(
 					"CDF",
-					uiSparkline([]float64{blk1Pct, blk3Pct, blk5Pct}, 100, dingoCacheSeverity(blk5Pct, true))+
+					uiSparkline([]float64{blk1Pct, blk3Pct, blk5Pct}, 100, dingoPropagationSeverity(blk5Pct))+
 						uiUnit(" 1s 3s 5s"),
 				),
 			),
@@ -3081,10 +3081,14 @@ func dingoTipGapSeverity(slots uint64) uiSeverity {
 	return uiSeverityCritical
 }
 
-func dingoCacheSeverity(percent float64, ok bool) uiSeverity {
+func dingoCacheSeverity(ok bool) uiSeverity {
 	if !ok {
 		return uiSeverityMuted
 	}
+	return uiSeverityNeutral
+}
+
+func dingoPropagationSeverity(percent float64) uiSeverity {
 	switch {
 	case percent >= 95:
 		return uiSeverityOK
@@ -3135,7 +3139,7 @@ func dingoIntCounterSeverity(value int, nonZeroSeverity uiSeverity) uiSeverity {
 }
 
 func formatDingoCacheMetric(label string, percent float64, ok bool) string {
-	severity := dingoCacheSeverity(percent, ok)
+	severity := dingoCacheSeverity(ok)
 	if !ok {
 		return fmt.Sprintf(
 			"%s %s %s",
@@ -4154,13 +4158,13 @@ func getBlockText(ctx context.Context) string {
 		formatSeverityCount(promMetrics.BlocksLate, lateSeverity),
 	)
 	fmt.Fprintf(&sb, " %s   %s   %s\n",
-		uiPercentBar("<=1s", blk1Pct, dingoCacheSeverity(blk1Pct, true), 8),
-		uiPercentBar("<=3s", blk3Pct, dingoCacheSeverity(blk3Pct, true), 8),
-		uiPercentBar("<=5s", blk5Pct, dingoCacheSeverity(blk5Pct, true), 8),
+		uiPercentBar("<=1s", blk1Pct, dingoPropagationSeverity(blk1Pct), 8),
+		uiPercentBar("<=3s", blk3Pct, dingoPropagationSeverity(blk3Pct), 8),
+		uiPercentBar("<=5s", blk5Pct, dingoPropagationSeverity(blk5Pct), 8),
 	)
 	fmt.Fprintf(&sb, " %s %s   %s\n",
 		uiLabel("CDF Shape"),
-		uiSparkline([]float64{blk1Pct, blk3Pct, blk5Pct}, 100, dingoCacheSeverity(blk5Pct, true)),
+		uiSparkline([]float64{blk1Pct, blk3Pct, blk5Pct}, 100, dingoPropagationSeverity(blk5Pct)),
 		uiMuted("1s 3s 5s"),
 	)
 
@@ -4287,16 +4291,16 @@ func getDingoPropagationText() string {
 			uiKVAligned(10, "Late >5s", formatSeverityCount(m.BlocksLate, lateSeverity)),
 		)
 		fmt.Fprintf(&sb, " %s   %s   %s\n",
-			uiPercentBar("<=1s", blk1Pct, dingoCacheSeverity(blk1Pct, true), 8),
-			uiPercentBar("<=3s", blk3Pct, dingoCacheSeverity(blk3Pct, true), 8),
-			uiPercentBar("<=5s", blk5Pct, dingoCacheSeverity(blk5Pct, true), 8),
+			uiPercentBar("<=1s", blk1Pct, dingoPropagationSeverity(blk1Pct), 8),
+			uiPercentBar("<=3s", blk3Pct, dingoPropagationSeverity(blk3Pct), 8),
+			uiPercentBar("<=5s", blk5Pct, dingoPropagationSeverity(blk5Pct), 8),
 		)
 		fmt.Fprintf(&sb, " %s %s   %s\n",
 			uiLabel("CDF Shape"),
 			uiSparkline(
 				[]float64{blk1Pct, blk3Pct, blk5Pct},
 				100,
-				dingoCacheSeverity(blk5Pct, true),
+				dingoPropagationSeverity(blk5Pct),
 			),
 			uiMuted("1s 3s 5s"),
 		)
