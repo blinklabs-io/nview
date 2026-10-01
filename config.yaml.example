@@ -72,6 +72,16 @@ node:
   # This can also be set via the CARDANO_NODE_PID environment variable
   pid: 0
 
+  # Data directory of the node
+  #
+  # The Runtime pane reports disk usage for the filesystem containing this
+  # directory. When empty, it is read from the node process command line
+  # (`--data-dir` for Dingo, `--database-path` for cardano-node). The row is
+  # hidden when no directory can be determined.
+  #
+  # This can also be set via the CARDANO_NODE_DATA_DIR environment variable
+  dataDir:
+
 prometheus:
   # host/port for the node Prometheus metrics
   #

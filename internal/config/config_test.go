@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -11,7 +12,7 @@ func resetConfigEnv(t *testing.T) {
 		"BYRON_GENESIS_START_SEC", "BYRON_EPOCH_LENGTH", "BYRON_SLOT_LENGTH",
 		"SHELLEY_EPOCH_LENGTH", "SHELLEY_SLOT_LENGTH", "SHELLEY_TRANS_EPOCH",
 		"DUMMY_NODE_NAME", "DUMMY_NETWORK", "DUMMY_REFRESH", "DUMMY_RETRIES",
-		"DUMMY_CARDANO_NODE_BINARY", "DUMMY_CARDANO_NODE_PID_FILE", "DUMMY_CARDANO_NETWORK",
+		"DUMMY_CARDANO_NODE_BINARY", "DUMMY_CARDANO_NODE_PID_FILE", "DUMMY_CARDANO_NODE_DATA_DIR", "DUMMY_CARDANO_NETWORK",
 		"DUMMY_CARDANO_NODE_NETWORK_MAGIC", "DUMMY_CARDANO_PORT", "DUMMY_SHELLEY_TRANS_EPOCH",
 		"DUMMY_CARDANO_BLOCK_PRODUCER", "DUMMY_PROM_HOST", "DUMMY_PROM_PORT",
 		"DUMMY_PROM_REFRESH", "DUMMY_PROM_TIMEOUT", "DUMMY_BYRON_GENESIS_START_SEC",
@@ -403,5 +404,41 @@ func TestApplyDingoGenesisOverrideSkipsPinnedGenesisValues(t *testing.T) {
 				t.Fatal("Expected pinned config to remain unchanged")
 			}
 		})
+	}
+}
+
+// TestLoadConfigDataDir covers node.dataDir: it defaults to empty, is read
+// from YAML, and is overridden by CARDANO_NODE_DATA_DIR.
+func TestLoadConfigDataDir(t *testing.T) {
+	resetConfigEnv(t)
+	cfg, err := LoadConfig("")
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+	if cfg.Node.DataDir != "" {
+		t.Errorf("Expected empty default DataDir, got %q", cfg.Node.DataDir)
+	}
+
+	file := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(
+		file, []byte("node:\n  dataDir: /from/yaml\n"), 0o600,
+	); err != nil {
+		t.Fatalf("Failed to write config: %v", err)
+	}
+	cfg, err = LoadConfig(file)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+	if cfg.Node.DataDir != "/from/yaml" {
+		t.Errorf("Expected YAML DataDir, got %q", cfg.Node.DataDir)
+	}
+
+	t.Setenv("CARDANO_NODE_DATA_DIR", "/from/env")
+	cfg, err = LoadConfig(file)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+	if cfg.Node.DataDir != "/from/env" {
+		t.Errorf("Expected env DataDir to win, got %q", cfg.Node.DataDir)
 	}
 }

@@ -4639,6 +4639,7 @@ func getResourceText(ctx context.Context) string {
 		uiKV("GC Minor", uiValue(strconv.FormatUint(gcMinor, 10))),
 		uiKV("GC Major", uiValue(strconv.FormatUint(gcMajor, 10))),
 	)
+	sb.WriteString(diskResourceText(ctx, config.GetConfig(), processMetrics))
 	return sb.String()
 }
 
