@@ -47,8 +47,8 @@ var dataDirCache struct {
 }
 
 // resolveDataDir returns the node's data directory: the configured value if
-// set, otherwise the one found on the process command line. It returns "" when
-// the directory cannot be determined.
+// set, otherwise the one found from the node process. It returns "" when the
+// directory cannot be determined.
 func resolveDataDir(
 	ctx context.Context,
 	cfg *config.Config,
@@ -60,7 +60,8 @@ func resolveDataDir(
 	if proc == nil || proc.Pid <= 0 {
 		return ""
 	}
-	flag, ok := dataDirFlags[getEffectiveNodeBinary()]
+	binary := getEffectiveNodeBinary()
+	flag, ok := dataDirFlags[binary]
 	if !ok {
 		return ""
 	}
@@ -79,9 +80,14 @@ func resolveDataDir(
 	if err != nil {
 		return ""
 	}
-	path := dataDirFromArgs(args, flag, func() (string, error) {
-		return proc.CwdWithContext(ctx)
-	})
+	cwd := func() (string, error) { return proc.CwdWithContext(ctx) }
+	var path string
+	if binary == DINGO_BINARY {
+		env, _ := proc.EnvironWithContext(ctx)
+		path = dingoDataDir(dingoProcessInfo{args: args, env: env, cwd: cwd})
+	} else {
+		path = dataDirFromArgs(args, flag, cwd)
+	}
 	if path == "" {
 		return ""
 	}

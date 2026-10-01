@@ -33,7 +33,14 @@ func useNodeBinary(t *testing.T, binary string) {
 	previous := detectedNodeBinary.Load()
 	detectedNodeBinary.Store(binary)
 	resetDataDirCache()
+	originalSystemConfig := dingoSystemConfig
+	originalHomeDir := userHomeDir
+	dingoSystemConfig = filepath.Join(t.TempDir(), "absent.yaml")
+	emptyHome := t.TempDir()
+	userHomeDir = func() (string, error) { return emptyHome, nil }
 	t.Cleanup(func() {
+		dingoSystemConfig = originalSystemConfig
+		userHomeDir = originalHomeDir
 		if s, ok := previous.(string); ok {
 			detectedNodeBinary.Store(s)
 		} else {
@@ -45,6 +52,13 @@ func useNodeBinary(t *testing.T, binary string) {
 
 // resetDataDirCache empties the package-level data directory cache so one
 // test cannot serve another test's resolved path.
+// isolatedHome returns an environment that gives the helper process an empty
+// home directory, so a developer's own ~/.dingo/dingo.yaml cannot leak in.
+func isolatedHome(t *testing.T) []string {
+	t.Helper()
+	return []string{"HOME=" + t.TempDir()}
+}
+
 func resetDataDirCache() {
 	dataDirCache.Lock()
 	dataDirCache.pid = 0
@@ -58,7 +72,7 @@ func resetDataDirCache() {
 // line names a different --data-dir.
 func TestResolveDataDirPrefersConfig(t *testing.T) {
 	useNodeBinary(t, DINGO_BINARY)
-	proc := startDingoProcessHelper(t, nil, "--data-dir", "/from/cmdline")
+	proc := startDingoProcessHelper(t, isolatedHome(t), "--data-dir", "/from/cmdline")
 	cfg := &config.Config{Node: config.NodeConfig{DataDir: "/from/config"}}
 
 	got := resolveDataDir(context.Background(), cfg, proc)
@@ -87,7 +101,7 @@ func TestResolveDataDirFromCmdline(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			useNodeBinary(t, tt.binary)
-			proc := startDingoProcessHelper(t, nil, tt.args...)
+			proc := startDingoProcessHelper(t, isolatedHome(t), tt.args...)
 
 			got := resolveDataDir(
 				context.Background(),
@@ -107,7 +121,7 @@ func TestResolveDataDirFromCmdline(t *testing.T) {
 // helper process's working directory.
 func TestResolveDataDirResolvesRelativePathAgainstCwd(t *testing.T) {
 	useNodeBinary(t, DINGO_BINARY)
-	proc := startDingoProcessHelper(t, nil, "--data-dir", "db")
+	proc := startDingoProcessHelper(t, isolatedHome(t), "--data-dir", "db")
 	cwd, err := proc.CwdWithContext(context.Background())
 	if err != nil {
 		t.Skipf("cannot read helper cwd: %v", err)
@@ -120,11 +134,12 @@ func TestResolveDataDirResolvesRelativePathAgainstCwd(t *testing.T) {
 }
 
 // TestResolveDataDirEmptyWhenUnknown covers every case where no directory can
-// be determined and the result must be "": the data-dir flag is absent, the
-// process is nil, and the effective binary (amaru) has no known flag.
+// be determined and the result must be "": the process is nil, the cardano-node
+// database-path flag is absent, and the effective binary (amaru) has no known
+// source.
 func TestResolveDataDirEmptyWhenUnknown(t *testing.T) {
-	useNodeBinary(t, DINGO_BINARY)
-	withoutFlag := startDingoProcessHelper(t, nil)
+	useNodeBinary(t, "cardano-node")
+	withoutFlag := startDingoProcessHelper(t, isolatedHome(t))
 	if got := resolveDataDir(
 		context.Background(), &config.Config{}, withoutFlag,
 	); got != "" {
@@ -137,7 +152,7 @@ func TestResolveDataDirEmptyWhenUnknown(t *testing.T) {
 	}
 
 	useNodeBinary(t, "amaru")
-	proc := startDingoProcessHelper(t, nil, "--data-dir", "/data")
+	proc := startDingoProcessHelper(t, isolatedHome(t), "--data-dir", "/data")
 	if got := resolveDataDir(
 		context.Background(), &config.Config{}, proc,
 	); got != "" {
@@ -150,8 +165,8 @@ func TestResolveDataDirEmptyWhenUnknown(t *testing.T) {
 // process's path and not the cached one.
 func TestResolveDataDirCacheFollowsPID(t *testing.T) {
 	useNodeBinary(t, DINGO_BINARY)
-	first := startDingoProcessHelper(t, nil, "--data-dir", "/data/one")
-	second := startDingoProcessHelper(t, nil, "--data-dir", "/data/two")
+	first := startDingoProcessHelper(t, isolatedHome(t), "--data-dir", "/data/one")
+	second := startDingoProcessHelper(t, isolatedHome(t), "--data-dir", "/data/two")
 	ctx := context.Background()
 
 	if got := resolveDataDir(ctx, &config.Config{}, first); got != "/data/one" {
@@ -272,7 +287,7 @@ func TestGetResourceTextIncludesDiskRows(t *testing.T) {
 	}
 
 	resetDataDirCache()
-	processMetrics = startDingoProcessHelper(t, nil)
+	processMetrics = startDingoProcessHelper(t, isolatedHome(t))
 	got = getResourceText(context.Background())
 	if strings.Contains(got, "Disk") {
 		t.Fatalf("expected no Disk rows without a data dir, got %q", got)
@@ -315,7 +330,7 @@ func TestDataDirFromArgs(t *testing.T) {
 // must not be served, and the path is re-read from the command line.
 func TestResolveDataDirCacheRejectsReusedPID(t *testing.T) {
 	useNodeBinary(t, DINGO_BINARY)
-	proc := startDingoProcessHelper(t, nil, "--data-dir", "/data/new")
+	proc := startDingoProcessHelper(t, isolatedHome(t), "--data-dir", "/data/new")
 	createTime, err := proc.CreateTimeWithContext(context.Background())
 	if err != nil {
 		t.Skipf("cannot read helper create time: %v", err)
@@ -358,7 +373,7 @@ func useDingoDashboard(t *testing.T, dataDir string) {
 	if dataDir != "" {
 		args = append(args, "--data-dir", dataDir)
 	}
-	processMetrics = startDingoProcessHelper(t, nil, args...)
+	processMetrics = startDingoProcessHelper(t, isolatedHome(t), args...)
 	dingoConsoleText = ""
 }
 
