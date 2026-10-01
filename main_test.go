@@ -872,19 +872,14 @@ func TestDingoSeverityThresholds(t *testing.T) {
 			expected: uiSeverityMuted,
 		},
 		{
-			name:     "cache ratio healthy",
+			name:     "cache ratio available",
 			got:      dingoCacheSeverity(98, true),
-			expected: uiSeverityOK,
+			expected: uiSeverityNeutral,
 		},
 		{
-			name:     "cache ratio warning",
-			got:      dingoCacheSeverity(90, true),
-			expected: uiSeverityWarn,
-		},
-		{
-			name:     "cache ratio critical",
-			got:      dingoCacheSeverity(75, true),
-			expected: uiSeverityCritical,
+			name:     "cache ratio low",
+			got:      dingoCacheSeverity(10, true),
+			expected: uiSeverityNeutral,
 		},
 		{
 			name:     "event rate unavailable",
