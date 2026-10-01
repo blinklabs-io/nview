@@ -1577,7 +1577,7 @@ func dingoForgeCounterSeverities(metrics *PromMetrics) (uiSeverity, uiSeverity, 
 
 func dingoConsoleCacheValue(hits, misses uint64) (string, uiSeverity) {
 	percent, ok := dingoLifetimeHitRatio(hits, misses)
-	severity := dingoCacheSeverity(percent, ok)
+	severity := dingoCacheSeverity(ok)
 	if !ok {
 		return uiMuted("n/a") + " " + uiProgressBar(0, 10, severity), severity
 	}
@@ -3081,7 +3081,7 @@ func dingoTipGapSeverity(slots uint64) uiSeverity {
 	return uiSeverityCritical
 }
 
-func dingoCacheSeverity(percent float64, ok bool) uiSeverity {
+func dingoCacheSeverity(ok bool) uiSeverity {
 	if !ok {
 		return uiSeverityMuted
 	}
@@ -3139,7 +3139,7 @@ func dingoIntCounterSeverity(value int, nonZeroSeverity uiSeverity) uiSeverity {
 }
 
 func formatDingoCacheMetric(label string, percent float64, ok bool) string {
-	severity := dingoCacheSeverity(percent, ok)
+	severity := dingoCacheSeverity(ok)
 	if !ok {
 		return fmt.Sprintf(
 			"%s %s %s",
