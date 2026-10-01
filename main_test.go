@@ -882,6 +882,36 @@ func TestDingoSeverityThresholds(t *testing.T) {
 			expected: uiSeverityNeutral,
 		},
 		{
+			name:     "propagation below healthy threshold",
+			got:      dingoPropagationSeverity(94),
+			expected: uiSeverityWarn,
+		},
+		{
+			name:     "propagation at healthy threshold",
+			got:      dingoPropagationSeverity(95),
+			expected: uiSeverityOK,
+		},
+		{
+			name:     "propagation above healthy threshold",
+			got:      dingoPropagationSeverity(96),
+			expected: uiSeverityOK,
+		},
+		{
+			name:     "propagation below warning threshold",
+			got:      dingoPropagationSeverity(84),
+			expected: uiSeverityCritical,
+		},
+		{
+			name:     "propagation at warning threshold",
+			got:      dingoPropagationSeverity(85),
+			expected: uiSeverityWarn,
+		},
+		{
+			name:     "propagation above warning threshold",
+			got:      dingoPropagationSeverity(86),
+			expected: uiSeverityWarn,
+		},
+		{
 			name:     "event rate unavailable",
 			got:      dingoRateSeverity("n/a", uiSeverityCritical),
 			expected: uiSeverityMuted,
