@@ -43,6 +43,17 @@ type dingoProcessInfo struct {
 	args []string
 	env  []string
 	cwd  func() (string, error)
+	// root is where the process's filesystem is visible to nview, such as
+	// /proc/<pid>/root. It is empty when nview shares the process's view.
+	root string
+}
+
+// nodePath maps a path named by the Dingo process to where nview can open it.
+func (p dingoProcessInfo) nodePath(path string) string {
+	if p.root == "" {
+		return path
+	}
+	return filepath.Join(p.root, path)
 }
 
 // dingoDataDir returns the data directory a Dingo process is using. It applies
@@ -84,7 +95,7 @@ func dingoConfigDatabasePath(p dingoProcessInfo) string {
 	if file == "" {
 		return ""
 	}
-	buf, err := os.ReadFile(file)
+	buf, err := os.ReadFile(p.nodePath(file))
 	if err != nil {
 		return ""
 	}
@@ -100,6 +111,7 @@ func dingoConfigDatabasePath(p dingoProcessInfo) string {
 // dingoConfigFile mirrors Dingo's config discovery: an explicit --config wins
 // outright, then ~/.dingo/dingo.yaml, then the system file. The home directory
 // is the one in Dingo's environment, because Dingo may run as another user.
+// Every file is opened through the process's own filesystem view.
 func dingoConfigFile(p dingoProcessInfo) string {
 	if file := valueFromArgs(p.args, dingoConfigFlag); file != "" {
 		return absoluteFromCwd(file, p.cwd)
@@ -110,11 +122,11 @@ func dingoConfigFile(p dingoProcessInfo) string {
 	}
 	if home != "" {
 		userFile := filepath.Join(home, ".dingo", "dingo.yaml")
-		if _, err := os.Stat(userFile); err == nil {
+		if _, err := os.Stat(p.nodePath(userFile)); err == nil {
 			return userFile
 		}
 	}
-	if _, err := os.Stat(dingoSystemConfig); err == nil {
+	if _, err := os.Stat(p.nodePath(dingoSystemConfig)); err == nil {
 		return dingoSystemConfig
 	}
 	return ""

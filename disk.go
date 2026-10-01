@@ -84,7 +84,12 @@ func resolveDataDir(
 	var path string
 	if binary == DINGO_BINARY {
 		env, _ := proc.EnvironWithContext(ctx)
-		path = dingoDataDir(dingoProcessInfo{args: args, env: env, cwd: cwd})
+		path = dingoDataDir(dingoProcessInfo{
+			args: args,
+			env:  env,
+			cwd:  cwd,
+			root: procRoot(proc.Pid),
+		})
 	} else {
 		path = dataDirFromArgs(args, flag, cwd)
 	}
@@ -139,12 +144,23 @@ type diskSnapshot struct {
 
 var latestDisk atomic.Pointer[diskSnapshot]
 
-// rebaseToRoot returns path as seen through root when that location exists,
-// and path unchanged otherwise.
+// procRoot returns the directory through which Linux exposes the filesystem
+// of the process with the given PID, or "" on systems without /proc.
+func procRoot(pid int32) string {
+	if runtime.GOOS != "linux" {
+		return ""
+	}
+	return fmt.Sprintf("/proc/%d/root", pid)
+}
+
+// rebaseToRoot returns path as seen through root, or "" when that location
+// cannot be reached. A failed lookup means the path is absent in the node's
+// namespace or unreadable to nview, and falling back to the bare path would
+// measure nview's own filesystem instead of the node's.
 func rebaseToRoot(root, path string) string {
 	candidate := filepath.Join(root, path)
 	if _, err := os.Stat(candidate); err != nil {
-		return path
+		return ""
 	}
 	return candidate
 }
@@ -152,12 +168,13 @@ func rebaseToRoot(root, path string) string {
 // nodeRootedPath maps a path taken from the node's command line into nview's
 // view of the node's filesystem. A node in another mount namespace, such as a
 // container sharing the PID namespace, reports paths that are only valid
-// under its own root, which Linux exposes at /proc/<pid>/root.
+// under its own root. Without /proc the path is used as given.
 func nodeRootedPath(pid int32, path string) string {
-	if runtime.GOOS != "linux" {
+	root := procRoot(pid)
+	if root == "" {
 		return path
 	}
-	return rebaseToRoot(fmt.Sprintf("/proc/%d/root", pid), path)
+	return rebaseToRoot(root, path)
 }
 
 // refreshDiskSnapshot measures the filesystem holding the node's data

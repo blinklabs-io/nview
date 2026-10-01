@@ -222,3 +222,44 @@ func TestDingoDataDirHomeFallsBackToNviewHome(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+// TestDingoConfigReadThroughNodeRoot covers a Dingo in another mount namespace:
+// the config files named by --config, the home directory and the system path
+// are opened under the node's root, and a file with the same path in nview's own
+// filesystem is never read. A root without the file means the file is absent.
+func TestDingoConfigReadThroughNodeRoot(t *testing.T) {
+	useNodeBinary(t, DINGO_BINARY)
+	root := t.TempDir()
+	home := "/home/dingo"
+	writeDingoConfig(t, filepath.Join(root, "etc", "dingo", "x.yaml"),
+		"databasePath: /node/explicit\n")
+	writeDingoConfig(t, filepath.Join(root, home, ".dingo", "dingo.yaml"),
+		"databasePath: /node/home\n")
+	writeDingoConfig(t, filepath.Join(root, dingoSystemConfig),
+		"databasePath: /node/system\n")
+	// The same paths exist in nview's own namespace with other values.
+	hostRoot := t.TempDir()
+	writeDingoConfig(t, filepath.Join(hostRoot, "x.yaml"), "databasePath: /host/explicit\n")
+	writeDingoConfig(t, dingoSystemConfig, "databasePath: /host/system\n")
+
+	info := func(args []string, env ...string) dingoProcessInfo {
+		p := dingoInfo("/work", env, args...)
+		p.root = root
+		return p
+	}
+	if got := dingoDataDir(info([]string{"--config", "/etc/dingo/x.yaml"})); got != "/node/explicit" {
+		t.Errorf("--config: got %q", got)
+	}
+	if got := dingoDataDir(info(nil, "HOME="+home)); got != "/node/home" {
+		t.Errorf("home config: got %q", got)
+	}
+	if got := dingoDataDir(info(nil, "HOME=/home/nobody")); got != "/node/system" {
+		t.Errorf("system config: got %q", got)
+	}
+
+	empty := dingoInfo("/work", []string{"HOME=/home/nobody"})
+	empty.root = t.TempDir()
+	if got := dingoDataDir(empty); got != "/work/.dingo" {
+		t.Errorf("node has no config but nview does: got %q, want /work/.dingo", got)
+	}
+}

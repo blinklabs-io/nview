@@ -424,18 +424,56 @@ func TestDingoCompactPagesShowDisk(t *testing.T) {
 
 // TestRebaseToRoot covers mapping a node's path into its mount namespace: a
 // path that exists under the node's root is read through that root, and one
-// that does not exist there is left for nview's own namespace.
+// that does not exist there is not found, so the caller never falls back to
+// nview's own filesystem.
 func TestRebaseToRoot(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "data", "db"), 0o750); err != nil {
 		t.Fatal(err)
 	}
+	ownCopy := t.TempDir()
 
 	if got := rebaseToRoot(root, "/data/db"); got != filepath.Join(root, "data", "db") {
 		t.Fatalf("expected path under node root, got %q", got)
 	}
-	if got := rebaseToRoot(root, "/elsewhere"); got != "/elsewhere" {
-		t.Fatalf("expected unchanged path when absent under root, got %q", got)
+	if got := rebaseToRoot(root, "/elsewhere"); got != "" {
+		t.Fatalf("expected no path when absent under root, got %q", got)
+	}
+	if got := rebaseToRoot(root, ownCopy); got != "" {
+		t.Fatalf("a path that exists only in nview's namespace must not be used, got %q", got)
+	}
+}
+
+// TestRebaseToRootUnreadableRoot covers a node root that nview may not read,
+// such as /proc/<pid>/root of another user's process without CAP_SYS_PTRACE: the
+// result is "" even though the same path exists in nview's own namespace.
+func TestRebaseToRootUnreadableRoot(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses directory permissions")
+	}
+	root := t.TempDir()
+	own := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, own), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(root, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(root, 0o750) })
+
+	if got := rebaseToRoot(root, own); got != "" {
+		t.Fatalf("expected no path for an unreadable root, got %q", got)
+	}
+}
+
+// TestNodeRootedPathWithoutProc covers systems without /proc: the path is used
+// as given.
+func TestNodeRootedPathWithoutProc(t *testing.T) {
+	if procRoot(1) != "" {
+		t.Skip("this system exposes /proc/<pid>/root")
+	}
+	if got := nodeRootedPath(1, "/data/db"); got != "/data/db" {
+		t.Fatalf("expected path unchanged, got %q", got)
 	}
 }
 
