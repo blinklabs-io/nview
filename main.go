@@ -1541,7 +1541,7 @@ func dingoConsoleSystemsBand(metrics *PromMetrics, width int) string {
 			dingoMetricStyled("Leader", uiSeverityValue(strconv.FormatUint(metrics.IsLeader, 10), forgeSeverity), forgeSeverity),
 		),
 	)
-	lines = append(lines, dingoDiskRows(innerWidth)...)
+	lines = slices.Insert(lines, 1, dingoDiskRows(innerWidth)...)
 	lines = append(lines, dingoConsoleSignalRows(metrics, forgeDisabled, innerWidth)...)
 	lines = append(lines, dingoConsoleLeiosRows(metrics, innerWidth)...)
 	return dingoPanel(

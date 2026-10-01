@@ -430,8 +430,18 @@ func TestRebaseToRoot(t *testing.T) {
 func TestDingoSystemsBandShowsDisk(t *testing.T) {
 	useDingoDashboard(t, t.TempDir())
 	refreshDiskSnapshot(context.Background(), &config.Config{}, processMetrics)
-	if got := dingoConsoleSystemsBand(&PromMetrics{}, 120); !strings.Contains(got, "Disk") {
+	got := dingoConsoleSystemsBand(&PromMetrics{}, 120)
+	if !strings.Contains(got, "Disk") {
 		t.Fatalf("expected Disk row in systems band:\n%s", got)
+	}
+	dbAt := strings.Index(got, "DB")
+	diskAt := strings.Index(got, "Disk")
+	cacheAt := strings.Index(got, "UTxO Cache")
+	if dbAt < 0 || cacheAt < 0 || !(dbAt < diskAt && diskAt < cacheAt) {
+		t.Fatalf("expected Disk row between the DB and cache rows:\n%s", got)
+	}
+	if !strings.ContainsAny(got[diskAt:cacheAt], "█░") {
+		t.Fatalf("expected a progress bar on the Disk row:\n%s", got)
 	}
 
 	latestDisk.Store(nil)
