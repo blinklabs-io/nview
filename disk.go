@@ -17,8 +17,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
+	"sync/atomic"
 
 	"github.com/blinklabs-io/nview/internal/config"
 	"github.com/shirou/gopsutil/v3/disk"
@@ -119,6 +122,76 @@ func diskSeverity(percent float64) uiSeverity {
 	}
 }
 
+// diskSnapshot is the most recent usage reading for the node's data directory.
+// The Dingo console renderers take no process or context, so they read the
+// snapshot that refreshDiskSnapshot stored for the current refresh.
+type diskSnapshot struct {
+	Used    uint64
+	Total   uint64
+	Percent float64
+}
+
+var latestDisk atomic.Pointer[diskSnapshot]
+
+// rebaseToRoot returns path as seen through root when that location exists,
+// and path unchanged otherwise.
+func rebaseToRoot(root, path string) string {
+	candidate := filepath.Join(root, path)
+	if _, err := os.Stat(candidate); err != nil {
+		return path
+	}
+	return candidate
+}
+
+// nodeRootedPath maps a path taken from the node's command line into nview's
+// view of the node's filesystem. A node in another mount namespace, such as a
+// container sharing the PID namespace, reports paths that are only valid
+// under its own root, which Linux exposes at /proc/<pid>/root.
+func nodeRootedPath(pid int32, path string) string {
+	if runtime.GOOS != "linux" {
+		return path
+	}
+	return rebaseToRoot(fmt.Sprintf("/proc/%d/root", pid), path)
+}
+
+// refreshDiskSnapshot measures the filesystem holding the node's data
+// directory and stores the result. It stores and returns nil when the
+// directory is unknown or its usage is unreadable. A configured directory is
+// used as given because the operator wrote it for nview's own namespace.
+func refreshDiskSnapshot(
+	ctx context.Context,
+	cfg *config.Config,
+	proc *process.Process,
+) *diskSnapshot {
+	dataDir := resolveDataDir(ctx, cfg, proc)
+	if dataDir != "" && cfg.Node.DataDir == "" && proc != nil {
+		dataDir = nodeRootedPath(proc.Pid, dataDir)
+	}
+	var snap *diskSnapshot
+	if dataDir != "" {
+		if usage, err := disk.UsageWithContext(ctx, dataDir); err == nil {
+			snap = &diskSnapshot{
+				Used:    usage.Used,
+				Total:   usage.Total,
+				Percent: usage.UsedPercent,
+			}
+		}
+	}
+	latestDisk.Store(snap)
+	return snap
+}
+
+func diskPercentText(snap *diskSnapshot) string {
+	return uiSeverityValue(
+		fmt.Sprintf("%.2f%%", snap.Percent),
+		diskSeverity(snap.Percent),
+	)
+}
+
+func diskUsedText(snap *diskSnapshot) string {
+	return formatMemoryBytes(snap.Used) + " / " + formatMemoryBytes(snap.Total)
+}
+
 // diskResourceText renders the Disk and Used rows for the Runtime pane. It
 // returns "" when the data directory is unknown or its usage is unreadable, so
 // a missing disk never breaks the rest of the pane.
@@ -127,22 +200,35 @@ func diskResourceText(
 	cfg *config.Config,
 	proc *process.Process,
 ) string {
-	dataDir := resolveDataDir(ctx, cfg, proc)
-	if dataDir == "" {
+	snap := refreshDiskSnapshot(ctx, cfg, proc)
+	if snap == nil {
 		return ""
 	}
-	usage, err := disk.UsageWithContext(ctx, dataDir)
-	if err != nil {
-		return ""
-	}
-	severity := diskSeverity(usage.UsedPercent)
 	return fmt.Sprintf(
 		" %s %s   %s\n %s\n",
 		uiLabel("Disk"),
-		uiSeverityValue(fmt.Sprintf("%.2f%%", usage.UsedPercent), severity),
-		uiProgressBar(usage.UsedPercent, 14, severity),
-		uiKV("Used", uiValue(
-			formatMemoryBytes(usage.Used)+" / "+formatMemoryBytes(usage.Total),
-		)),
+		diskPercentText(snap),
+		uiProgressBar(snap.Percent, 14, diskSeverity(snap.Percent)),
+		uiKV("Used", uiValue(diskUsedText(snap))),
 	)
+}
+
+// dingoDiskRows returns the Disk row for the Dingo console panels, or nothing
+// when the latest refresh found no readable data directory.
+func dingoDiskRows(innerWidth int) []string {
+	snap := latestDisk.Load()
+	if snap == nil {
+		return nil
+	}
+	severity := diskSeverity(snap.Percent)
+	return []string{dingoMetricRowColumns(
+		innerWidth,
+		2,
+		dingoMetricStyledSpan(
+			"Disk",
+			diskPercentText(snap)+" "+uiValue(diskUsedText(snap)),
+			severity,
+			2,
+		),
+	)}
 }

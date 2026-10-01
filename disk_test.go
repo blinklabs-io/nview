@@ -17,6 +17,8 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -333,5 +335,107 @@ func TestResolveDataDirCacheRejectsReusedPID(t *testing.T) {
 	dataDirCache.Unlock()
 	if cachedTime != createTime {
 		t.Fatalf("cache not refreshed: create time %d, want %d", cachedTime, createTime)
+	}
+}
+
+// useDingoDashboard prepares the globals refreshDashboardText reads for a
+// Dingo node whose command line names dataDir, and restores them afterwards.
+func useDingoDashboard(t *testing.T, dataDir string) {
+	t.Helper()
+	useNodeBinary(t, DINGO_BINARY)
+	originalProc := processMetrics
+	originalProm := promMetrics.Load()
+	originalConsole := dingoConsoleText
+	originalDisk := latestDisk.Load()
+	t.Cleanup(func() {
+		processMetrics = originalProc
+		promMetrics.Store(originalProm)
+		dingoConsoleText = originalConsole
+		latestDisk.Store(originalDisk)
+	})
+	promMetrics.Store(&PromMetrics{})
+	args := []string{}
+	if dataDir != "" {
+		args = append(args, "--data-dir", dataDir)
+	}
+	processMetrics = startDingoProcessHelper(t, nil, args...)
+	dingoConsoleText = ""
+}
+
+// TestRefreshDashboardTextShowsDiskForDingo covers the Dingo entry point: the
+// dashboard refresh for a Dingo node must put the Disk row in the console text,
+// and must leave it out when the node names no data directory.
+func TestRefreshDashboardTextShowsDiskForDingo(t *testing.T) {
+	useDingoDashboard(t, t.TempDir())
+	refreshDashboardText(context.Background())
+	if !strings.Contains(dingoConsoleText, "Disk") ||
+		!strings.Contains(dingoConsoleText, "%") {
+		t.Fatalf("expected Disk row in Dingo console, got:\n%s", dingoConsoleText)
+	}
+
+	useDingoDashboard(t, "")
+	refreshDashboardText(context.Background())
+	if strings.Contains(dingoConsoleText, "Disk") {
+		t.Fatalf("expected no Disk row without a data dir, got:\n%s", dingoConsoleText)
+	}
+}
+
+// TestDingoCompactPagesShowDisk covers the compact Dingo renderers: the
+// dashboard and operations pages carry the Disk row after a refresh, and the
+// chain and peer pages are unchanged.
+func TestDingoCompactPagesShowDisk(t *testing.T) {
+	useDingoDashboard(t, t.TempDir())
+	original := compactDingoPage.Load()
+	t.Cleanup(func() { compactDingoPage.Store(original) })
+	refreshDiskSnapshot(context.Background(), &config.Config{}, processMetrics)
+
+	for page, want := range map[int32]bool{0: true, 1: false, 2: false, 3: true} {
+		compactDingoPage.Store(page)
+		got := getDingoConsoleCompactText(&PromMetrics{}, 80)
+		if strings.Contains(got, "Disk") != want {
+			t.Errorf("compact page %d: Disk present = %v, want %v:\n%s",
+				page, !want, want, got)
+		}
+	}
+
+	latestDisk.Store(nil)
+	for _, page := range []int32{0, 3} {
+		compactDingoPage.Store(page)
+		if got := getDingoConsoleCompactText(&PromMetrics{}, 80); strings.Contains(got, "Disk") {
+			t.Errorf("compact page %d shows Disk without a snapshot:\n%s", page, got)
+		}
+	}
+}
+
+// TestRebaseToRoot covers mapping a node's path into its mount namespace: a
+// path that exists under the node's root is read through that root, and one
+// that does not exist there is left for nview's own namespace.
+func TestRebaseToRoot(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "data", "db"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := rebaseToRoot(root, "/data/db"); got != filepath.Join(root, "data", "db") {
+		t.Fatalf("expected path under node root, got %q", got)
+	}
+	if got := rebaseToRoot(root, "/elsewhere"); got != "/elsewhere" {
+		t.Fatalf("expected unchanged path when absent under root, got %q", got)
+	}
+}
+
+// TestDingoSystemsBandShowsDisk covers the full-layout Dingo renderer: the
+// systems band carries the Disk row after a refresh and omits it when the
+// latest refresh found no readable data directory.
+func TestDingoSystemsBandShowsDisk(t *testing.T) {
+	useDingoDashboard(t, t.TempDir())
+	refreshDiskSnapshot(context.Background(), &config.Config{}, processMetrics)
+	if got := dingoConsoleSystemsBand(&PromMetrics{}, 120); !strings.Contains(got, "Disk") {
+		t.Fatalf("expected Disk row in systems band:\n%s", got)
+	}
+
+	latestDisk.Store(nil)
+	if got := dingoConsoleSystemsBand(&PromMetrics{}, 120); strings.Contains(got, "Disk") {
+		t.Fatalf("expected no Disk row without a snapshot:\n%s", got)
 	}
 }
