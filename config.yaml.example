@@ -90,6 +90,11 @@ node:
   # plugin `dataDir` settings. The row is hidden when no directory can be
   # determined.
   #
+  # On Linux, a discovered path is read through /proc/<pid>/root, so nview can
+  # run in a container that shares the node's PID namespace. It then needs to
+  # run as the same user as the node, or have CAP_SYS_PTRACE; otherwise the
+  # row is hidden.
+  #
   # This can also be set via the CARDANO_NODE_DATA_DIR environment variable
   dataDir:
 
