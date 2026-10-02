@@ -528,6 +528,7 @@ func refreshDashboardText(ctx context.Context) {
 	refreshChrome()
 	if getEffectiveNodeBinary() == DINGO_BINARY {
 		dashboardPages.SwitchToPage("dingo")
+		refreshDiskSnapshot(ctx, config.GetConfig(), processMetrics)
 		setTextIfChanged(dingoConsoleTextView, &dingoConsoleText, getDingoConsoleText(ctx))
 		updateMithrilView()
 		updatePeerOverlay(ctx)
@@ -1440,7 +1441,7 @@ func dingoConsoleDashboardCompact(metrics *PromMetrics, width int) string {
 		"dashboard",
 		healthSeverity,
 		width,
-		[]string{
+		append([]string{
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
@@ -1487,7 +1488,7 @@ func dingoConsoleDashboardCompact(metrics *PromMetrics, width int) string {
 				dingoMetric("Heap", uiValue(formatMemoryBytes(metrics.GoHeapInuse))),
 				dingoMetric("DB", uiValue(formatDingoBytes(dingoDbSize(metrics)))),
 			),
-		},
+		}, dingoDiskRows(innerWidth)...),
 	)
 }
 
@@ -1540,6 +1541,7 @@ func dingoConsoleSystemsBand(metrics *PromMetrics, width int) string {
 			dingoMetricStyled("Leader", uiSeverityValue(strconv.FormatUint(metrics.IsLeader, 10), forgeSeverity), forgeSeverity),
 		),
 	)
+	lines = slices.Insert(lines, 1, dingoDiskRows(innerWidth)...)
 	lines = append(lines, dingoConsoleSignalRows(metrics, forgeDisabled, innerWidth)...)
 	lines = append(lines, dingoConsoleLeiosRows(metrics, innerWidth)...)
 	return dingoPanel(
@@ -1994,7 +1996,7 @@ func dingoConsoleOperationsCompact(metrics *PromMetrics, width int) string {
 		"operations",
 		worstSeverity(corePaneSeverity(), activityPaneSeverity(), runtimePaneSeverity()),
 		width,
-		[]string{
+		append([]string{
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
@@ -2024,7 +2026,7 @@ func dingoConsoleOperationsCompact(metrics *PromMetrics, width int) string {
 				dingoMetric("FD", uiValue(formatFDUsage(metrics))),
 				dingoMetric("Goroutines", uiValue(strconv.FormatUint(metrics.GoRoutines, 10))),
 			),
-		},
+		}, dingoDiskRows(innerWidth)...),
 	)
 }
 
@@ -4643,6 +4645,7 @@ func getResourceText(ctx context.Context) string {
 		uiKV("GC Minor", uiValue(strconv.FormatUint(gcMinor, 10))),
 		uiKV("GC Major", uiValue(strconv.FormatUint(gcMajor, 10))),
 	)
+	sb.WriteString(diskResourceText(ctx, config.GetConfig(), processMetrics))
 	return sb.String()
 }
 

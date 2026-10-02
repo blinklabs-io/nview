@@ -72,6 +72,34 @@ node:
   # This can also be set via the CARDANO_NODE_PID environment variable
   pid: 0
 
+  # Data directory of the node
+  #
+  # The Runtime pane reports disk usage for the filesystem containing this
+  # directory. When empty, it is read from the node process:
+  #
+  # - For cardano-node: `--database-path` on the command line
+  # - For Dingo, in Dingo's own order: `--data-dir`, then the
+  #   CARDANO_DATABASE_PATH environment variable, then `databasePath` in the
+  #   config file (`--config`, else ~/.dingo/dingo.yaml, else
+  #   /etc/dingo/dingo.yaml), then `.dingo` in its working directory
+  #
+  # Reading another process's environment needs OS support (Linux), so on
+  # macOS the environment variable and Dingo's HOME are not seen; nview's own
+  # home directory is used for the config file lookup instead. Set this value
+  # when the directory comes from a source nview cannot read, such as storage
+  # plugin `dataDir` settings. The row is hidden when no directory can be
+  # determined.
+  #
+  # On Linux, a discovered path, and for Dingo its config files, are read
+  # through /proc/<pid>/root, so nview can run in a container that shares the
+  # node's PID namespace. This needs the same user as the node, or
+  # CAP_SYS_PTRACE; otherwise the row is hidden rather than measuring nview's
+  # own filesystem. That also applies to nview and a node on one host running
+  # as different users; setting this value avoids it.
+  #
+  # This can also be set via the CARDANO_NODE_DATA_DIR environment variable
+  dataDir:
+
 prometheus:
   # host/port for the node Prometheus metrics
   #

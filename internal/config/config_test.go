@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -17,6 +18,11 @@ func resetConfigEnv(t *testing.T) {
 		"DUMMY_PROM_REFRESH", "DUMMY_PROM_TIMEOUT", "DUMMY_BYRON_GENESIS_START_SEC",
 		"DUMMY_BYRON_EPOCH_LENGTH", "DUMMY_BYRON_K", "DUMMY_BYRON_SLOT_LENGTH",
 		"DUMMY_SHELLEY_EPOCH_LENGTH", "DUMMY_SHELLEY_SLOT_LENGTH",
+		// envconfig falls back to the unprefixed name, so unset it too.
+		"NODE_NAME", "NETWORK", "REFRESH", "RETRIES", "CARDANO_NODE_BINARY", "CARDANO_NODE_PID_FILE",
+		"CARDANO_NETWORK", "CARDANO_NODE_NETWORK_MAGIC", "CARDANO_PORT", "CARDANO_BLOCK_PRODUCER",
+		"PROM_HOST", "PROM_PORT", "PROM_REFRESH", "PROM_TIMEOUT", "BYRON_K",
+		"DUMMY_CARDANO_NODE_DATA_DIR", "CARDANO_NODE_DATA_DIR",
 	}
 	for _, v := range envVars {
 		os.Unsetenv(v)
@@ -403,5 +409,41 @@ func TestApplyDingoGenesisOverrideSkipsPinnedGenesisValues(t *testing.T) {
 				t.Fatal("Expected pinned config to remain unchanged")
 			}
 		})
+	}
+}
+
+// TestLoadConfigDataDir covers node.dataDir: it defaults to empty, is read
+// from YAML, and is overridden by CARDANO_NODE_DATA_DIR.
+func TestLoadConfigDataDir(t *testing.T) {
+	resetConfigEnv(t)
+	cfg, err := LoadConfig("")
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+	if cfg.Node.DataDir != "" {
+		t.Errorf("Expected empty default DataDir, got %q", cfg.Node.DataDir)
+	}
+
+	file := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(
+		file, []byte("node:\n  dataDir: /from/yaml\n"), 0o600,
+	); err != nil {
+		t.Fatalf("Failed to write config: %v", err)
+	}
+	cfg, err = LoadConfig(file)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+	if cfg.Node.DataDir != "/from/yaml" {
+		t.Errorf("Expected YAML DataDir, got %q", cfg.Node.DataDir)
+	}
+
+	t.Setenv("CARDANO_NODE_DATA_DIR", "/from/env")
+	cfg, err = LoadConfig(file)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+	if cfg.Node.DataDir != "/from/env" {
+		t.Errorf("Expected env DataDir to win, got %q", cfg.Node.DataDir)
 	}
 }

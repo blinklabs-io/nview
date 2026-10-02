@@ -47,6 +47,7 @@ type NodeConfig struct {
 	Binary            string               `yaml:"binary"           envconfig:"CARDANO_NODE_BINARY"`
 	Pid               int32                `yaml:"pid"              envconfig:"CARDANO_NODE_PID"`
 	PidFile           string               `yaml:"pidFile"          envconfig:"CARDANO_NODE_PID_FILE"`
+	DataDir           string               `yaml:"dataDir"          envconfig:"CARDANO_NODE_DATA_DIR"`
 	Network           string               `yaml:"network"          envconfig:"CARDANO_NETWORK"`
 	NetworkMagic      uint32               `yaml:"networkMagic"     envconfig:"CARDANO_NODE_NETWORK_MAGIC"`
 	Port              uint32               `yaml:"port"             envconfig:"CARDANO_PORT"`
