@@ -1,0 +1,48 @@
+# Generated automatically by org-governance-bot. Do not edit manually.
+name: "CI"
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+      - v*.*.*
+
+jobs:
+  go-test:
+    uses: blinklabs-io/actions/.github/workflows/reuseable-go-test.yml@main
+    with:
+      check-format: true
+      go-versions: '["1.25.x","1.26.x"]'
+      golangci-go-version: 1.26.x
+      nilaway-go-version: 1.26.x
+      nilaway-include-pkgs: github.com/blinklabs-io/nview
+      run-golangci-lint: true
+      run-nilaway: true
+  publish:
+    needs: [go-test]
+    if: github.event_name == 'push'
+    uses: blinklabs-io/actions/.github/workflows/reuseable-publish.yml@main
+    permissions:
+      actions: write
+      attestations: write
+      checks: write
+      contents: write
+      id-token: write
+      packages: write
+      statuses: write
+    secrets:
+      docker-password: ${{ secrets.DOCKER_PASSWORD }}
+      maxmind-api-credentials: ${{ secrets.MAXMIND_API_CREDENTIALS }}
+    with:
+      binary-name: nview
+      build-args: |-
+        VERSION=${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        COMMIT_HASH=${{ github.sha }}
+      description: nview is a local monitoring tool for a Cardano node
+      docker-image: blinklabs/nview
+      go-version: 1.26.x
+      pre-build-command: resources/update.sh
+      pre-build-on-tags-only: true
