@@ -30,7 +30,7 @@ mod-tidy:
 	go mod tidy
 
 clean:
-	rm -f $(BINARY_OUTPUTS)
+	rm -f $(BINARIES) $(addsuffix .exe,$(BINARIES))
 
 format: mod-tidy
 	go fmt ./...
