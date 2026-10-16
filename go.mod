@@ -1,8 +1,6 @@
 module github.com/blinklabs-io/nview
 
-go 1.25.0
-
-toolchain go1.25.4
+go 1.26.0
 
 require (
 	github.com/gdamore/tcell/v2 v2.13.10
@@ -12,7 +10,7 @@ require (
 	github.com/oschwald/geoip2-golang v1.13.0
 	github.com/prometheus/client_model v0.6.3
 	github.com/prometheus/common v0.71.0
-	github.com/prometheus/prometheus v0.303.0
+	github.com/prometheus/prometheus v0.315.0
 	github.com/rivo/tview v0.42.0
 	github.com/shirou/gopsutil/v3 v3.24.5
 	golang.org/x/term v0.45.0
@@ -24,7 +22,7 @@ require (
 	github.com/gdamore/encoding v1.0.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc // indirect
+	github.com/grafana/regexp v0.0.0-20250905093917-f7b3be9d1853 // indirect
 	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20251013123823-9fd1530e3ec3 // indirect
 	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect
