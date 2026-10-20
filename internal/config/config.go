@@ -351,10 +351,10 @@ func (c *Config) populateByronGenesis() error {
 		}
 	case "musashi":
 		if kWasDefaulted {
-			c.Node.ByronGenesis.K = 432
+			c.Node.ByronGenesis.K = 108
 		}
 		if c.Node.ByronGenesis.StartTime == 0 {
-			c.Node.ByronGenesis.StartTime = 1780012800
+			c.Node.ByronGenesis.StartTime = 1792281600
 		}
 	case "mainnet":
 		if c.Node.ByronGenesis.StartTime == 0 {
@@ -394,8 +394,10 @@ func (c *Config) populateShelleyGenesis() error {
 		// Our epoch length is 432000, except sancho/preview/musashi
 		c.Node.ShelleyGenesis.EpochLength = 432000
 		switch network {
-		case "sancho", "preview", "musashi":
+		case "sancho", "preview":
 			c.Node.ShelleyGenesis.EpochLength = 86400
+		case "musashi":
+			c.Node.ShelleyGenesis.EpochLength = 21600
 		}
 	} else {
 		return nil

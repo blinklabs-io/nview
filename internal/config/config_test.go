@@ -106,7 +106,7 @@ func TestPopulateByronGenesis(t *testing.T) {
 		{"preprod app", "preprod", "", 1654041600, 2160},
 		{"preview app", "preview", "", 1666656000, 432},
 		{"sancho app", "sancho", "", 1686789000, 432},
-		{"musashi app", "musashi", "", 1780012800, 432},
+		{"musashi app", "musashi", "", 1792281600, 108},
 		{"mainnet node", "", "mainnet", 1506203091, 2160},
 	}
 
@@ -180,7 +180,7 @@ func TestPopulateShelleyGenesis(t *testing.T) {
 		{"preprod app", "preprod", "", 432000},
 		{"preview app", "preview", "", 86400},
 		{"sancho app", "sancho", "", 86400},
-		{"musashi app", "musashi", "", 86400},
+		{"musashi app", "musashi", "", 21600},
 		{"mainnet node", "", "mainnet", 432000},
 	}
 
