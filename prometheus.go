@@ -396,7 +396,9 @@ func prometheusText2json(prom []byte) ([]byte, error) {
 
 func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
 	var symbols labels.SymbolTable
-	parser, err := textparse.New(prom, contentType, "", true, false, &symbols)
+	parser, err := textparse.New(prom, contentType, &symbols, textparse.ParserOptions{
+		KeepClassicOnClassicAndNativeHistograms: true,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -418,10 +420,10 @@ func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
 		}
 		_, _, value := parser.Series()
 		parser.Labels(&parsedLabels)
-		name := parsedLabels.Get(labels.MetricName)
+		name := parsedLabels.Get(model.MetricNameLabel)
 		metricLabels := make([]*dto.LabelPair, 0, parsedLabels.Len()-1)
 		parsedLabels.Range(func(label labels.Label) {
-			if label.Name == labels.MetricName {
+			if label.Name == model.MetricNameLabel {
 				return
 			}
 			name, labelValue := label.Name, label.Value
