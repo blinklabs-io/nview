@@ -43,6 +43,6 @@ jobs:
         COMMIT_HASH=${{ github.sha }}
       description: nview is a local monitoring tool for a Cardano node
       docker-image: blinklabs/nview
-      go-version: 1.26.10
+      go-version: 1.26.x
       pre-build-command: resources/update.sh
       pre-build-on-tags-only: true
