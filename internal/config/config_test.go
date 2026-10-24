@@ -59,6 +59,8 @@ func TestPopulateNetworkMagic(t *testing.T) {
 		{"mainnet app", "mainnet", "", 764824073, false},
 		{"preprod app", "preprod", "", 1, false},
 		{"preview app", "preview", "", 2, false},
+		{"dijkstra app", "dijkstra", "", 6, false},
+		{"dijkstra node", "", "dijkstra", 6, false},
 		{"musashi app", "musashi", "", 164, false},
 		{"mainnet node", "", "mainnet", 764824073, false},
 		{"musashi node", "", "musashi", 164, false},
@@ -106,6 +108,8 @@ func TestPopulateByronGenesis(t *testing.T) {
 		{"preprod app", "preprod", "", 1654041600, 2160},
 		{"preview app", "preview", "", 1666656000, 432},
 		{"sancho app", "sancho", "", 1686789000, 432},
+		{"dijkstra app", "dijkstra", "", 1792281600, 432},
+		{"dijkstra node", "", "dijkstra", 1792281600, 432},
 		{"musashi app", "musashi", "", 1792281600, 108},
 		{"mainnet node", "", "mainnet", 1506203091, 2160},
 	}
@@ -180,6 +184,8 @@ func TestPopulateShelleyGenesis(t *testing.T) {
 		{"preprod app", "preprod", "", 432000},
 		{"preview app", "preview", "", 86400},
 		{"sancho app", "sancho", "", 86400},
+		{"dijkstra app", "dijkstra", "", 86400},
+		{"dijkstra node", "", "dijkstra", 86400},
 		{"musashi app", "musashi", "", 21600},
 		{"mainnet node", "", "mainnet", 432000},
 	}

@@ -251,6 +251,8 @@ func (c *Config) populateNetworkMagic() error {
 				c.Node.NetworkMagic = 1
 			case "preview":
 				c.Node.NetworkMagic = 2
+			case "dijkstra":
+				c.Node.NetworkMagic = 6
 			case "musashi":
 				c.Node.NetworkMagic = 164
 			default:
@@ -266,6 +268,8 @@ func (c *Config) populateNetworkMagic() error {
 				c.Node.NetworkMagic = 1
 			case "preview":
 				c.Node.NetworkMagic = 2
+			case "dijkstra":
+				c.Node.NetworkMagic = 6
 			case "musashi":
 				c.Node.NetworkMagic = 164
 			default:
@@ -349,6 +353,13 @@ func (c *Config) populateByronGenesis() error {
 		if c.Node.ByronGenesis.StartTime == 0 {
 			c.Node.ByronGenesis.StartTime = 1686789000
 		}
+	case "dijkstra":
+		if kWasDefaulted {
+			c.Node.ByronGenesis.K = 432
+		}
+		if c.Node.ByronGenesis.StartTime == 0 {
+			c.Node.ByronGenesis.StartTime = 1792281600
+		}
 	case "musashi":
 		if kWasDefaulted {
 			c.Node.ByronGenesis.K = 108
@@ -394,7 +405,7 @@ func (c *Config) populateShelleyGenesis() error {
 		// Our epoch length is 432000, except sancho/preview/musashi
 		c.Node.ShelleyGenesis.EpochLength = 432000
 		switch network {
-		case "sancho", "preview":
+		case "sancho", "preview", "dijkstra":
 			c.Node.ShelleyGenesis.EpochLength = 86400
 		case "musashi":
 			c.Node.ShelleyGenesis.EpochLength = 21600
