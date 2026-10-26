@@ -927,3 +927,107 @@ func TestRunEpochUpdateLoopPreservesRefreshCadenceAfterValidEpoch(t *testing.T) 
 	case <-time.After(200 * time.Millisecond):
 	}
 }
+
+// TestPromMetricsCardanoNode11Names decodes a scrape shaped like a
+// cardano-node 11.x endpoint, which names the connection counts
+// inboundConns_int/outboundConns_int and suffixes the known, established and
+// active peer totals with _int. It checks that those totals are read and that
+// cold, warm and hot are derived from them (20-8=12 cold, 8-5=3 warm, 5 hot).
+func TestPromMetricsCardanoNode11Names(t *testing.T) {
+	prom := []byte(`
+# TYPE cardano_node_metrics_blockNum_int gauge
+cardano_node_metrics_blockNum_int 4795678
+# TYPE cardano_node_metrics_connectionManager_inboundConns_int gauge
+cardano_node_metrics_connectionManager_inboundConns_int 1
+# TYPE cardano_node_metrics_connectionManager_outboundConns_int gauge
+cardano_node_metrics_connectionManager_outboundConns_int 36
+# TYPE cardano_node_metrics_peerSelection_KnownPeers_int gauge
+cardano_node_metrics_peerSelection_KnownPeers_int 20
+# TYPE cardano_node_metrics_peerSelection_EstablishedPeers_int gauge
+cardano_node_metrics_peerSelection_EstablishedPeers_int 8
+# TYPE cardano_node_metrics_peerSelection_ActivePeers_int gauge
+cardano_node_metrics_peerSelection_ActivePeers_int 5
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	tests := []struct {
+		name string
+		got  uint64
+		want uint64
+	}{
+		{"BlockNum", metrics.BlockNum, 4795678},
+		{"ConnIncoming", metrics.ConnIncoming, 1},
+		{"ConnOutgoing", metrics.ConnOutgoing, 36},
+		{"PeersKnown", metrics.PeersKnown, 20},
+		{"PeersEstablished", metrics.PeersEstablished, 8},
+		{"PeersActive", metrics.PeersActive, 5},
+		{"PeersCold", metrics.PeersCold, 12},
+		{"PeersWarm", metrics.PeersWarm, 3},
+		{"PeersHot", metrics.PeersHot, 5},
+	}
+	for _, tt := range tests {
+		if tt.got != tt.want {
+			t.Errorf("%s = %d, expected %d", tt.name, tt.got, tt.want)
+		}
+	}
+}
+
+// TestPromMetricsLegacyNodeNamesStillDecode feeds the pre-11 metric names
+// (incomingConns, outgoingConns, lowercase peerSelection cold/warm/hot) and
+// checks they still decode, so older nodes keep working after the 11.x
+// aliases were added.
+func TestPromMetricsLegacyNodeNamesStillDecode(t *testing.T) {
+	prom := []byte(`
+cardano_node_metrics_connectionManager_incomingConns 10
+cardano_node_metrics_connectionManager_outgoingConns 5
+cardano_node_metrics_peerSelection_cold 7
+cardano_node_metrics_peerSelection_warm 6
+cardano_node_metrics_peerSelection_hot 4
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	if metrics.ConnIncoming != 10 || metrics.ConnOutgoing != 5 {
+		t.Errorf("Conn = %d/%d, expected 10/5", metrics.ConnIncoming, metrics.ConnOutgoing)
+	}
+	if metrics.PeersCold != 7 || metrics.PeersWarm != 6 || metrics.PeersHot != 4 {
+		t.Errorf("Peers = %d/%d/%d, expected 7/6/4", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
+	}
+}
+
+// TestPromMetricsCardanoNode11OpenMetrics decodes the same 11.x names through
+// the OpenMetrics parser, which is the format nview negotiates with the node,
+// including the "info" metric type the node declares.
+func TestPromMetricsCardanoNode11OpenMetrics(t *testing.T) {
+	prom := []byte(`# TYPE cardano_node_metrics_cardano_build_info info
+cardano_node_metrics_cardano_build_info{version="11.1.3"} 1
+# TYPE cardano_node_metrics_connectionManager_inboundConns_int gauge
+cardano_node_metrics_connectionManager_inboundConns_int 2
+# TYPE cardano_node_metrics_connectionManager_outboundConns_int gauge
+cardano_node_metrics_connectionManager_outboundConns_int 40
+# TYPE cardano_node_metrics_peerSelection_KnownPeers_int gauge
+cardano_node_metrics_peerSelection_KnownPeers_int 150
+# TYPE cardano_node_metrics_peerSelection_EstablishedPeers_int gauge
+cardano_node_metrics_peerSelection_EstablishedPeers_int 30
+# TYPE cardano_node_metrics_peerSelection_ActivePeers_int gauge
+cardano_node_metrics_peerSelection_ActivePeers_int 20
+# EOF
+`)
+
+	b, err := prom2jsonWithContentType(prom, "application/openmetrics-text; version=1.0.0; charset=utf-8")
+	if err != nil {
+		t.Fatalf("prom2jsonWithContentType() error = %v", err)
+	}
+	var metrics PromMetrics
+	if err := json.Unmarshal(b, &metrics); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	if metrics.ConnIncoming != 2 || metrics.ConnOutgoing != 40 {
+		t.Errorf("Conn = %d/%d, expected 2/40", metrics.ConnIncoming, metrics.ConnOutgoing)
+	}
+	if metrics.PeersCold != 120 || metrics.PeersWarm != 10 || metrics.PeersHot != 20 {
+		t.Errorf("Peers = %d/%d/%d, expected 120/10/20", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
+	}
+}

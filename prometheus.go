@@ -387,11 +387,64 @@ func prometheusText2json(prom []byte) ([]byte, error) {
 			}
 		}
 	}
+	applyPromMetricAliases(out)
 	b, err = json.MarshalIndent(out, "", "    ")
 	if err != nil {
 		return b, err
 	}
 	return b, nil
+}
+
+// promMetricAliases maps the metric names cardano-node 11.x exports onto the
+// names PromMetrics decodes. The first name present in a scrape wins, so a
+// pre-11 node keeps decoding through the legacy name.
+var promMetricAliases = []struct {
+	field string
+	names []string
+}{
+	{
+		"cardano_node_metrics_connectionManager_incomingConns",
+		[]string{"cardano_node_metrics_connectionManager_inboundConns_int"},
+	},
+	{
+		"cardano_node_metrics_connectionManager_outgoingConns",
+		[]string{"cardano_node_metrics_connectionManager_outboundConns_int"},
+	},
+	{
+		"cardano_node_metrics_peerSelection_KnownPeers",
+		[]string{"cardano_node_metrics_peerSelection_KnownPeers_int"},
+	},
+	{
+		"cardano_node_metrics_peerSelection_EstablishedPeers",
+		[]string{"cardano_node_metrics_peerSelection_EstablishedPeers_int"},
+	},
+	{
+		"cardano_node_metrics_peerSelection_ActivePeers",
+		[]string{"cardano_node_metrics_peerSelection_ActivePeers_int"},
+	},
+}
+
+// applyPromMetricAliases copies renamed metrics onto the names PromMetrics
+// decodes and derives the cold/warm/hot peer counts from the known,
+// established and active totals, which every node version exports.
+func applyPromMetricAliases(out map[string]any) {
+	for _, alias := range promMetricAliases {
+		for _, name := range alias.names {
+			if v, ok := out[name]; ok {
+				out[alias.field] = v
+				break
+			}
+		}
+	}
+	known, okKnown := out["cardano_node_metrics_peerSelection_KnownPeers"].(float64)
+	established, okEstablished := out["cardano_node_metrics_peerSelection_EstablishedPeers"].(float64)
+	active, okActive := out["cardano_node_metrics_peerSelection_ActivePeers"].(float64)
+	if !okKnown || !okEstablished || !okActive {
+		return
+	}
+	out["cardano_node_metrics_peerSelection_cold"] = max(known-established, 0)
+	out["cardano_node_metrics_peerSelection_warm"] = max(established-active, 0)
+	out["cardano_node_metrics_peerSelection_hot"] = active
 }
 
 func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
@@ -431,6 +484,7 @@ func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
 		})
 		setPromMetricValueWithLabels(out, name, value, metricLabels)
 	}
+	applyPromMetricAliases(out)
 	return json.MarshalIndent(out, "", "    ")
 }
 
