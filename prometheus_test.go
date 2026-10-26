@@ -166,7 +166,6 @@ func TestPromMetricsConnectionManagerGauges(t *testing.T) {
 cardano_node_metrics_connectionManager_unidirectionalConns 4
 cardano_node_metrics_connectionManager_duplexConns 6
 cardano_node_metrics_connectionManager_fullDuplexConns 8
-cardano_node_metrics_connectionManager_prunableConns 2
 `)
 
 	metrics := decodePromMetrics(t, prom)
@@ -179,9 +178,6 @@ cardano_node_metrics_connectionManager_prunableConns 2
 	}
 	if metrics.ConnFullDuplex != 8 {
 		t.Errorf("ConnFullDuplex = %d, expected 8", metrics.ConnFullDuplex)
-	}
-	if metrics.ConnPrunable != 2 {
-		t.Errorf("ConnPrunable = %d, expected 2", metrics.ConnPrunable)
 	}
 }
 
@@ -223,16 +219,12 @@ func TestPromMetricsMissingFullDuplexConns(t *testing.T) {
 	prom := []byte(`
 cardano_node_metrics_connectionManager_unidirectionalConns 4
 cardano_node_metrics_connectionManager_duplexConns 6
-cardano_node_metrics_connectionManager_prunableConns 2
 `)
 
 	metrics := decodePromMetrics(t, prom)
 
 	if metrics.ConnFullDuplex != 0 {
 		t.Errorf("ConnFullDuplex = %d, expected 0", metrics.ConnFullDuplex)
-	}
-	if metrics.ConnPrunable != 2 {
-		t.Errorf("ConnPrunable = %d, expected 2", metrics.ConnPrunable)
 	}
 }
 
@@ -1029,5 +1021,29 @@ cardano_node_metrics_peerSelection_ActivePeers_int 20
 	}
 	if metrics.PeersCold != 120 || metrics.PeersWarm != 10 || metrics.PeersHot != 20 {
 		t.Errorf("Peers = %d/%d/%d, expected 120/10/20", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
+	}
+}
+
+// TestPromMetricsKeepsExportedPeerGauges feeds a scrape that exports both the
+// lowercase cold/warm/hot gauges and the known/established/active totals, as
+// Dingo does, with values that differ from the derived ones. It checks the
+// node's own gauges are kept rather than overwritten by the derivation.
+func TestPromMetricsKeepsExportedPeerGauges(t *testing.T) {
+	prom := []byte(`
+cardano_node_metrics_peerSelection_cold 30
+cardano_node_metrics_peerSelection_warm 2
+cardano_node_metrics_peerSelection_hot 5
+cardano_node_metrics_peerSelection_KnownPeers 40
+cardano_node_metrics_peerSelection_EstablishedPeers 8
+cardano_node_metrics_peerSelection_ActivePeers 5
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	if metrics.PeersCold != 30 || metrics.PeersWarm != 2 || metrics.PeersHot != 5 {
+		t.Errorf("Peers = %d/%d/%d, expected 30/2/5", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
+	}
+	if metrics.PeersKnown != 40 || metrics.PeersEstablished != 8 || metrics.PeersActive != 5 {
+		t.Errorf("totals = %d/%d/%d, expected 40/8/5", metrics.PeersKnown, metrics.PeersEstablished, metrics.PeersActive)
 	}
 }

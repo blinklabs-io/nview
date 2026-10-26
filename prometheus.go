@@ -137,7 +137,6 @@ type PromMetrics struct {
 	ConnUniDir          uint64  `json:"cardano_node_metrics_connectionManager_unidirectionalConns"`
 	ConnBiDir           uint64  `json:"cardano_node_metrics_connectionManager_duplexConns"`
 	ConnFullDuplex      uint64  `json:"cardano_node_metrics_connectionManager_fullDuplexConns"`
-	ConnPrunable        uint64  `json:"cardano_node_metrics_connectionManager_prunableConns"`
 	// Go runtime metrics for Dingo
 	GoMemAlloc            uint64 `json:"go_memstats_alloc_bytes"`
 	GoHeapIdle            uint64 `json:"go_memstats_heap_idle_bytes"`
@@ -425,8 +424,10 @@ var promMetricAliases = []struct {
 }
 
 // applyPromMetricAliases copies renamed metrics onto the names PromMetrics
-// decodes and derives the cold/warm/hot peer counts from the known,
-// established and active totals, which every node version exports.
+// decodes. When the node exports no cold/warm/hot gauges, as cardano-node 11.x
+// does not, they are derived from the known, established and active totals.
+// Gauges a node does export are left alone so its own values are never
+// overwritten by a derived one.
 func applyPromMetricAliases(out map[string]any) {
 	for _, alias := range promMetricAliases {
 		for _, name := range alias.names {
@@ -436,15 +437,25 @@ func applyPromMetricAliases(out map[string]any) {
 			}
 		}
 	}
+	const (
+		cold = "cardano_node_metrics_peerSelection_cold"
+		warm = "cardano_node_metrics_peerSelection_warm"
+		hot  = "cardano_node_metrics_peerSelection_hot"
+	)
+	for _, name := range []string{cold, warm, hot} {
+		if _, ok := out[name]; ok {
+			return
+		}
+	}
 	known, okKnown := out["cardano_node_metrics_peerSelection_KnownPeers"].(float64)
 	established, okEstablished := out["cardano_node_metrics_peerSelection_EstablishedPeers"].(float64)
 	active, okActive := out["cardano_node_metrics_peerSelection_ActivePeers"].(float64)
 	if !okKnown || !okEstablished || !okActive {
 		return
 	}
-	out["cardano_node_metrics_peerSelection_cold"] = max(known-established, 0)
-	out["cardano_node_metrics_peerSelection_warm"] = max(established-active, 0)
-	out["cardano_node_metrics_peerSelection_hot"] = active
+	out[cold] = max(known-established, 0)
+	out[warm] = max(established-active, 0)
+	out[hot] = active
 }
 
 func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
