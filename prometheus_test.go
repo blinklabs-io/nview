@@ -166,7 +166,6 @@ func TestPromMetricsConnectionManagerGauges(t *testing.T) {
 cardano_node_metrics_connectionManager_unidirectionalConns 4
 cardano_node_metrics_connectionManager_duplexConns 6
 cardano_node_metrics_connectionManager_fullDuplexConns 8
-cardano_node_metrics_connectionManager_prunableConns 2
 `)
 
 	metrics := decodePromMetrics(t, prom)
@@ -179,9 +178,6 @@ cardano_node_metrics_connectionManager_prunableConns 2
 	}
 	if metrics.ConnFullDuplex != 8 {
 		t.Errorf("ConnFullDuplex = %d, expected 8", metrics.ConnFullDuplex)
-	}
-	if metrics.ConnPrunable != 2 {
-		t.Errorf("ConnPrunable = %d, expected 2", metrics.ConnPrunable)
 	}
 }
 
@@ -223,16 +219,12 @@ func TestPromMetricsMissingFullDuplexConns(t *testing.T) {
 	prom := []byte(`
 cardano_node_metrics_connectionManager_unidirectionalConns 4
 cardano_node_metrics_connectionManager_duplexConns 6
-cardano_node_metrics_connectionManager_prunableConns 2
 `)
 
 	metrics := decodePromMetrics(t, prom)
 
 	if metrics.ConnFullDuplex != 0 {
 		t.Errorf("ConnFullDuplex = %d, expected 0", metrics.ConnFullDuplex)
-	}
-	if metrics.ConnPrunable != 2 {
-		t.Errorf("ConnPrunable = %d, expected 2", metrics.ConnPrunable)
 	}
 }
 
@@ -925,5 +917,220 @@ func TestRunEpochUpdateLoopPreservesRefreshCadenceAfterValidEpoch(t *testing.T) 
 	case <-calls:
 		t.Fatal("expected no further call once the refresh cadence takes over")
 	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+// TestPromMetricsCardanoNode11Names decodes a scrape shaped like a
+// cardano-node 11.x endpoint, which names the connection counts
+// inboundConns_int/outboundConns_int and suffixes the known, established and
+// active peer totals with _int. It checks that those totals are read and that
+// cold, warm and hot are derived from them (20-8=12 cold, 8-5=3 warm, 5 hot).
+func TestPromMetricsCardanoNode11Names(t *testing.T) {
+	prom := []byte(`
+# TYPE cardano_node_metrics_blockNum_int gauge
+cardano_node_metrics_blockNum_int 4795678
+# TYPE cardano_node_metrics_connectionManager_inboundConns_int gauge
+cardano_node_metrics_connectionManager_inboundConns_int 1
+# TYPE cardano_node_metrics_connectionManager_outboundConns_int gauge
+cardano_node_metrics_connectionManager_outboundConns_int 36
+# TYPE cardano_node_metrics_peerSelection_KnownPeers_int gauge
+cardano_node_metrics_peerSelection_KnownPeers_int 20
+# TYPE cardano_node_metrics_peerSelection_EstablishedPeers_int gauge
+cardano_node_metrics_peerSelection_EstablishedPeers_int 8
+# TYPE cardano_node_metrics_peerSelection_ActivePeers_int gauge
+cardano_node_metrics_peerSelection_ActivePeers_int 5
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	tests := []struct {
+		name string
+		got  uint64
+		want uint64
+	}{
+		{"BlockNum", metrics.BlockNum, 4795678},
+		{"ConnIncoming", metrics.ConnIncoming, 1},
+		{"ConnOutgoing", metrics.ConnOutgoing, 36},
+		{"PeersKnown", metrics.PeersKnown, 20},
+		{"PeersEstablished", metrics.PeersEstablished, 8},
+		{"PeersActive", metrics.PeersActive, 5},
+		{"PeersCold", metrics.PeersCold, 12},
+		{"PeersWarm", metrics.PeersWarm, 3},
+		{"PeersHot", metrics.PeersHot, 5},
+	}
+	for _, tt := range tests {
+		if tt.got != tt.want {
+			t.Errorf("%s = %d, expected %d", tt.name, tt.got, tt.want)
+		}
+	}
+}
+
+// TestPromMetricsLegacyNodeNamesStillDecode feeds the pre-11 metric names
+// (incomingConns, outgoingConns, lowercase peerSelection cold/warm/hot) and
+// checks they still decode, so older nodes keep working after the 11.x
+// aliases were added.
+func TestPromMetricsLegacyNodeNamesStillDecode(t *testing.T) {
+	prom := []byte(`
+cardano_node_metrics_connectionManager_incomingConns 10
+cardano_node_metrics_connectionManager_outgoingConns 5
+cardano_node_metrics_peerSelection_cold 7
+cardano_node_metrics_peerSelection_warm 6
+cardano_node_metrics_peerSelection_hot 4
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	if metrics.ConnIncoming != 10 || metrics.ConnOutgoing != 5 {
+		t.Errorf("Conn = %d/%d, expected 10/5", metrics.ConnIncoming, metrics.ConnOutgoing)
+	}
+	if metrics.PeersCold != 7 || metrics.PeersWarm != 6 || metrics.PeersHot != 4 {
+		t.Errorf("Peers = %d/%d/%d, expected 7/6/4", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
+	}
+}
+
+// TestPromMetricsCardanoNode11OpenMetrics decodes the same 11.x names through
+// the OpenMetrics parser, which is the format nview negotiates with the node,
+// including the "info" metric type the node declares.
+func TestPromMetricsCardanoNode11OpenMetrics(t *testing.T) {
+	prom := []byte(`# TYPE cardano_node_metrics_cardano_build_info info
+cardano_node_metrics_cardano_build_info{version="11.1.3"} 1
+# TYPE cardano_node_metrics_connectionManager_inboundConns_int gauge
+cardano_node_metrics_connectionManager_inboundConns_int 2
+# TYPE cardano_node_metrics_connectionManager_outboundConns_int gauge
+cardano_node_metrics_connectionManager_outboundConns_int 40
+# TYPE cardano_node_metrics_peerSelection_KnownPeers_int gauge
+cardano_node_metrics_peerSelection_KnownPeers_int 150
+# TYPE cardano_node_metrics_peerSelection_EstablishedPeers_int gauge
+cardano_node_metrics_peerSelection_EstablishedPeers_int 30
+# TYPE cardano_node_metrics_peerSelection_ActivePeers_int gauge
+cardano_node_metrics_peerSelection_ActivePeers_int 20
+# EOF
+`)
+
+	b, err := prom2jsonWithContentType(prom, "application/openmetrics-text; version=1.0.0; charset=utf-8")
+	if err != nil {
+		t.Fatalf("prom2jsonWithContentType() error = %v", err)
+	}
+	var metrics PromMetrics
+	if err := json.Unmarshal(b, &metrics); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	if metrics.ConnIncoming != 2 || metrics.ConnOutgoing != 40 {
+		t.Errorf("Conn = %d/%d, expected 2/40", metrics.ConnIncoming, metrics.ConnOutgoing)
+	}
+	if metrics.PeersCold != 120 || metrics.PeersWarm != 10 || metrics.PeersHot != 20 {
+		t.Errorf("Peers = %d/%d/%d, expected 120/10/20", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
+	}
+}
+
+// TestPromMetricsKeepsExportedPeerGauges feeds a scrape that exports both the
+// lowercase cold/warm/hot gauges and the known/established/active totals, as
+// Dingo does, with values that differ from the derived ones. It checks the
+// node's own gauges are kept rather than overwritten by the derivation.
+func TestPromMetricsKeepsExportedPeerGauges(t *testing.T) {
+	prom := []byte(`
+cardano_node_metrics_peerSelection_cold 30
+cardano_node_metrics_peerSelection_warm 2
+cardano_node_metrics_peerSelection_hot 5
+cardano_node_metrics_peerSelection_KnownPeers 40
+cardano_node_metrics_peerSelection_EstablishedPeers 8
+cardano_node_metrics_peerSelection_ActivePeers 5
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	if metrics.PeersCold != 30 || metrics.PeersWarm != 2 || metrics.PeersHot != 5 {
+		t.Errorf("Peers = %d/%d/%d, expected 30/2/5", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
+	}
+	if metrics.PeersKnown != 40 || metrics.PeersEstablished != 8 || metrics.PeersActive != 5 {
+		t.Errorf("totals = %d/%d/%d, expected 40/8/5", metrics.PeersKnown, metrics.PeersEstablished, metrics.PeersActive)
+	}
+}
+
+// TestPromMetricsCardanoNode11ConnectionAndPeerFamily checks the rest of the
+// 11.x connection, warm-transition and known-peer churn names (all _int suffixed) decode, and
+// that exported Cold_int/Warm_int/Hot_int are preferred over a derivation from
+// totals that would give different values.
+func TestPromMetricsCardanoNode11ConnectionAndPeerFamily(t *testing.T) {
+	prom := []byte(`
+cardano_node_metrics_connectionManager_unidirectionalConns_int 1
+cardano_node_metrics_connectionManager_duplexConns_int 36
+cardano_node_metrics_connectionManager_fullDuplexConns_int 2
+cardano_node_metrics_peerSelection_WarmPeersPromotions_int 7
+cardano_node_metrics_peerSelection_WarmPeersDemotions_int 4
+cardano_node_metrics_peerSelection_churn_IncreasedKnownPeers_int 5
+cardano_node_metrics_peerSelection_churn_DecreasedKnownPeers_int 3
+cardano_node_metrics_peerSelection_Cold_int 120
+cardano_node_metrics_peerSelection_Warm_int 10
+cardano_node_metrics_peerSelection_Hot_int 20
+cardano_node_metrics_peerSelection_KnownPeers_int 999
+cardano_node_metrics_peerSelection_EstablishedPeers_int 500
+cardano_node_metrics_peerSelection_ActivePeers_int 100
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	if metrics.ConnUniDir != 1 || metrics.ConnBiDir != 36 || metrics.ConnFullDuplex != 2 {
+		t.Errorf("Conn uni/bi/full = %d/%d/%d, expected 1/36/2", metrics.ConnUniDir, metrics.ConnBiDir, metrics.ConnFullDuplex)
+	}
+	if metrics.PeerWarmPromotions != 7 || metrics.PeerWarmDemotions != 4 {
+		t.Errorf("Warm promotions/demotions = %d/%d, expected 7/4", metrics.PeerWarmPromotions, metrics.PeerWarmDemotions)
+	}
+	if metrics.PeerChurnKnownUp != 5 || metrics.PeerChurnKnownDown != 3 {
+		t.Errorf("Churn up/down = %d/%d, expected 5/3", metrics.PeerChurnKnownUp, metrics.PeerChurnKnownDown)
+	}
+	if metrics.PeersCold != 120 || metrics.PeersWarm != 10 || metrics.PeersHot != 20 {
+		t.Errorf("Peers = %d/%d/%d, expected 120/10/20", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
+	}
+}
+
+// TestPromMetricsNewConnectionNameWinsOverLegacy feeds a scrape carrying both
+// the 11.x and the legacy connection names with different values, and checks
+// the 11.x name is the one decoded.
+func TestPromMetricsNewConnectionNameWinsOverLegacy(t *testing.T) {
+	prom := []byte(`
+cardano_node_metrics_connectionManager_incomingConns 10
+cardano_node_metrics_connectionManager_inboundConns_int 2
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	if metrics.ConnIncoming != 2 {
+		t.Errorf("ConnIncoming = %d, expected 2", metrics.ConnIncoming)
+	}
+}
+
+// TestPromMetricsPartialPeerGaugesAreCompleted feeds a scrape exporting only
+// the lowercase cold gauge next to full totals, and checks the missing warm
+// and hot gauges are derived while the exported cold one is kept.
+func TestPromMetricsPartialPeerGaugesAreCompleted(t *testing.T) {
+	prom := []byte(`
+cardano_node_metrics_peerSelection_cold 30
+cardano_node_metrics_peerSelection_KnownPeers 40
+cardano_node_metrics_peerSelection_EstablishedPeers 8
+cardano_node_metrics_peerSelection_ActivePeers 5
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	if metrics.PeersCold != 30 || metrics.PeersWarm != 3 || metrics.PeersHot != 5 {
+		t.Errorf("Peers = %d/%d/%d, expected 30/3/5", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
+	}
+}
+
+// TestPromMetricsPartialTotalsDoNotDerivePeers feeds a scrape with known and
+// established totals but no active total, and checks nothing is derived from
+// the incomplete set.
+func TestPromMetricsPartialTotalsDoNotDerivePeers(t *testing.T) {
+	prom := []byte(`
+cardano_node_metrics_peerSelection_KnownPeers_int 20
+cardano_node_metrics_peerSelection_EstablishedPeers_int 8
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	if metrics.PeersCold != 0 || metrics.PeersWarm != 0 || metrics.PeersHot != 0 {
+		t.Errorf("Peers = %d/%d/%d, expected 0/0/0", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
 	}
 }

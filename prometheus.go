@@ -137,7 +137,6 @@ type PromMetrics struct {
 	ConnUniDir          uint64  `json:"cardano_node_metrics_connectionManager_unidirectionalConns"`
 	ConnBiDir           uint64  `json:"cardano_node_metrics_connectionManager_duplexConns"`
 	ConnFullDuplex      uint64  `json:"cardano_node_metrics_connectionManager_fullDuplexConns"`
-	ConnPrunable        uint64  `json:"cardano_node_metrics_connectionManager_prunableConns"`
 	// Go runtime metrics for Dingo
 	GoMemAlloc            uint64 `json:"go_memstats_alloc_bytes"`
 	GoHeapIdle            uint64 `json:"go_memstats_heap_idle_bytes"`
@@ -387,11 +386,109 @@ func prometheusText2json(prom []byte) ([]byte, error) {
 			}
 		}
 	}
+	applyPromMetricAliases(out)
 	b, err = json.MarshalIndent(out, "", "    ")
 	if err != nil {
 		return b, err
 	}
 	return b, nil
+}
+
+// promMetricAliases maps each name PromMetrics decodes to the name
+// cardano-node 11.x exports for it. When a scrape carries both, the 11.x name
+// wins; a pre-11 node only has the legacy one and decodes through it.
+var promMetricAliases = []struct {
+	field string
+	name  string
+}{
+	{
+		"cardano_node_metrics_connectionManager_incomingConns",
+		"cardano_node_metrics_connectionManager_inboundConns_int",
+	},
+	{
+		"cardano_node_metrics_connectionManager_outgoingConns",
+		"cardano_node_metrics_connectionManager_outboundConns_int",
+	},
+	{
+		"cardano_node_metrics_connectionManager_unidirectionalConns",
+		"cardano_node_metrics_connectionManager_unidirectionalConns_int",
+	},
+	{
+		"cardano_node_metrics_connectionManager_duplexConns",
+		"cardano_node_metrics_connectionManager_duplexConns_int",
+	},
+	{
+		"cardano_node_metrics_connectionManager_fullDuplexConns",
+		"cardano_node_metrics_connectionManager_fullDuplexConns_int",
+	},
+	{
+		"cardano_node_metrics_peerSelection_KnownPeers",
+		"cardano_node_metrics_peerSelection_KnownPeers_int",
+	},
+	{
+		"cardano_node_metrics_peerSelection_EstablishedPeers",
+		"cardano_node_metrics_peerSelection_EstablishedPeers_int",
+	},
+	{
+		"cardano_node_metrics_peerSelection_ActivePeers",
+		"cardano_node_metrics_peerSelection_ActivePeers_int",
+	},
+	{
+		"cardano_node_metrics_peerSelection_WarmPeersPromotions",
+		"cardano_node_metrics_peerSelection_WarmPeersPromotions_int",
+	},
+	{
+		"cardano_node_metrics_peerSelection_WarmPeersDemotions",
+		"cardano_node_metrics_peerSelection_WarmPeersDemotions_int",
+	},
+	{
+		"cardano_node_metrics_peerSelection_churn_IncreasedKnownPeers",
+		"cardano_node_metrics_peerSelection_churn_IncreasedKnownPeers_int",
+	},
+	{
+		"cardano_node_metrics_peerSelection_churn_DecreasedKnownPeers",
+		"cardano_node_metrics_peerSelection_churn_DecreasedKnownPeers_int",
+	},
+	{
+		"cardano_node_metrics_peerSelection_cold",
+		"cardano_node_metrics_peerSelection_Cold_int",
+	},
+	{
+		"cardano_node_metrics_peerSelection_warm",
+		"cardano_node_metrics_peerSelection_Warm_int",
+	},
+	{
+		"cardano_node_metrics_peerSelection_hot",
+		"cardano_node_metrics_peerSelection_Hot_int",
+	},
+}
+
+// applyPromMetricAliases copies the 11.x names onto the names PromMetrics
+// decodes. Any cold/warm/hot gauge still missing afterwards, because the node
+// exports neither name, is derived from the known, established and active
+// totals. Gauges a node does export are never overwritten by a derived value.
+func applyPromMetricAliases(out map[string]any) {
+	for _, alias := range promMetricAliases {
+		if v, ok := out[alias.name]; ok {
+			out[alias.field] = v
+		}
+	}
+	known, okKnown := out["cardano_node_metrics_peerSelection_KnownPeers"].(float64)
+	established, okEstablished := out["cardano_node_metrics_peerSelection_EstablishedPeers"].(float64)
+	active, okActive := out["cardano_node_metrics_peerSelection_ActivePeers"].(float64)
+	if !okKnown || !okEstablished || !okActive {
+		return
+	}
+	derived := map[string]float64{
+		"cardano_node_metrics_peerSelection_cold": max(known-established, 0),
+		"cardano_node_metrics_peerSelection_warm": max(established-active, 0),
+		"cardano_node_metrics_peerSelection_hot":  active,
+	}
+	for name, value := range derived {
+		if _, ok := out[name]; !ok {
+			out[name] = value
+		}
+	}
 }
 
 func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
@@ -431,6 +528,7 @@ func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
 		})
 		setPromMetricValueWithLabels(out, name, value, metricLabels)
 	}
+	applyPromMetricAliases(out)
 	return json.MarshalIndent(out, "", "    ")
 }
 
