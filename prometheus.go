@@ -394,57 +394,75 @@ func prometheusText2json(prom []byte) ([]byte, error) {
 	return b, nil
 }
 
-// promMetricAliases maps the metric names cardano-node 11.x exports onto the
-// names PromMetrics decodes. The first name present in a scrape wins, so a
-// pre-11 node keeps decoding through the legacy name.
+// promMetricAliases maps each name PromMetrics decodes to the name
+// cardano-node 11.x exports for it. When a scrape carries both, the 11.x name
+// wins; a pre-11 node only has the legacy one and decodes through it.
 var promMetricAliases = []struct {
 	field string
-	names []string
+	name  string
 }{
 	{
 		"cardano_node_metrics_connectionManager_incomingConns",
-		[]string{"cardano_node_metrics_connectionManager_inboundConns_int"},
+		"cardano_node_metrics_connectionManager_inboundConns_int",
 	},
 	{
 		"cardano_node_metrics_connectionManager_outgoingConns",
-		[]string{"cardano_node_metrics_connectionManager_outboundConns_int"},
+		"cardano_node_metrics_connectionManager_outboundConns_int",
+	},
+	{
+		"cardano_node_metrics_connectionManager_unidirectionalConns",
+		"cardano_node_metrics_connectionManager_unidirectionalConns_int",
+	},
+	{
+		"cardano_node_metrics_connectionManager_duplexConns",
+		"cardano_node_metrics_connectionManager_duplexConns_int",
+	},
+	{
+		"cardano_node_metrics_connectionManager_fullDuplexConns",
+		"cardano_node_metrics_connectionManager_fullDuplexConns_int",
 	},
 	{
 		"cardano_node_metrics_peerSelection_KnownPeers",
-		[]string{"cardano_node_metrics_peerSelection_KnownPeers_int"},
+		"cardano_node_metrics_peerSelection_KnownPeers_int",
 	},
 	{
 		"cardano_node_metrics_peerSelection_EstablishedPeers",
-		[]string{"cardano_node_metrics_peerSelection_EstablishedPeers_int"},
+		"cardano_node_metrics_peerSelection_EstablishedPeers_int",
 	},
 	{
 		"cardano_node_metrics_peerSelection_ActivePeers",
-		[]string{"cardano_node_metrics_peerSelection_ActivePeers_int"},
+		"cardano_node_metrics_peerSelection_ActivePeers_int",
+	},
+	{
+		"cardano_node_metrics_peerSelection_WarmPeersPromotions",
+		"cardano_node_metrics_peerSelection_WarmPeersPromotions_int",
+	},
+	{
+		"cardano_node_metrics_peerSelection_WarmPeersDemotions",
+		"cardano_node_metrics_peerSelection_WarmPeersDemotions_int",
+	},
+	{
+		"cardano_node_metrics_peerSelection_cold",
+		"cardano_node_metrics_peerSelection_Cold_int",
+	},
+	{
+		"cardano_node_metrics_peerSelection_warm",
+		"cardano_node_metrics_peerSelection_Warm_int",
+	},
+	{
+		"cardano_node_metrics_peerSelection_hot",
+		"cardano_node_metrics_peerSelection_Hot_int",
 	},
 }
 
-// applyPromMetricAliases copies renamed metrics onto the names PromMetrics
-// decodes. When the node exports no cold/warm/hot gauges, as cardano-node 11.x
-// does not, they are derived from the known, established and active totals.
-// Gauges a node does export are left alone so its own values are never
-// overwritten by a derived one.
+// applyPromMetricAliases copies the 11.x names onto the names PromMetrics
+// decodes. Any cold/warm/hot gauge still missing afterwards, because the node
+// exports neither name, is derived from the known, established and active
+// totals. Gauges a node does export are never overwritten by a derived value.
 func applyPromMetricAliases(out map[string]any) {
 	for _, alias := range promMetricAliases {
-		for _, name := range alias.names {
-			if v, ok := out[name]; ok {
-				out[alias.field] = v
-				break
-			}
-		}
-	}
-	const (
-		cold = "cardano_node_metrics_peerSelection_cold"
-		warm = "cardano_node_metrics_peerSelection_warm"
-		hot  = "cardano_node_metrics_peerSelection_hot"
-	)
-	for _, name := range []string{cold, warm, hot} {
-		if _, ok := out[name]; ok {
-			return
+		if v, ok := out[alias.name]; ok {
+			out[alias.field] = v
 		}
 	}
 	known, okKnown := out["cardano_node_metrics_peerSelection_KnownPeers"].(float64)
@@ -453,9 +471,16 @@ func applyPromMetricAliases(out map[string]any) {
 	if !okKnown || !okEstablished || !okActive {
 		return
 	}
-	out[cold] = max(known-established, 0)
-	out[warm] = max(established-active, 0)
-	out[hot] = active
+	derived := map[string]float64{
+		"cardano_node_metrics_peerSelection_cold": max(known-established, 0),
+		"cardano_node_metrics_peerSelection_warm": max(established-active, 0),
+		"cardano_node_metrics_peerSelection_hot":  active,
+	}
+	for name, value := range derived {
+		if _, ok := out[name]; !ok {
+			out[name] = value
+		}
+	}
 }
 
 func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
