@@ -24,7 +24,7 @@ jobs:
   publish:
     needs: [go-test]
     if: github.event_name == 'push'
-    uses: blinklabs-io/actions/.github/workflows/reuseable-publish.yml@f624a0a0e58c674971587ea32b5cb19c55c42d36
+    uses: blinklabs-io/actions/.github/workflows/reuseable-publish.yml@e3dee08bef03cc5e245e18069f48644a6084a4f3
     permissions:
       actions: write
       attestations: write
