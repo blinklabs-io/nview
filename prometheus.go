@@ -442,6 +442,14 @@ var promMetricAliases = []struct {
 		"cardano_node_metrics_peerSelection_WarmPeersDemotions_int",
 	},
 	{
+		"cardano_node_metrics_peerSelection_churn_IncreasedKnownPeers",
+		"cardano_node_metrics_peerSelection_churn_IncreasedKnownPeers_int",
+	},
+	{
+		"cardano_node_metrics_peerSelection_churn_DecreasedKnownPeers",
+		"cardano_node_metrics_peerSelection_churn_DecreasedKnownPeers_int",
+	},
+	{
 		"cardano_node_metrics_peerSelection_cold",
 		"cardano_node_metrics_peerSelection_Cold_int",
 	},

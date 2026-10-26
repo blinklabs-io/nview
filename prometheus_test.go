@@ -1049,7 +1049,7 @@ cardano_node_metrics_peerSelection_ActivePeers 5
 }
 
 // TestPromMetricsCardanoNode11ConnectionAndPeerFamily checks the rest of the
-// 11.x connection and warm-transition names (all _int suffixed) decode, and
+// 11.x connection, warm-transition and known-peer churn names (all _int suffixed) decode, and
 // that exported Cold_int/Warm_int/Hot_int are preferred over a derivation from
 // totals that would give different values.
 func TestPromMetricsCardanoNode11ConnectionAndPeerFamily(t *testing.T) {
@@ -1059,6 +1059,8 @@ cardano_node_metrics_connectionManager_duplexConns_int 36
 cardano_node_metrics_connectionManager_fullDuplexConns_int 2
 cardano_node_metrics_peerSelection_WarmPeersPromotions_int 7
 cardano_node_metrics_peerSelection_WarmPeersDemotions_int 4
+cardano_node_metrics_peerSelection_churn_IncreasedKnownPeers_int 5
+cardano_node_metrics_peerSelection_churn_DecreasedKnownPeers_int 3
 cardano_node_metrics_peerSelection_Cold_int 120
 cardano_node_metrics_peerSelection_Warm_int 10
 cardano_node_metrics_peerSelection_Hot_int 20
@@ -1074,6 +1076,9 @@ cardano_node_metrics_peerSelection_ActivePeers_int 100
 	}
 	if metrics.PeerWarmPromotions != 7 || metrics.PeerWarmDemotions != 4 {
 		t.Errorf("Warm promotions/demotions = %d/%d, expected 7/4", metrics.PeerWarmPromotions, metrics.PeerWarmDemotions)
+	}
+	if metrics.PeerChurnKnownUp != 5 || metrics.PeerChurnKnownDown != 3 {
+		t.Errorf("Churn up/down = %d/%d, expected 5/3", metrics.PeerChurnKnownUp, metrics.PeerChurnKnownDown)
 	}
 	if metrics.PeersCold != 120 || metrics.PeersWarm != 10 || metrics.PeersHot != 20 {
 		t.Errorf("Peers = %d/%d/%d, expected 120/10/20", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
