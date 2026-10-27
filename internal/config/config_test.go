@@ -23,6 +23,8 @@ func resetConfigEnv(t *testing.T) {
 		"CARDANO_NETWORK", "CARDANO_NODE_NETWORK_MAGIC", "CARDANO_PORT", "CARDANO_BLOCK_PRODUCER",
 		"PROM_HOST", "PROM_PORT", "PROM_REFRESH", "PROM_TIMEOUT", "BYRON_K",
 		"DUMMY_CARDANO_NODE_DATA_DIR", "CARDANO_NODE_DATA_DIR",
+		"DUMMY_APP_NVIEW_VISUAL_MODE", "NVIEW_VISUAL_MODE",
+		"DUMMY_APP_NVIEW_IMAGE_PROTOCOL", "NVIEW_IMAGE_PROTOCOL",
 	}
 	for _, v := range envVars {
 		os.Unsetenv(v)
@@ -451,5 +453,54 @@ func TestLoadConfigDataDir(t *testing.T) {
 	}
 	if cfg.Node.DataDir != "/from/env" {
 		t.Errorf("Expected env DataDir to win, got %q", cfg.Node.DataDir)
+	}
+}
+
+// TestLoadConfigVisualSettings covers app.visualMode and app.imageProtocol:
+// they default to auto, are read from YAML, and are overridden by
+// NVIEW_VISUAL_MODE and NVIEW_IMAGE_PROTOCOL.
+func TestLoadConfigVisualSettings(t *testing.T) {
+	resetConfigEnv(t)
+	cfg, err := LoadConfig("")
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+	if cfg.App.VisualMode != "auto" || cfg.App.ImageProtocol != "auto" {
+		t.Errorf(
+			"Expected auto defaults, got %q and %q",
+			cfg.App.VisualMode, cfg.App.ImageProtocol,
+		)
+	}
+
+	file := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(
+		file,
+		[]byte("app:\n  visualMode: plain\n  imageProtocol: kitty\n"),
+		0o600,
+	); err != nil {
+		t.Fatalf("Failed to write config: %v", err)
+	}
+	cfg, err = LoadConfig(file)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+	if cfg.App.VisualMode != "plain" || cfg.App.ImageProtocol != "kitty" {
+		t.Errorf(
+			"Expected YAML values, got %q and %q",
+			cfg.App.VisualMode, cfg.App.ImageProtocol,
+		)
+	}
+
+	t.Setenv("NVIEW_VISUAL_MODE", "nerd")
+	t.Setenv("NVIEW_IMAGE_PROTOCOL", "none")
+	cfg, err = LoadConfig(file)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+	if cfg.App.VisualMode != "nerd" || cfg.App.ImageProtocol != "none" {
+		t.Errorf(
+			"Expected env values to win, got %q and %q",
+			cfg.App.VisualMode, cfg.App.ImageProtocol,
+		)
 	}
 }

@@ -39,6 +39,11 @@ type AppConfig struct {
 	Refresh       uint32 `yaml:"refresh"       envconfig:"REFRESH"`
 	Retries       uint32 `yaml:"retries"       envconfig:"RETRIES"`
 	LogBufferSize uint32 `yaml:"logBufferSize" envconfig:"LOG_BUFFER_SIZE"`
+	// VisualMode selects the TUI glyph set: auto, unicode, plain or nerd.
+	VisualMode string `yaml:"visualMode" envconfig:"NVIEW_VISUAL_MODE"`
+	// ImageProtocol selects terminal image protocol detection: auto, none,
+	// kitty, iterm2 or sixel.
+	ImageProtocol string `yaml:"imageProtocol" envconfig:"NVIEW_IMAGE_PROTOCOL"`
 }
 
 // NodeConfig contains configuration specific to the Cardano node being monitored.
@@ -88,6 +93,8 @@ func getDefaultConfig() *Config {
 			Refresh:       1,
 			Retries:       3,
 			LogBufferSize: 1000,
+			VisualMode:    "auto",
+			ImageProtocol: "auto",
 		},
 		Node: NodeConfig{
 			Binary:            "cardano-node",
