@@ -20,6 +20,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/blinklabs-io/nview/internal/config"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -75,16 +76,22 @@ type uiSegment struct {
 }
 
 func currentTerminalVisuals() terminalVisualCapabilities {
-	return terminalVisualsFromEnv(os.Getenv)
+	app := config.GetConfig().App
+	return terminalVisuals(app.VisualMode, app.ImageProtocol, os.Getenv)
 }
 
-func terminalVisualsFromEnv(getenv func(string) string) terminalVisualCapabilities {
+// terminalVisuals resolves the glyph set and image protocol from the
+// configured values and the terminal environment read through getenv.
+func terminalVisuals(
+	visualMode, imageProtocol string,
+	getenv func(string) string,
+) terminalVisualCapabilities {
 	if getenv == nil {
 		getenv = func(string) string { return "" }
 	}
 
 	mode := terminalVisualUnicode
-	switch strings.ToLower(strings.TrimSpace(getenv("NVIEW_VISUAL_MODE"))) {
+	switch strings.ToLower(strings.TrimSpace(visualMode)) {
 	case "plain", "ascii", "basic":
 		mode = terminalVisualPlain
 	case "nerd", "nerdfont", "powerline":
@@ -103,7 +110,7 @@ func terminalVisualsFromEnv(getenv func(string) string) terminalVisualCapabiliti
 
 	return terminalVisualCapabilities{
 		Mode:          mode,
-		ImageProtocol: terminalImageProtocolFromEnv(getenv),
+		ImageProtocol: terminalImageProtocol(imageProtocol, getenv),
 	}
 }
 
@@ -125,12 +132,13 @@ func terminalSupportsUnicode(getenv func(string) string) bool {
 	return strings.Contains(locale, "UTF-8") || strings.Contains(locale, "UTF8")
 }
 
-func terminalImageProtocolFromEnv(getenv func(string) string) string {
-	switch strings.ToLower(strings.TrimSpace(getenv("NVIEW_IMAGE_PROTOCOL"))) {
+func terminalImageProtocol(protocol string, getenv func(string) string) string {
+	protocol = strings.ToLower(strings.TrimSpace(protocol))
+	switch protocol {
 	case "none", "off", "plain":
 		return "none"
 	case "kitty", "iterm2", "sixel":
-		return strings.ToLower(strings.TrimSpace(getenv("NVIEW_IMAGE_PROTOCOL")))
+		return protocol
 	case "", "auto":
 	default:
 		return "none"

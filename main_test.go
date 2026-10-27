@@ -1000,8 +1000,7 @@ func TestDashboardPaneSeverities(t *testing.T) {
 }
 
 func TestFormatMithrilProgressLinePlainFallback(t *testing.T) {
-	t.Setenv("NVIEW_VISUAL_MODE", "plain")
-	t.Setenv("NVIEW_IMAGE_PROTOCOL", "none")
+	setTestVisuals(t, "plain", "none")
 
 	result := formatMithrilProgressLine(
 		"Download",
@@ -1289,7 +1288,7 @@ func TestGetDingoConsoleTextRendersUnboxedLanes(t *testing.T) {
 }
 
 func TestDingoPanelRowsHaveStableWidths(t *testing.T) {
-	t.Setenv("NVIEW_VISUAL_MODE", "plain")
+	setTestVisuals(t, "plain", "")
 
 	innerWidth := dingoPanelInnerWidth(90)
 	panel := dingoPanel(

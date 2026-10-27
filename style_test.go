@@ -15,31 +15,54 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/blinklabs-io/nview/internal/config"
 	"github.com/rivo/tview"
 )
 
-func TestTerminalVisualsFromEnv(t *testing.T) {
+// setTestVisuals loads the config with the given visual mode and image
+// protocol, as NVIEW_VISUAL_MODE and NVIEW_IMAGE_PROTOCOL would, and reloads
+// the defaults when the test ends. The reload is registered before the
+// environment is set so that it runs after the environment is restored.
+func setTestVisuals(t *testing.T, visualMode, imageProtocol string) {
+	t.Helper()
+
+	t.Cleanup(func() {
+		if _, err := config.LoadConfig(""); err != nil {
+			t.Errorf("config.LoadConfig() error = %v", err)
+		}
+	})
+	t.Setenv("NVIEW_VISUAL_MODE", visualMode)
+	t.Setenv("NVIEW_IMAGE_PROTOCOL", imageProtocol)
+	if _, err := config.LoadConfig(""); err != nil {
+		t.Fatalf("config.LoadConfig() error = %v", err)
+	}
+}
+
+// TestTerminalVisuals checks how the configured visual mode and image protocol
+// combine with the terminal environment (TERM, locale, Kitty and iTerm
+// variables) into the glyph set and image protocol nview uses.
+func TestTerminalVisuals(t *testing.T) {
 	tests := []struct {
 		name          string
+		visualMode    string
+		imageProtocol string
 		env           map[string]string
 		expectedMode  terminalVisualMode
 		expectedImage string
 	}{
 		{
-			name: "explicit plain",
-			env: map[string]string{
-				"NVIEW_VISUAL_MODE": "plain",
-			},
+			name:          "explicit plain",
+			visualMode:    "plain",
 			expectedMode:  terminalVisualPlain,
 			expectedImage: "none",
 		},
 		{
-			name: "explicit nerd font",
-			env: map[string]string{
-				"NVIEW_VISUAL_MODE": "nerd",
-			},
+			name:          "explicit nerd font",
+			visualMode:    "nerd",
 			expectedMode:  terminalVisualNerd,
 			expectedImage: "none",
 		},
@@ -69,11 +92,11 @@ func TestTerminalVisualsFromEnv(t *testing.T) {
 			expectedImage: "kitty",
 		},
 		{
-			name: "explicit image protocol off",
+			name:          "explicit image protocol off",
+			imageProtocol: "none",
 			env: map[string]string{
-				"LANG":                 "en_US.UTF-8",
-				"KITTY_WINDOW_ID":      "1",
-				"NVIEW_IMAGE_PROTOCOL": "none",
+				"LANG":            "en_US.UTF-8",
+				"KITTY_WINDOW_ID": "1",
 			},
 			expectedMode:  terminalVisualUnicode,
 			expectedImage: "none",
@@ -82,7 +105,7 @@ func TestTerminalVisualsFromEnv(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := terminalVisualsFromEnv(func(key string) string {
+			got := terminalVisuals(tt.visualMode, tt.imageProtocol, func(key string) string {
 				return tt.env[key]
 			})
 			if got.Mode != tt.expectedMode {
@@ -100,8 +123,7 @@ func TestTerminalVisualsFromEnv(t *testing.T) {
 }
 
 func TestUIProgressBarPlainFallback(t *testing.T) {
-	t.Setenv("NVIEW_VISUAL_MODE", "plain")
-	t.Setenv("NVIEW_IMAGE_PROTOCOL", "none")
+	setTestVisuals(t, "plain", "none")
 
 	got := uiProgressBar(50, 4, uiSeverityOK)
 	expected := "[green]##[gray]--[white]"
@@ -111,8 +133,7 @@ func TestUIProgressBarPlainFallback(t *testing.T) {
 }
 
 func TestUIProgressBarUnicode(t *testing.T) {
-	t.Setenv("NVIEW_VISUAL_MODE", "unicode")
-	t.Setenv("NVIEW_IMAGE_PROTOCOL", "none")
+	setTestVisuals(t, "unicode", "none")
 
 	got := uiProgressBar(50, 4, uiSeverityWarn)
 	expected := "[yellow]██[gray]░░[white]"
@@ -137,8 +158,7 @@ func TestUIWrapEscapesTagDelimiters(t *testing.T) {
 }
 
 func TestUISegmentBarPlainFallback(t *testing.T) {
-	t.Setenv("NVIEW_VISUAL_MODE", "plain")
-	t.Setenv("NVIEW_IMAGE_PROTOCOL", "none")
+	setTestVisuals(t, "plain", "none")
 
 	got := uiSegmentBar([]uiSegment{
 		{Value: 3, Severity: uiSeverityOK},
@@ -151,8 +171,7 @@ func TestUISegmentBarPlainFallback(t *testing.T) {
 }
 
 func TestUISegmentBarRemainderUsesLastPositiveSegment(t *testing.T) {
-	t.Setenv("NVIEW_VISUAL_MODE", "plain")
-	t.Setenv("NVIEW_IMAGE_PROTOCOL", "none")
+	setTestVisuals(t, "plain", "none")
 
 	got := uiSegmentBar([]uiSegment{
 		{Value: 1, Severity: uiSeverityOK},
@@ -167,8 +186,7 @@ func TestUISegmentBarRemainderUsesLastPositiveSegment(t *testing.T) {
 }
 
 func TestUISparklinePlainFallback(t *testing.T) {
-	t.Setenv("NVIEW_VISUAL_MODE", "plain")
-	t.Setenv("NVIEW_IMAGE_PROTOCOL", "none")
+	setTestVisuals(t, "plain", "none")
 
 	got := uiSparkline([]float64{0, 50, 100}, 100, uiSeverityOK)
 	expected := "[green].+@[white]"
@@ -182,5 +200,45 @@ func TestUIKVAlignedPadsBeforeColor(t *testing.T) {
 	expected := "[green]Hot     [white] [white]1[white]"
 	if got != expected {
 		t.Errorf("uiKVAligned() = %q, expected %q", got, expected)
+	}
+}
+
+// TestCurrentTerminalVisualsReadsYAMLConfig checks that app.visualMode and
+// app.imageProtocol in the YAML file reach the TUI, and that the environment
+// variables still override them.
+func TestCurrentTerminalVisualsReadsYAMLConfig(t *testing.T) {
+	t.Cleanup(func() {
+		if _, err := config.LoadConfig(""); err != nil {
+			t.Errorf("config.LoadConfig() error = %v", err)
+		}
+	})
+	// An empty value would still count as set and override the file, so
+	// register the restore with Setenv and then unset.
+	for _, name := range []string{"NVIEW_VISUAL_MODE", "NVIEW_IMAGE_PROTOCOL"} {
+		t.Setenv(name, "")
+		os.Unsetenv(name)
+	}
+	t.Setenv("LANG", "en_US.UTF-8")
+
+	file := filepath.Join(t.TempDir(), "config.yaml")
+	yaml := "app:\n  visualMode: plain\n  imageProtocol: none\n"
+	if err := os.WriteFile(file, []byte(yaml), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if _, err := config.LoadConfig(file); err != nil {
+		t.Fatalf("config.LoadConfig() error = %v", err)
+	}
+	got := currentTerminalVisuals()
+	if got.Mode != terminalVisualPlain || got.ImageProtocol != "none" {
+		t.Errorf("from YAML: Mode = %d, ImageProtocol = %q, expected plain and none",
+			got.Mode, got.ImageProtocol)
+	}
+
+	t.Setenv("NVIEW_VISUAL_MODE", "nerd")
+	if _, err := config.LoadConfig(file); err != nil {
+		t.Fatalf("config.LoadConfig() error = %v", err)
+	}
+	if got := currentTerminalVisuals(); got.Mode != terminalVisualNerd {
+		t.Errorf("env override: Mode = %d, expected %d", got.Mode, terminalVisualNerd)
 	}
 }

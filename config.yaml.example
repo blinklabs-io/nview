@@ -17,6 +17,20 @@ app:
   # the node specific setting below
   network:
 
+  # Terminal glyph set for the TUI
+  #
+  # Valid values are `auto`, `unicode`, `plain`, and `nerd`.
+  #
+  # This can also be set via the NVIEW_VISUAL_MODE environment variable
+  visualMode: auto
+
+  # Terminal image protocol detection
+  #
+  # Valid values are `auto`, `none`, `kitty`, `iterm2`, and `sixel`.
+  #
+  # This can also be set via the NVIEW_IMAGE_PROTOCOL environment variable
+  imageProtocol: auto
+
 node:
   # Name of the node you are running.
   #
