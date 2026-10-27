@@ -23,6 +23,24 @@ import (
 	"github.com/rivo/tview"
 )
 
+// clearVisualEnv unsets the variables that LoadConfig reads for the visual
+// settings, including the prefixed names envconfig checks first, so an
+// inherited value cannot change what a test loads. The values are restored
+// when the test ends.
+func clearVisualEnv(t *testing.T) {
+	t.Helper()
+
+	for _, name := range []string{
+		"NVIEW_VISUAL_MODE", "NVIEW_IMAGE_PROTOCOL",
+		"DUMMY_APP_NVIEW_VISUAL_MODE", "DUMMY_APP_NVIEW_IMAGE_PROTOCOL",
+	} {
+		// An empty value would still count as set and override the file,
+		// so register the restore with Setenv and then unset.
+		t.Setenv(name, "")
+		os.Unsetenv(name)
+	}
+}
+
 // setTestVisuals loads the config with the given visual mode and image
 // protocol, as NVIEW_VISUAL_MODE and NVIEW_IMAGE_PROTOCOL would, and reloads
 // the defaults when the test ends. The reload is registered before the
@@ -35,6 +53,7 @@ func setTestVisuals(t *testing.T, visualMode, imageProtocol string) {
 			t.Errorf("config.LoadConfig() error = %v", err)
 		}
 	})
+	clearVisualEnv(t)
 	t.Setenv("NVIEW_VISUAL_MODE", visualMode)
 	t.Setenv("NVIEW_IMAGE_PROTOCOL", imageProtocol)
 	if _, err := config.LoadConfig(""); err != nil {
@@ -212,13 +231,10 @@ func TestCurrentTerminalVisualsReadsYAMLConfig(t *testing.T) {
 			t.Errorf("config.LoadConfig() error = %v", err)
 		}
 	})
-	// An empty value would still count as set and override the file, so
-	// register the restore with Setenv and then unset.
-	for _, name := range []string{"NVIEW_VISUAL_MODE", "NVIEW_IMAGE_PROTOCOL"} {
-		t.Setenv(name, "")
-		os.Unsetenv(name)
-	}
+	clearVisualEnv(t)
 	t.Setenv("LANG", "en_US.UTF-8")
+	// Image detection would pick kitty, so "none" can only come from the file.
+	t.Setenv("KITTY_WINDOW_ID", "1")
 
 	file := filepath.Join(t.TempDir(), "config.yaml")
 	yaml := "app:\n  visualMode: plain\n  imageProtocol: none\n"

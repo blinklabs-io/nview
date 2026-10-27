@@ -80,8 +80,6 @@ func currentTerminalVisuals() terminalVisualCapabilities {
 	return terminalVisuals(app.VisualMode, app.ImageProtocol, os.Getenv)
 }
 
-// terminalVisuals resolves the glyph set and image protocol from the
-// configured values and the terminal environment read through getenv.
 func terminalVisuals(
 	visualMode, imageProtocol string,
 	getenv func(string) string,
