@@ -478,6 +478,38 @@ var promMetricAliases = []struct {
 		"cardano_node_metrics_Forge_didnt_adopt_counter",
 	},
 	{
+		"cardano_node_metrics_txsProcessedNum_int",
+		"cardano_node_metrics_txsProcessedNum_counter",
+	},
+	{
+		"cardano_node_metrics_forks_int",
+		"cardano_node_metrics_forks_counter",
+	},
+	{
+		"cardano_node_metrics_served_block_count_int",
+		"cardano_node_metrics_served_block_counter",
+	},
+	{
+		"cardano_node_metrics_blockfetchclient_blockdelay_s",
+		"cardano_node_metrics_blockfetchclient_blockdelay_real",
+	},
+	{
+		"cardano_node_metrics_blockfetchclient_lateblocks",
+		"cardano_node_metrics_blockfetchclient_lateblocks_counter",
+	},
+	{
+		"cardano_node_metrics_blockfetchclient_blockdelay_cdfOne",
+		"cardano_node_metrics_blockfetchclient_blockdelay_cdfOne_real",
+	},
+	{
+		"cardano_node_metrics_blockfetchclient_blockdelay_cdfThree",
+		"cardano_node_metrics_blockfetchclient_blockdelay_cdfThree_real",
+	},
+	{
+		"cardano_node_metrics_blockfetchclient_blockdelay_cdfFive",
+		"cardano_node_metrics_blockfetchclient_blockdelay_cdfFive_real",
+	},
+	{
 		"cardano_node_metrics_peerSelection_cold",
 		"cardano_node_metrics_peerSelection_Cold_int",
 	},
