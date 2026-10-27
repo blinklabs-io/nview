@@ -1213,3 +1213,114 @@ func TestSetRoleDetectsCardanoNode11BlockProducer(t *testing.T) {
 		t.Errorf("role = %q, expected Core", role)
 	}
 }
+
+// TestPromMetricsCardanoNode11CounterNames decodes the counters and block
+// fetch metrics a cardano-node 11.1.3 relay exports. The transaction, fork and
+// served-block counters carry a _counter suffix, and the block fetch delay
+// metrics carry _real (the late-block count _counter) instead of the names
+// nview tags. The values are from a live scrape.
+func TestPromMetricsCardanoNode11CounterNames(t *testing.T) {
+	prom := []byte(`
+cardano_node_metrics_txsProcessedNum_counter 1475
+cardano_node_metrics_forks_counter 27
+cardano_node_metrics_served_block_counter 69
+cardano_node_metrics_blockfetchclient_blockdelay_real 0.219240463
+cardano_node_metrics_blockfetchclient_lateblocks_counter 3
+cardano_node_metrics_blockfetchclient_blockdelay_cdfOne_real 0.9907407407407407
+cardano_node_metrics_blockfetchclient_blockdelay_cdfThree_real 0.9935185185185185
+cardano_node_metrics_blockfetchclient_blockdelay_cdfFive_real 0.9990740740740741
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	counts := []struct {
+		name string
+		got  uint64
+		want uint64
+	}{
+		{"TxProcessed", metrics.TxProcessed, 1475},
+		{"Forks", metrics.Forks, 27},
+		{"BlocksServed", metrics.BlocksServed, 69},
+		{"BlocksLate", metrics.BlocksLate, 3},
+	}
+	for _, tt := range counts {
+		if tt.got != tt.want {
+			t.Errorf("%s = %d, expected %d", tt.name, tt.got, tt.want)
+		}
+	}
+	delays := []struct {
+		name string
+		got  float64
+		want float64
+	}{
+		{"BlockDelay", metrics.BlockDelay, 0.219240463},
+		{"BlocksW1s", metrics.BlocksW1s, 0.9907407407407407},
+		{"BlocksW3s", metrics.BlocksW3s, 0.9935185185185185},
+		{"BlocksW5s", metrics.BlocksW5s, 0.9990740740740741},
+	}
+	for _, tt := range delays {
+		if tt.got != tt.want {
+			t.Errorf("%s = %v, expected %v", tt.name, tt.got, tt.want)
+		}
+	}
+}
+
+// TestPromMetricsLegacyCounterNamesStillDecode feeds the pre-11 counter and
+// block fetch names and checks they still decode.
+func TestPromMetricsLegacyCounterNamesStillDecode(t *testing.T) {
+	prom := []byte(`
+cardano_node_metrics_txsProcessedNum_int 1475
+cardano_node_metrics_forks_int 27
+cardano_node_metrics_served_block_count_int 69
+cardano_node_metrics_blockfetchclient_blockdelay_s 0.5
+cardano_node_metrics_blockfetchclient_lateblocks 3
+cardano_node_metrics_blockfetchclient_blockdelay_cdfOne 0.99
+cardano_node_metrics_blockfetchclient_blockdelay_cdfThree 0.995
+cardano_node_metrics_blockfetchclient_blockdelay_cdfFive 0.999
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	if metrics.TxProcessed != 1475 || metrics.Forks != 27 || metrics.BlocksServed != 69 || metrics.BlocksLate != 3 {
+		t.Errorf("counters = %d/%d/%d/%d, expected 1475/27/69/3",
+			metrics.TxProcessed, metrics.Forks, metrics.BlocksServed, metrics.BlocksLate)
+	}
+	if metrics.BlockDelay != 0.5 || metrics.BlocksW1s != 0.99 || metrics.BlocksW3s != 0.995 || metrics.BlocksW5s != 0.999 {
+		t.Errorf("delays = %v/%v/%v/%v, expected 0.5/0.99/0.995/0.999",
+			metrics.BlockDelay, metrics.BlocksW1s, metrics.BlocksW3s, metrics.BlocksW5s)
+	}
+}
+
+// TestPromMetricsCardanoNode11CounterNamesOpenMetrics checks the 11.x counter
+// names also decode from an OpenMetrics scrape, the form nview negotiates.
+func TestPromMetricsCardanoNode11CounterNamesOpenMetrics(t *testing.T) {
+	prom := []byte(`# TYPE cardano_node_metrics_txsProcessedNum_counter counter
+cardano_node_metrics_txsProcessedNum_counter 1475
+# TYPE cardano_node_metrics_forks_counter counter
+cardano_node_metrics_forks_counter 27
+# TYPE cardano_node_metrics_served_block_counter counter
+cardano_node_metrics_served_block_counter 69
+# TYPE cardano_node_metrics_blockfetchclient_lateblocks_counter counter
+cardano_node_metrics_blockfetchclient_lateblocks_counter 3
+# TYPE cardano_node_metrics_blockfetchclient_blockdelay_real gauge
+cardano_node_metrics_blockfetchclient_blockdelay_real 0.25
+# EOF
+`)
+
+	b, err := prom2jsonWithContentType(prom, "application/openmetrics-text; version=1.0.0; charset=utf-8")
+	if err != nil {
+		t.Fatalf("prom2jsonWithContentType() error = %v", err)
+	}
+	var metrics PromMetrics
+	if err := json.Unmarshal(b, &metrics); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	if metrics.TxProcessed != 1475 || metrics.Forks != 27 || metrics.BlocksServed != 69 || metrics.BlocksLate != 3 {
+		t.Errorf("counters = %d/%d/%d/%d, expected 1475/27/69/3",
+			metrics.TxProcessed, metrics.Forks, metrics.BlocksServed, metrics.BlocksLate)
+	}
+	if metrics.BlockDelay != 0.25 {
+		t.Errorf("BlockDelay = %v, expected 0.25", metrics.BlockDelay)
+	}
+}
