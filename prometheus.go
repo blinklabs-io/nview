@@ -450,6 +450,34 @@ var promMetricAliases = []struct {
 		"cardano_node_metrics_peerSelection_churn_DecreasedKnownPeers_int",
 	},
 	{
+		"cardano_node_metrics_forging_enabled",
+		"cardano_node_metrics_forging_enabled_int",
+	},
+	{
+		"cardano_node_metrics_blocksForgedNum_int",
+		"cardano_node_metrics_blocksForged_int",
+	},
+	{
+		"cardano_node_metrics_slotsMissedNum_int",
+		"cardano_node_metrics_slotsMissed_int",
+	},
+	{
+		"cardano_node_metrics_Forge_node_is_leader_int",
+		"cardano_node_metrics_Forge_node_is_leader_counter",
+	},
+	{
+		"cardano_node_metrics_Forge_forge_about_to_lead_int",
+		"cardano_node_metrics_Forge_about_to_lead_counter",
+	},
+	{
+		"cardano_node_metrics_Forge_adopted_int",
+		"cardano_node_metrics_Forge_adopted_counter",
+	},
+	{
+		"cardano_node_metrics_Forge_didnt_adopt_int",
+		"cardano_node_metrics_Forge_didnt_adopt_counter",
+	},
+	{
 		"cardano_node_metrics_peerSelection_cold",
 		"cardano_node_metrics_peerSelection_Cold_int",
 	},

@@ -1134,3 +1134,82 @@ cardano_node_metrics_peerSelection_EstablishedPeers_int 8
 		t.Errorf("Peers = %d/%d/%d, expected 0/0/0", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
 	}
 }
+
+// TestPromMetricsCardanoNode11BlockProducerNames decodes the forging metrics
+// a cardano-node 11.1.3 block producer exports: the Forge counters carry a
+// _counter suffix, and the forging flag and the forged and missed slot
+// counts carry _int (and no Num). It checks each is read.
+func TestPromMetricsCardanoNode11BlockProducerNames(t *testing.T) {
+	prom := []byte(`
+cardano_node_metrics_forging_enabled_int 1
+cardano_node_metrics_blocksForged_int 29
+cardano_node_metrics_slotsMissed_int 2
+cardano_node_metrics_Forge_node_is_leader_counter 30
+cardano_node_metrics_Forge_about_to_lead_counter 55
+cardano_node_metrics_Forge_adopted_counter 30
+cardano_node_metrics_Forge_didnt_adopt_counter 1
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	tests := []struct {
+		name string
+		got  uint64
+		want uint64
+	}{
+		{"ForgingEnabled", metrics.ForgingEnabled, 1},
+		{"BlocksForged", metrics.BlocksForged, 29},
+		{"MissedSlots", metrics.MissedSlots, 2},
+		{"IsLeader", metrics.IsLeader, 30},
+		{"AboutToLead", metrics.AboutToLead, 55},
+		{"Adopted", metrics.Adopted, 30},
+		{"DidntAdopt", metrics.DidntAdopt, 1},
+	}
+	for _, tt := range tests {
+		if tt.got != tt.want {
+			t.Errorf("%s = %d, expected %d", tt.name, tt.got, tt.want)
+		}
+	}
+}
+
+// TestPromMetricsLegacyBlockProducerNamesStillDecode feeds the pre-11 forging
+// names and checks they still decode.
+func TestPromMetricsLegacyBlockProducerNamesStillDecode(t *testing.T) {
+	prom := []byte(`
+cardano_node_metrics_forging_enabled 1
+cardano_node_metrics_blocksForgedNum_int 29
+cardano_node_metrics_slotsMissedNum_int 2
+cardano_node_metrics_Forge_node_is_leader_int 30
+cardano_node_metrics_Forge_forge_about_to_lead_int 55
+cardano_node_metrics_Forge_adopted_int 30
+cardano_node_metrics_Forge_didnt_adopt_int 1
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	if metrics.ForgingEnabled != 1 || metrics.BlocksForged != 29 || metrics.MissedSlots != 2 {
+		t.Errorf("forging/forged/missed = %d/%d/%d, expected 1/29/2", metrics.ForgingEnabled, metrics.BlocksForged, metrics.MissedSlots)
+	}
+	if metrics.IsLeader != 30 || metrics.AboutToLead != 55 || metrics.Adopted != 30 || metrics.DidntAdopt != 1 {
+		t.Errorf("Forge counters = %d/%d/%d/%d, expected 30/55/30/1", metrics.IsLeader, metrics.AboutToLead, metrics.Adopted, metrics.DidntAdopt)
+	}
+}
+
+// TestSetRoleDetectsCardanoNode11BlockProducer checks that a node exporting
+// only the 11.x about-to-lead counter, with no block-producer setting, is
+// reported as a Core node rather than a Relay.
+func TestSetRoleDetectsCardanoNode11BlockProducer(t *testing.T) {
+	prevRole, prevMetrics := role, promMetrics.Load()
+	t.Cleanup(func() {
+		role = prevRole
+		promMetrics.Store(prevMetrics)
+	})
+	metrics := decodePromMetrics(t, []byte("cardano_node_metrics_Forge_about_to_lead_counter 55\n"))
+	promMetrics.Store(&metrics)
+
+	setRole()
+
+	if role != "Core" {
+		t.Errorf("role = %q, expected Core", role)
+	}
+}
