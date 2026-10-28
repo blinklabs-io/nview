@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/blinklabs-io/nview/internal/config"
 	"github.com/rivo/tview"
 )
 
@@ -177,6 +178,12 @@ func TestDingoForgeCounterHistoryHandlesResetAndMissingSamples(t *testing.T) {
 
 func TestDingoForgeLeaderPanelShowsProducerHealth(t *testing.T) {
 	now := time.Unix(2000, 0)
+	cfg := config.GetConfig()
+	originalSlotLength := cfg.Node.ShelleyGenesis.SlotLength
+	cfg.Node.ShelleyGenesis.SlotLength = 1000
+	t.Cleanup(func() {
+		cfg.Node.ShelleyGenesis.SlotLength = originalSlotLength
+	})
 	metrics := forgeCounterFixture(12, 3, 4, 2)
 	metrics.CollectedAt = now
 	metrics.DingoForgeCredentialsValid = 1

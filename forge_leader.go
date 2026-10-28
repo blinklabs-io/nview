@@ -395,11 +395,17 @@ func dingoKESExpiryStatus(metrics *PromMetrics) (string, uiSeverity) {
 		return uiSeverityValue("invalid", uiSeverityCritical), uiSeverityCritical
 	}
 	slots := metrics.RemainingKesPeriods * metrics.DingoForgeSlotsPerKESPeriod
-	days := float64(slots) / 86400
+	slotLength := config.GetConfig().Node.ShelleyGenesis.SlotLength
 	severity := uiSeverityOK
 	if slots == 0 {
 		severity = uiSeverityCritical
-	} else if days < 7 {
+	}
+	if slotLength == 0 {
+		return uiSeverityValue(strconv.FormatUint(slots, 10), severity) +
+			uiUnit(" slots / ") + uiMuted("n/a days"), severity
+	}
+	days := float64(slots) * float64(slotLength) / (1000 * 86400)
+	if slots > 0 && days < 7 {
 		severity = uiSeverityWarn
 	}
 	return uiSeverityValue(strconv.FormatUint(slots, 10), severity) +
