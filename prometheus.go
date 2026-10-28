@@ -154,16 +154,23 @@ type PromMetrics struct {
 	DingoBuildGoVersion   string `json:"dingo_build_info_goversion"`
 
 	// Dingo-native metrics
-	DingoDbSizeBytes          uint64  `json:"dingo_database_size_bytes"`
-	DingoDbBlobSizeBytes      uint64  `json:"dingo_database_size_bytes_blob"`
-	DingoDbMetadataSizeBytes  uint64  `json:"dingo_database_size_bytes_metadata"`
-	DingoChainCachedBlocks    uint64  `json:"dingo_chain_manager_cached_blocks"`
-	DingoChainsyncSeenHeaders uint64  `json:"dingo_chainsync_seen_headers"`
-	DingoTipGapSlots          uint64  `json:"dingo_tip_gap_slots"`
-	DingoForgeTipGapSlots     uint64  `json:"dingo_forge_tip_gap_slots"`
-	DingoSlotClockFallback    uint64  `json:"dingo_ledger_slot_clock_fallback_total"`
-	DingoForgeSlotClockErr    uint64  `json:"dingo_forge_slot_clock_errors_total"`
-	DingoForgeSyncSkip        uint64  `json:"dingo_forge_sync_skip_total"`
+	DingoDbSizeBytes          uint64 `json:"dingo_database_size_bytes"`
+	DingoDbBlobSizeBytes      uint64 `json:"dingo_database_size_bytes_blob"`
+	DingoDbMetadataSizeBytes  uint64 `json:"dingo_database_size_bytes_metadata"`
+	DingoChainCachedBlocks    uint64 `json:"dingo_chain_manager_cached_blocks"`
+	DingoChainsyncSeenHeaders uint64 `json:"dingo_chainsync_seen_headers"`
+	DingoTipGapSlots          uint64 `json:"dingo_tip_gap_slots"`
+	DingoForgeTipGapSlots     uint64 `json:"dingo_forge_tip_gap_slots"`
+	DingoSlotClockFallback    uint64 `json:"dingo_ledger_slot_clock_fallback_total"`
+	DingoForgeSlotClockErr    uint64 `json:"dingo_forge_slot_clock_errors_total"`
+	DingoForgeSyncSkip        uint64 `json:"dingo_forge_sync_skip_total"`
+	DingoPipelineHalted       uint64 `json:"dingo_ledger_pipeline_halted"`
+	DingoPipelineStuck        uint64 `json:"dingo_ledger_pipeline_stuck"`
+	// DingoPipelinePresent is set when the scrape carried both pipeline
+	// gauges; Dingo builds without them would otherwise read as healthy.
+	DingoPipelinePresent      bool    `json:"dingo_ledger_pipeline_present"`
+	DingoPipelineRestarts     uint64  `json:"dingo_ledger_pipeline_no_progress_restarts"`
+	DingoLastBlockAdded       float64 `json:"dingo_ledger_last_block_added_timestamp_seconds"`
 	DingoTxsEvicted           uint64  `json:"dingo_metrics_txsEvictedNum_int"`
 	DingoTxsExpired           uint64  `json:"dingo_metrics_txsExpiredNum_int"`
 	DingoBlockForgingLatencyN uint64  `json:"dingo_metrics_blockForgingLatency_seconds_count"`
@@ -606,6 +613,16 @@ func setPromMetricValueWithLabels(out map[string]any, name string, value float64
 		if existing, ok := out["network"].(string); !ok || existing == "" {
 			out["network"] = network
 		}
+	}
+	switch name {
+	case "dingo_ledger_pipeline_halted":
+		out["dingo_ledger_pipeline_halted_seen"] = true
+	case "dingo_ledger_pipeline_stuck":
+		out["dingo_ledger_pipeline_stuck_seen"] = true
+	}
+	if out["dingo_ledger_pipeline_halted_seen"] == true &&
+		out["dingo_ledger_pipeline_stuck_seen"] == true {
+		out["dingo_ledger_pipeline_present"] = true
 	}
 	if isLeiosPromMetric(name) {
 		setNamedMetricValue(out, "leios_metrics", name, value, labels)

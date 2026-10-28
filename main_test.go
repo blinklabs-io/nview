@@ -2514,3 +2514,250 @@ func TestRenderHelpersUseArgumentSnapshotNotGlobal(t *testing.T) {
 		)
 	}
 }
+
+// TestDingoPipelineState checks the label and severity for the ledger
+// pipeline gauges: a halted pipeline needs operator action and wins over
+// stuck, and a pipeline reporting neither is ok.
+func TestDingoPipelineState(t *testing.T) {
+	tests := []struct {
+		name          string
+		metrics       *PromMetrics
+		expectedLabel string
+		expectedSev   uiSeverity
+	}{
+		{"nil metrics", nil, "n/a", uiSeverityMuted},
+		{"running", &PromMetrics{DingoPipelinePresent: true}, "ok", uiSeverityOK},
+		{"gauges absent", &PromMetrics{}, "n/a", uiSeverityMuted},
+		{"stuck", &PromMetrics{DingoPipelineStuck: 1}, "STUCK", uiSeverityCritical},
+		{"halted", &PromMetrics{DingoPipelineHalted: 1}, "HALTED", uiSeverityCritical},
+		{
+			"halted and stuck",
+			&PromMetrics{DingoPipelineHalted: 1, DingoPipelineStuck: 1},
+			"HALTED",
+			uiSeverityCritical,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			label, severity := dingoPipelineState(tt.metrics)
+			if label != tt.expectedLabel || severity != tt.expectedSev {
+				t.Errorf(
+					"dingoPipelineState() = %q, %d, expected %q, %d",
+					label, severity, tt.expectedLabel, tt.expectedSev,
+				)
+			}
+		})
+	}
+}
+
+// TestDingoLastBlockAge checks the age of the last block Dingo added to the
+// chain: a zero timestamp means no block since start, a timestamp ahead of the
+// local clock reads as zero rather than negative, and the severity follows the
+// stall thresholds.
+func TestDingoLastBlockAge(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+
+	if _, ok := dingoLastBlockAge(nil, now); ok {
+		t.Error("nil metrics: expected no age")
+	}
+	if _, ok := dingoLastBlockAge(&PromMetrics{}, now); ok {
+		t.Error("zero timestamp: expected no age")
+	}
+
+	tests := []struct {
+		name        string
+		added       float64
+		expectedAge time.Duration
+		expectedSev uiSeverity
+		expectedFmt string
+	}{
+		{"clock skew", 1_700_000_005, 0, uiSeverityOK, "0s ago"},
+		{"fresh", 1_699_999_988, 12 * time.Second, uiSeverityOK, "12s ago"},
+		{"below warn", 1_699_999_881, 119 * time.Second, uiSeverityOK, "1m 59s ago"},
+		{"warn", 1_699_999_880, 2 * time.Minute, uiSeverityWarn, "2m 00s ago"},
+		{"below critical", 1_699_999_701, 299 * time.Second, uiSeverityWarn, "4m 59s ago"},
+		{"critical", 1_699_999_700, 5 * time.Minute, uiSeverityCritical, "5m 00s ago"},
+		{"hours", 1_699_992_000, 2*time.Hour + 13*time.Minute + 20*time.Second, uiSeverityCritical, "2h 13m ago"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			age, ok := dingoLastBlockAge(&PromMetrics{DingoLastBlockAdded: tt.added}, now)
+			if !ok {
+				t.Fatal("expected an age")
+			}
+			if age != tt.expectedAge {
+				t.Errorf("age = %v, expected %v", age, tt.expectedAge)
+			}
+			if got := dingoLastBlockSeverity(age); got != tt.expectedSev {
+				t.Errorf("severity = %d, expected %d", got, tt.expectedSev)
+			}
+			if got := formatDingoLastBlock(age, true); got != tt.expectedFmt {
+				t.Errorf("format = %q, expected %q", got, tt.expectedFmt)
+			}
+		})
+	}
+	if got := formatDingoLastBlock(0, false); got != "none yet" {
+		t.Errorf("format without a block = %q, expected %q", got, "none yet")
+	}
+}
+
+// TestDashboardHealthReportsDingoPipelineFailure checks the header and every
+// Health cell show a halted or stuck Dingo ledger pipeline, but only once the
+// scrape itself is healthy: a failing scrape still reports degraded.
+func TestDashboardHealthReportsDingoPipelineFailure(t *testing.T) {
+	originalPromMetrics := promMetrics.Load()
+	originalFailures := failCount()
+	defer func() {
+		promMetrics.Store(originalPromMetrics)
+		subsystemFailures[healthSubsystemPrometheus].Store(originalFailures)
+	}()
+	subsystemFailures[healthSubsystemPrometheus].Store(0)
+
+	tests := []struct {
+		name          string
+		metrics       *PromMetrics
+		failures      uint32
+		expectedLabel string
+		expectedSev   uiSeverity
+	}{
+		{"running", &PromMetrics{}, 0, "online", uiSeverityOK},
+		{"stuck", &PromMetrics{DingoPipelineStuck: 1}, 0, "STUCK", uiSeverityCritical},
+		{"halted", &PromMetrics{DingoPipelineHalted: 1}, 0, "HALTED", uiSeverityCritical},
+		{
+			"halted beats stuck",
+			&PromMetrics{DingoPipelineHalted: 1, DingoPipelineStuck: 1},
+			0, "HALTED", uiSeverityCritical,
+		},
+		{"scrape failing", &PromMetrics{DingoPipelineHalted: 1}, 5, "degraded", uiSeverityCritical},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			subsystemFailures[healthSubsystemPrometheus].Store(tt.failures)
+			promMetrics.Store(tt.metrics)
+			label, severity := dashboardHealth()
+			if label != tt.expectedLabel || severity != tt.expectedSev {
+				t.Errorf(
+					"dashboardHealth() = %q, %d, expected %q, %d",
+					label, severity, tt.expectedLabel, tt.expectedSev,
+				)
+			}
+		})
+	}
+}
+
+// TestDingoPaneSeverityFollowsPipelineAndLastBlock checks the Dingo pane turns
+// critical for a halted or stuck pipeline, and follows the last block age when
+// the pipeline reports healthy.
+func TestDingoPaneSeverityFollowsPipelineAndLastBlock(t *testing.T) {
+	cfg := config.GetConfig()
+	originalBinary := cfg.Node.Binary
+	originalDetectedBinary, _ := detectedNodeBinary.Load().(string)
+	originalPromMetrics := promMetrics.Load()
+	defer func() {
+		cfg.Node.Binary = originalBinary
+		detectedNodeBinary.Store(originalDetectedBinary)
+		promMetrics.Store(originalPromMetrics)
+	}()
+	cfg.Node.Binary = ""
+	detectedNodeBinary.Store(DINGO_BINARY)
+
+	now := float64(time.Now().Unix())
+	tests := []struct {
+		name        string
+		metrics     *PromMetrics
+		expectedSev uiSeverity
+	}{
+		{"fresh block", &PromMetrics{DingoLastBlockAdded: now - 5}, uiSeverityOK},
+		{"no block yet", &PromMetrics{}, uiSeverityOK},
+		{"halted", &PromMetrics{DingoPipelineHalted: 1, DingoLastBlockAdded: now - 5}, uiSeverityCritical},
+		{"stuck", &PromMetrics{DingoPipelineStuck: 1, DingoLastBlockAdded: now - 5}, uiSeverityCritical},
+		{"slow block", &PromMetrics{DingoLastBlockAdded: now - 150}, uiSeverityWarn},
+		{"stalled block", &PromMetrics{DingoLastBlockAdded: now - 400}, uiSeverityCritical},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			promMetrics.Store(tt.metrics)
+			if got := dingoPaneSeverity(); got != tt.expectedSev {
+				t.Errorf("dingoPaneSeverity() = %d, expected %d", got, tt.expectedSev)
+			}
+		})
+	}
+}
+
+// TestDingoViewsShowPipelineAndLastBlock renders the header and the three
+// Dingo views and checks a halted pipeline shows as HALTED with its last
+// block age, and that a healthy pipeline shows ok and never HALTED or STUCK.
+func TestDingoViewsShowPipelineAndLastBlock(t *testing.T) {
+	cfg := config.GetConfig()
+	originalBinary := cfg.Node.Binary
+	originalDetectedBinary, _ := detectedNodeBinary.Load().(string)
+	originalPromMetrics := promMetrics.Load()
+	originalFailures := failCount()
+	defer func() {
+		cfg.Node.Binary = originalBinary
+		detectedNodeBinary.Store(originalDetectedBinary)
+		promMetrics.Store(originalPromMetrics)
+		subsystemFailures[healthSubsystemPrometheus].Store(originalFailures)
+	}()
+	cfg.Node.Binary = ""
+	detectedNodeBinary.Store(DINGO_BINARY)
+	subsystemFailures[healthSubsystemPrometheus].Store(0)
+
+	render := func(metrics *PromMetrics) map[string]string {
+		promMetrics.Store(metrics)
+		return map[string]string{
+			"header":  getHeaderText(),
+			"systems": dingoConsoleSystemsBand(metrics, 120),
+			"compact": dingoConsoleDashboardCompact(metrics, 60),
+			"stats":   getDingoStats(),
+		}
+	}
+	lastBlock := float64(time.Now().Unix() - 90)
+
+	halted := render(&PromMetrics{
+		DingoPipelineHalted:   1,
+		DingoPipelineRestarts: 3,
+		DingoLastBlockAdded:   lastBlock,
+	})
+	for view, text := range halted {
+		if !strings.Contains(text, "HALTED") {
+			t.Errorf("%s view missing HALTED:\n%s", view, text)
+		}
+	}
+	for _, view := range []string{"systems", "compact", "stats"} {
+		for _, expected := range []string{"Pipeline", "Last Block", "1m 3"} {
+			if !strings.Contains(halted[view], expected) {
+				t.Errorf("%s view missing %q:\n%s", view, expected, halted[view])
+			}
+		}
+	}
+	for _, view := range []string{"systems", "compact", "stats"} {
+		if !strings.Contains(halted[view], "Restarts") {
+			t.Errorf("%s view missing Restarts:\n%s", view, halted[view])
+		}
+	}
+
+	stuck := render(&PromMetrics{DingoPipelineStuck: 1, DingoLastBlockAdded: lastBlock})
+	for view, text := range stuck {
+		if !strings.Contains(text, "STUCK") {
+			t.Errorf("%s view missing STUCK:\n%s", view, text)
+		}
+	}
+
+	healthy := render(&PromMetrics{DingoPipelinePresent: true, DingoLastBlockAdded: float64(time.Now().Unix() - 5)})
+	for view, text := range healthy {
+		for _, unexpected := range []string{"HALTED", "STUCK"} {
+			if strings.Contains(text, unexpected) {
+				t.Errorf("%s view unexpectedly shows %s:\n%s", view, unexpected, text)
+			}
+		}
+	}
+	for _, view := range []string{"systems", "compact", "stats"} {
+		if !strings.Contains(healthy[view], "s ago") {
+			t.Errorf("%s view missing the last block age:\n%s", view, healthy[view])
+		}
+	}
+	if !strings.Contains(healthy["header"], "online") {
+		t.Errorf("header should show online:\n%s", healthy["header"])
+	}
+}

@@ -1324,3 +1324,54 @@ cardano_node_metrics_blockfetchclient_blockdelay_real 0.25
 		t.Errorf("BlockDelay = %v, expected 0.25", metrics.BlockDelay)
 	}
 }
+
+// TestPromMetricsDingoPipelineNames decodes the ledger pipeline health gauges
+// Dingo exports, with the network label a live Dingo 0.88.1 adds to each
+// series. The timestamp is in float scientific notation, as exported.
+func TestPromMetricsDingoPipelineNames(t *testing.T) {
+	prom := []byte(`
+dingo_ledger_pipeline_halted{network="preview"} 1
+dingo_ledger_pipeline_stuck{network="preview"} 1
+dingo_ledger_pipeline_no_progress_restarts{network="preview"} 3
+dingo_ledger_last_block_added_timestamp_seconds{network="preview"} 1.7931402904092171e+09
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	if metrics.DingoPipelineHalted != 1 {
+		t.Errorf("DingoPipelineHalted = %d, expected 1", metrics.DingoPipelineHalted)
+	}
+	if metrics.DingoPipelineStuck != 1 {
+		t.Errorf("DingoPipelineStuck = %d, expected 1", metrics.DingoPipelineStuck)
+	}
+	if !metrics.DingoPipelinePresent {
+		t.Error("DingoPipelinePresent = false, expected true")
+	}
+	if metrics.DingoPipelineRestarts != 3 {
+		t.Errorf("DingoPipelineRestarts = %d, expected 3", metrics.DingoPipelineRestarts)
+	}
+	if metrics.DingoLastBlockAdded != 1.7931402904092171e+09 {
+		t.Errorf("DingoLastBlockAdded = %v, expected 1.7931402904092171e+09", metrics.DingoLastBlockAdded)
+	}
+}
+
+// TestPromMetricsDingoPipelineAbsent checks that a scrape missing either
+// pipeline gauge is not reported as present, so it cannot read as healthy.
+func TestPromMetricsDingoPipelineAbsent(t *testing.T) {
+	for name, prom := range map[string]string{
+		"none":        "dingo_ledger_last_block_added_timestamp_seconds 1.7e+09\n",
+		"halted only": "dingo_ledger_pipeline_halted 0\n",
+		"stuck only":  "dingo_ledger_pipeline_stuck 0\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if decodePromMetrics(t, []byte(prom)).DingoPipelinePresent {
+				t.Error("DingoPipelinePresent = true, expected false")
+			}
+		})
+	}
+	both := decodePromMetrics(t, []byte(
+		"dingo_ledger_pipeline_halted 0\ndingo_ledger_pipeline_stuck 0\n"))
+	if !both.DingoPipelinePresent {
+		t.Error("DingoPipelinePresent = false with both gauges, expected true")
+	}
+}
