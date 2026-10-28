@@ -423,8 +423,12 @@ func dashboardHealth() (string, uiSeverity) {
 	if failures > 0 {
 		return "retrying", uiSeverityWarn
 	}
-	if promMetrics.Load() == nil {
+	metrics := promMetrics.Load()
+	if metrics == nil {
 		return "waiting", uiSeverityMuted
+	}
+	if label, severity := dingoPipelineState(metrics); severity == uiSeverityCritical {
+		return label, severity
 	}
 	return "online", uiSeverityOK
 }
@@ -742,9 +746,17 @@ func dingoPaneSeverity() uiSeverity {
 		promMetrics.EventDeliveryTimeouts > 0 {
 		return uiSeverityCritical
 	}
+	if _, severity := dingoPipelineState(promMetrics); severity == uiSeverityCritical {
+		return severity
+	}
+	lastBlockSeverity := uiSeverityOK
+	if age, ok := dingoLastBlockAge(promMetrics, time.Now()); ok {
+		lastBlockSeverity = dingoLastBlockSeverity(age)
+	}
 	return worstSeverity(
 		dingoTipGapSeverity(promMetrics.DingoTipGapSlots),
 		dingoTipGapSeverity(promMetrics.DingoForgeTipGapSlots),
+		lastBlockSeverity,
 	)
 }
 
@@ -1273,6 +1285,89 @@ func dingoMetricStyledSpan(label, value string, severity uiSeverity, span int) d
 	return cell
 }
 
+// Dingo adds a block roughly every 20 seconds on a synced network, so two
+// minutes without one is already a 0.25% event and five minutes is not chance.
+const (
+	dingoLastBlockWarnAfter     = 2 * time.Minute
+	dingoLastBlockCriticalAfter = 5 * time.Minute
+)
+
+// dingoPipelineState reports whether the ledger pipeline has stopped. Halted
+// means it gave up on an unrepairable validation failure and needs operator
+// action; stuck means it keeps restarting without the tip advancing.
+func dingoPipelineState(metrics *PromMetrics) (string, uiSeverity) {
+	switch {
+	case metrics == nil:
+		return "n/a", uiSeverityMuted
+	case metrics.DingoPipelineHalted > 0:
+		return "HALTED", uiSeverityCritical
+	case metrics.DingoPipelineStuck > 0:
+		return "STUCK", uiSeverityCritical
+	}
+	return "ok", uiSeverityOK
+}
+
+// dingoLastBlockAge returns how long ago Dingo last added a block to the
+// chain. The gauge is zero until a block arrives after start, which reports as
+// no age. A timestamp ahead of the local clock reads as zero.
+func dingoLastBlockAge(metrics *PromMetrics, now time.Time) (time.Duration, bool) {
+	if metrics == nil || metrics.DingoLastBlockAdded <= 0 {
+		return 0, false
+	}
+	added := time.Unix(int64(metrics.DingoLastBlockAdded), 0)
+	return max(now.Sub(added), 0), true
+}
+
+func dingoLastBlockSeverity(age time.Duration) uiSeverity {
+	switch {
+	case age >= dingoLastBlockCriticalAfter:
+		return uiSeverityCritical
+	case age >= dingoLastBlockWarnAfter:
+		return uiSeverityWarn
+	}
+	return uiSeverityOK
+}
+
+func formatDingoLastBlock(age time.Duration, ok bool) string {
+	if !ok {
+		return "none yet"
+	}
+	total := int64(age.Seconds())
+	switch {
+	case total >= 3600:
+		return fmt.Sprintf("%dh %02dm ago", total/3600, total%3600/60)
+	case total >= 60:
+		return fmt.Sprintf("%dm %02ds ago", total/60, total%60)
+	}
+	return fmt.Sprintf("%ds ago", total)
+}
+
+// dingoPipelineCells returns the pipeline state, its restart count and the
+// last block age as metric cells, each styled by its own severity.
+func dingoPipelineCells(metrics *PromMetrics) (dingoMetricCell, dingoMetricCell, dingoMetricCell) {
+	label, severity := dingoPipelineState(metrics)
+	restartSeverity := uiSeverityOK
+	if metrics.DingoPipelineRestarts > 0 {
+		restartSeverity = uiSeverityWarn
+	}
+	age, ok := dingoLastBlockAge(metrics, time.Now())
+	blockSeverity := uiSeverityMuted
+	if ok {
+		blockSeverity = dingoLastBlockSeverity(age)
+	}
+	return dingoMetricStyled("Pipeline", uiSeverityValue(label, severity), severity),
+		dingoMetricStyled(
+			"Restarts",
+			formatSeverityCount(metrics.DingoPipelineRestarts, restartSeverity),
+			restartSeverity,
+		),
+		dingoMetricStyled(
+			"Last Block",
+			uiSeverityValue(formatDingoLastBlock(age, ok), blockSeverity),
+			blockSeverity,
+		)
+}
+
 func dingoConsoleTipGap(metrics *PromMetrics) (uint64, uiSeverity) {
 	if metrics == nil || metrics.SlotNum == 0 {
 		return 0, uiSeverityMuted
@@ -1437,6 +1532,7 @@ func dingoConsoleDashboardCompact(metrics *PromMetrics, width int) string {
 		uiValue(formatDingoBytes(metrics.MempoolBytes))
 
 	innerWidth := dingoPanelInnerWidth(width)
+	pipeline, _, lastBlock := dingoPipelineCells(metrics)
 	return dingoPanel(
 		"dashboard",
 		healthSeverity,
@@ -1454,6 +1550,7 @@ func dingoConsoleDashboardCompact(metrics *PromMetrics, width int) string {
 				dingoMetricStyled("Health", uiSeverityValue(healthLabel, healthSeverity), healthSeverity),
 				dingoMetric("Role", uiValue(role)),
 			),
+			dingoMetricRowColumns(innerWidth, 2, pipeline, lastBlock),
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
@@ -1507,9 +1604,11 @@ func dingoConsoleSystemsBand(metrics *PromMetrics, width int) string {
 	innerWidth := dingoPanelInnerWidth(width)
 	utxoCache, utxoSeverity := dingoConsoleCacheValue(metrics.DingoCacheUtxoHotHits, metrics.DingoCacheUtxoHotMiss)
 	blockCache, blockSeverity := dingoConsoleCacheValue(metrics.DingoCacheBlockLruHits, metrics.DingoCacheBlockLruMiss)
-	lines := make([]string, 0, 9)
+	pipeline, restarts, lastBlock := dingoPipelineCells(metrics)
+	lines := make([]string, 0, 10)
 	lines = append(
 		lines,
+		dingoMetricRow(innerWidth, pipeline, restarts, lastBlock),
 		dingoMetricRow(
 			innerWidth,
 			dingoMetric("DB", uiValue(formatDingoBytes(dingoDbSize(metrics)))),
@@ -1541,7 +1640,7 @@ func dingoConsoleSystemsBand(metrics *PromMetrics, width int) string {
 			dingoMetricStyled("Leader", uiSeverityValue(strconv.FormatUint(metrics.IsLeader, 10), forgeSeverity), forgeSeverity),
 		),
 	)
-	lines = slices.Insert(lines, 1, dingoDiskRows(innerWidth)...)
+	lines = slices.Insert(lines, 2, dingoDiskRows(innerWidth)...)
 	lines = append(lines, dingoConsoleSignalRows(metrics, forgeDisabled, innerWidth)...)
 	lines = append(lines, dingoConsoleLeiosRows(metrics, innerWidth)...)
 	return dingoPanel(
@@ -3295,6 +3394,20 @@ func getDingoStats() string {
 		uiStatusGlyph(forgeSeverity),
 		uiSeverityValue(strconv.FormatUint(curr.DingoForgeTipGapSlots, 10), forgeSeverity),
 		uiUnit(" slots"),
+	)
+	pipelineLabel, pipelineSeverity := dingoPipelineState(&curr)
+	lastBlockAge, lastBlockOK := dingoLastBlockAge(&curr, now)
+	lastBlockSeverity := uiSeverityMuted
+	if lastBlockOK {
+		lastBlockSeverity = dingoLastBlockSeverity(lastBlockAge)
+	}
+	fmt.Fprintf(&sb, " %s %s %s   %s %s %s\n",
+		uiLabel("Pipeline"),
+		uiStatusGlyph(pipelineSeverity),
+		uiSeverityValue(pipelineLabel, pipelineSeverity),
+		uiLabel("Last Block"),
+		uiStatusGlyph(lastBlockSeverity),
+		uiSeverityValue(formatDingoLastBlock(lastBlockAge, lastBlockOK), lastBlockSeverity),
 	)
 	fmt.Fprintf(&sb, " %s   %s   %s\n",
 		uiKV("Seen Headers", uiValue(strconv.FormatUint(curr.DingoChainsyncSeenHeaders, 10))),

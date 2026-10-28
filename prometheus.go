@@ -164,6 +164,10 @@ type PromMetrics struct {
 	DingoSlotClockFallback    uint64  `json:"dingo_ledger_slot_clock_fallback_total"`
 	DingoForgeSlotClockErr    uint64  `json:"dingo_forge_slot_clock_errors_total"`
 	DingoForgeSyncSkip        uint64  `json:"dingo_forge_sync_skip_total"`
+	DingoPipelineHalted       uint64  `json:"dingo_ledger_pipeline_halted"`
+	DingoPipelineStuck        uint64  `json:"dingo_ledger_pipeline_stuck"`
+	DingoPipelineRestarts     uint64  `json:"dingo_ledger_pipeline_no_progress_restarts"`
+	DingoLastBlockAdded       float64 `json:"dingo_ledger_last_block_added_timestamp_seconds"`
 	DingoTxsEvicted           uint64  `json:"dingo_metrics_txsEvictedNum_int"`
 	DingoTxsExpired           uint64  `json:"dingo_metrics_txsExpiredNum_int"`
 	DingoBlockForgingLatencyN uint64  `json:"dingo_metrics_blockForgingLatency_seconds_count"`
