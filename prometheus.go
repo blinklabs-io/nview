@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"mime"
 	"net/http"
 	"slices"
@@ -251,6 +252,26 @@ type PromMetrics struct {
 	DingoStakeSnapshotPoolCount   uint64 `json:"dingo_metrics_stake_snapshot_pool_count_int"`
 	DingoStakeSnapshotActiveStake uint64 `json:"dingo_metrics_stake_snapshot_total_active_stake_lovelace"`
 
+	DingoForgeCredentialsValid  uint64             `json:"dingo_forge_credentials_valid"`
+	DingoForgeOpCertLoaded      uint64             `json:"dingo_forge_opcert_counter_loaded"`
+	DingoForgeOpCertOnChain     uint64             `json:"dingo_forge_opcert_counter_onchain"`
+	DingoForgeSlotsPerKESPeriod uint64             `json:"dingo_forge_slots_per_kes_period"`
+	DingoKESAgentConnected      uint64             `json:"dingo_kes_agent_connected"`
+	DingoKESAgentSignSuccess    uint64             `json:"dingo_kes_agent_sign_success_total"`
+	DingoKESAgentSignFailure    uint64             `json:"dingo_kes_agent_sign_failure_total"`
+	DingoLeaderWon              uint64             `json:"dingo_metrics_leader_slot_won_total"`
+	DingoLeaderNotWon           uint64             `json:"dingo_metrics_leader_slot_not_won_total"`
+	DingoMissedLeaderSlots      uint64             `json:"dingo_forge_missed_leader_slots_total"`
+	DingoSlotBattles            uint64             `json:"dingo_metrics_slotBattlesTotal_int"`
+	DingoLeaderLastEpochChecked uint64             `json:"dingo_metrics_leader_last_epoch_slots_checked_int"`
+	DingoLeaderLastEpochWon     uint64             `json:"dingo_metrics_leader_last_epoch_slots_won_int"`
+	DingoLeaderLastEpochNotWon  uint64             `json:"dingo_metrics_leader_last_epoch_slots_not_won_int"`
+	DingoLeaderLastEpoch        uint64             `json:"dingo_metrics_leader_last_evaluated_epoch_int"`
+	DingoOwnEquivocations       uint64             `json:"dingo_equivocation_total_self"`
+	PromMetricPresent           map[string]bool    `json:"prom_metric_present"`
+	CollectedAt                 time.Time          `json:"-"`
+	DingoCounterWindow          DingoCounterWindow `json:"-"`
+
 	// Generic future protocol metrics. Current Dingo scrapes do not expose
 	// Leios, but any metric family containing "leios" is collected here.
 	LeiosMetrics map[string]float64 `json:"leios_metrics"`
@@ -286,6 +307,8 @@ func getPromMetrics(ctx context.Context) (*PromMetrics, error) {
 		recordSubsystemFailure(healthSubsystemPrometheus)
 		return metrics, fmt.Errorf("failed JSON unmarshal: %w", err)
 	}
+	metrics.CollectedAt = time.Now()
+	globalDingoForgeCounterHistory.Apply(metrics, metrics.CollectedAt)
 
 	// Detect node type based on metrics
 	detectNodeType(metrics)
@@ -602,6 +625,9 @@ func setPromMetricValue(out map[string]any, name string, value float64) {
 }
 
 func setPromMetricValueWithLabels(out map[string]any, name string, value float64, labels []*dto.LabelPair) {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return
+	}
 	if network := strings.TrimSpace(labelValue(labels, "network")); network != "" {
 		if existing, ok := out["network"].(string); !ok || existing == "" {
 			out["network"] = network
@@ -618,6 +644,17 @@ func setPromMetricValueWithLabels(out map[string]any, name string, value float64
 		}
 		setPromMetricValue(out, name, value)
 		return
+	}
+	if name == "dingo_equivocation_total" {
+		if strings.EqualFold(labelValue(labels, "self_key"), "true") {
+			const ownEquivocation = "dingo_equivocation_total_self"
+			markPromMetricPresent(out, ownEquivocation)
+			setPromMetricValue(out, ownEquivocation, value)
+		}
+		return
+	}
+	if isDingoForgeLeaderMetric(name) {
+		markPromMetricPresent(out, name)
 	}
 	if name == "dingo_protocol_messages_received_total" {
 		bucketByLabel(out, name, value, labels, "protocol", true)
@@ -758,7 +795,17 @@ func shouldAggregatePromMetric(name string) bool {
 		strings.HasPrefix(name, "dingo_metrics_peerSelection_peers_by_source_") ||
 		strings.HasPrefix(name, "dingo_protocol_messages_received_total_") ||
 		strings.HasPrefix(name, "dingo_blockfetch_shadow_gate_decisions_total_") ||
-		strings.HasPrefix(name, "dingo_protocol_message_duration_seconds_")
+		strings.HasPrefix(name, "dingo_protocol_message_duration_seconds_") ||
+		name == "dingo_equivocation_total_self"
+}
+
+func markPromMetricPresent(out map[string]any, name string) {
+	present, _ := out["prom_metric_present"].(map[string]bool)
+	if present == nil {
+		present = make(map[string]bool)
+		out["prom_metric_present"] = present
+	}
+	present[name] = true
 }
 
 func labelValue(labels []*dto.LabelPair, name string) string {
