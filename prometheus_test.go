@@ -1344,10 +1344,34 @@ dingo_ledger_last_block_added_timestamp_seconds{network="preview"} 1.79314029040
 	if metrics.DingoPipelineStuck != 1 {
 		t.Errorf("DingoPipelineStuck = %d, expected 1", metrics.DingoPipelineStuck)
 	}
+	if !metrics.DingoPipelinePresent {
+		t.Error("DingoPipelinePresent = false, expected true")
+	}
 	if metrics.DingoPipelineRestarts != 3 {
 		t.Errorf("DingoPipelineRestarts = %d, expected 3", metrics.DingoPipelineRestarts)
 	}
 	if metrics.DingoLastBlockAdded != 1.7931402904092171e+09 {
 		t.Errorf("DingoLastBlockAdded = %v, expected 1.7931402904092171e+09", metrics.DingoLastBlockAdded)
+	}
+}
+
+// TestPromMetricsDingoPipelineAbsent checks that a scrape missing either
+// pipeline gauge is not reported as present, so it cannot read as healthy.
+func TestPromMetricsDingoPipelineAbsent(t *testing.T) {
+	for name, prom := range map[string]string{
+		"none":        "dingo_ledger_last_block_added_timestamp_seconds 1.7e+09\n",
+		"halted only": "dingo_ledger_pipeline_halted 0\n",
+		"stuck only":  "dingo_ledger_pipeline_stuck 0\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if decodePromMetrics(t, []byte(prom)).DingoPipelinePresent {
+				t.Error("DingoPipelinePresent = true, expected false")
+			}
+		})
+	}
+	both := decodePromMetrics(t, []byte(
+		"dingo_ledger_pipeline_halted 0\ndingo_ledger_pipeline_stuck 0\n"))
+	if !both.DingoPipelinePresent {
+		t.Error("DingoPipelinePresent = false with both gauges, expected true")
 	}
 }

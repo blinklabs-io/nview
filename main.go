@@ -1303,6 +1303,8 @@ func dingoPipelineState(metrics *PromMetrics) (string, uiSeverity) {
 		return "HALTED", uiSeverityCritical
 	case metrics.DingoPipelineStuck > 0:
 		return "STUCK", uiSeverityCritical
+	case !metrics.DingoPipelinePresent:
+		return "n/a", uiSeverityMuted
 	}
 	return "ok", uiSeverityOK
 }
@@ -1532,7 +1534,7 @@ func dingoConsoleDashboardCompact(metrics *PromMetrics, width int) string {
 		uiValue(formatDingoBytes(metrics.MempoolBytes))
 
 	innerWidth := dingoPanelInnerWidth(width)
-	pipeline, _, lastBlock := dingoPipelineCells(metrics)
+	pipeline, restarts, lastBlock := dingoPipelineCells(metrics)
 	return dingoPanel(
 		"dashboard",
 		healthSeverity,
@@ -1550,7 +1552,8 @@ func dingoConsoleDashboardCompact(metrics *PromMetrics, width int) string {
 				dingoMetricStyled("Health", uiSeverityValue(healthLabel, healthSeverity), healthSeverity),
 				dingoMetric("Role", uiValue(role)),
 			),
-			dingoMetricRowColumns(innerWidth, 2, pipeline, lastBlock),
+			dingoMetricRowColumns(innerWidth, 2, pipeline, restarts),
+			dingoMetricRowColumns(innerWidth, 2, lastBlock),
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
@@ -3401,10 +3404,16 @@ func getDingoStats() string {
 	if lastBlockOK {
 		lastBlockSeverity = dingoLastBlockSeverity(lastBlockAge)
 	}
-	fmt.Fprintf(&sb, " %s %s %s   %s %s %s\n",
+	restartSeverity := uiSeverityOK
+	if curr.DingoPipelineRestarts > 0 {
+		restartSeverity = uiSeverityWarn
+	}
+	fmt.Fprintf(&sb, " %s %s %s   %s %s   %s %s %s\n",
 		uiLabel("Pipeline"),
 		uiStatusGlyph(pipelineSeverity),
 		uiSeverityValue(pipelineLabel, pipelineSeverity),
+		uiLabel("Restarts"),
+		formatSeverityCount(curr.DingoPipelineRestarts, restartSeverity),
 		uiLabel("Last Block"),
 		uiStatusGlyph(lastBlockSeverity),
 		uiSeverityValue(formatDingoLastBlock(lastBlockAge, lastBlockOK), lastBlockSeverity),

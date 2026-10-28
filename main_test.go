@@ -2527,7 +2527,8 @@ func TestDingoPipelineState(t *testing.T) {
 		expectedSev   uiSeverity
 	}{
 		{"nil metrics", nil, "n/a", uiSeverityMuted},
-		{"running", &PromMetrics{}, "ok", uiSeverityOK},
+		{"running", &PromMetrics{DingoPipelinePresent: true}, "ok", uiSeverityOK},
+		{"gauges absent", &PromMetrics{}, "n/a", uiSeverityMuted},
 		{"stuck", &PromMetrics{DingoPipelineStuck: 1}, "STUCK", uiSeverityCritical},
 		{"halted", &PromMetrics{DingoPipelineHalted: 1}, "HALTED", uiSeverityCritical},
 		{
@@ -2731,8 +2732,10 @@ func TestDingoViewsShowPipelineAndLastBlock(t *testing.T) {
 			}
 		}
 	}
-	if !strings.Contains(halted["systems"], "Restarts") {
-		t.Errorf("systems view missing Restarts:\n%s", halted["systems"])
+	for _, view := range []string{"systems", "compact", "stats"} {
+		if !strings.Contains(halted[view], "Restarts") {
+			t.Errorf("%s view missing Restarts:\n%s", view, halted[view])
+		}
 	}
 
 	stuck := render(&PromMetrics{DingoPipelineStuck: 1, DingoLastBlockAdded: lastBlock})
@@ -2742,7 +2745,7 @@ func TestDingoViewsShowPipelineAndLastBlock(t *testing.T) {
 		}
 	}
 
-	healthy := render(&PromMetrics{DingoLastBlockAdded: float64(time.Now().Unix() - 5)})
+	healthy := render(&PromMetrics{DingoPipelinePresent: true, DingoLastBlockAdded: float64(time.Now().Unix() - 5)})
 	for view, text := range healthy {
 		for _, unexpected := range []string{"HALTED", "STUCK"} {
 			if strings.Contains(text, unexpected) {
