@@ -285,37 +285,37 @@ type MithrilLedgerImportStage struct {
 
 // Gets metrics from prometheus and return a PromMetrics instance
 func getPromMetrics(ctx context.Context) (*PromMetrics, error) {
-	var metrics *PromMetrics
+	var metrics PromMetrics
 	var respBodyBytes []byte
 	respBodyBytes, statusCode, contentType, err := getNodeMetrics(ctx)
 	if err != nil {
 		recordSubsystemFailure(healthSubsystemPrometheus)
-		return metrics, fmt.Errorf("failed getNodeMetrics: %w", err)
+		return nil, fmt.Errorf("failed getNodeMetrics: %w", err)
 	}
 	if statusCode != http.StatusOK {
 		recordSubsystemFailure(healthSubsystemPrometheus)
-		return metrics, fmt.Errorf("failed HTTP: %d", statusCode)
+		return nil, fmt.Errorf("failed HTTP: %d", statusCode)
 	}
 
 	b, err := prom2jsonWithContentType(respBodyBytes, contentType)
 	if err != nil {
 		recordSubsystemFailure(healthSubsystemPrometheus)
-		return metrics, fmt.Errorf("failed prom2json: %w", err)
+		return nil, fmt.Errorf("failed prom2json: %w", err)
 	}
 
 	if err := json.Unmarshal(b, &metrics); err != nil {
 		recordSubsystemFailure(healthSubsystemPrometheus)
-		return metrics, fmt.Errorf("failed JSON unmarshal: %w", err)
+		return &metrics, fmt.Errorf("failed JSON unmarshal: %w", err)
 	}
 	metrics.CollectedAt = time.Now()
-	globalDingoForgeCounterHistory.Apply(metrics, metrics.CollectedAt)
+	globalDingoForgeCounterHistory.Apply(&metrics, metrics.CollectedAt)
 
 	// Detect node type based on metrics
-	detectNodeType(metrics)
+	detectNodeType(&metrics)
 
 	// panic(string(b))
 	recordSubsystemSuccess(healthSubsystemPrometheus)
-	return metrics, nil
+	return &metrics, nil
 }
 
 // detectNodeType determines the node binary from metrics (honoring
