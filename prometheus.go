@@ -799,12 +799,21 @@ func normalizedMetricLabelPart(value string) string {
 // presenceTrackedPromMetrics are the optional Dingo series whose absence must
 // not read as a healthy zero.
 var presenceTrackedPromMetrics = map[string]struct{}{
-	"dingo_metrics_peerSelection_hot_set_deficit": {},
-	"dingo_chainselection_stalled_total":          {},
-	"dingo_chainselection_gdd_disconnects_total":  {},
-	"dingo_chainsync_plateau_decisions_total":     {},
-	"dingo_keepalive_timeout_total":               {},
-	"dingo_mithril_snapshot_restore_state":        {},
+	"dingo_metrics_peerSelection_hot_set_deficit":   {},
+	"dingo_chain_header_queue_length":               {},
+	"dingo_blockfetch_inflight_blocks":              {},
+	"dingo_blockfetch_inflight_bytes":               {},
+	"dingo_mithril_source_decisions_total":          {},
+	"dingo_mithril_fallbacks_total":                 {},
+	"dingo_mithril_sync_backfill_current_slot":      {},
+	"dingo_mithril_sync_backfill_tip_slot":          {},
+	"dingo_mithril_sync_backfill_blocks_per_second": {},
+	"dingo_mithril_sync_backfill_percent":           {},
+	"dingo_chainselection_stalled_total":            {},
+	"dingo_chainselection_gdd_disconnects_total":    {},
+	"dingo_chainsync_plateau_decisions_total":       {},
+	"dingo_keepalive_timeout_total":                 {},
+	"dingo_mithril_snapshot_restore_state":          {},
 }
 
 // exports reports whether the scrape carried the named series.

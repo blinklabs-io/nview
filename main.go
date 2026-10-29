@@ -1386,11 +1386,48 @@ func dingoHeaderQueueSeverity(length, capacity uint64) uiSeverity {
 	return uiSeverityOK
 }
 
-// dingoSyncBacklogRows renders the header queue fill and the blocks in flight.
-// It returns nothing when the node does not export the header queue.
-func dingoSyncBacklogRows(metrics *PromMetrics, innerWidth int, compact bool) []string {
-	if metrics.DingoHeaderQueueCapacity == 0 {
-		return nil
+// dingoNotAvailable is the placeholder for a series the node does not export.
+// A missing series is not a healthy zero.
+func dingoNotAvailable() string {
+	return uiSeverityValue("n/a", uiSeverityMuted)
+}
+
+// dingoCountValue formats a whole-number series, or n/a when it is not exported.
+func dingoCountValue(metrics *PromMetrics, name string, value uint64) string {
+	if !metrics.exports(name) {
+		return dingoNotAvailable()
+	}
+	return uiValue(strconv.FormatUint(value, 10))
+}
+
+// dingoRateValue formats a fractional series, or n/a when it is not exported.
+func dingoRateValue(metrics *PromMetrics, name string, value float64) string {
+	if !metrics.exports(name) {
+		return dingoNotAvailable()
+	}
+	return uiValue(fmt.Sprintf("%.1f", value))
+}
+
+// dingoInflightValue shows the blocks and bytes in flight, each n/a when the
+// node does not export it.
+func dingoInflightValue(metrics *PromMetrics) string {
+	bytes := dingoNotAvailable()
+	if metrics.exports("dingo_blockfetch_inflight_bytes") {
+		bytes = uiValue(formatDingoBytes(metrics.DingoBlockfetchInflightBytes))
+	}
+	return dingoCountValue(
+		metrics,
+		"dingo_blockfetch_inflight_blocks",
+		metrics.DingoBlockfetchInflightBlocks,
+	) + uiUnit(" blk / ") + bytes
+}
+
+// dingoHeaderQueueFill returns the queue severity and its length over capacity.
+// It reads n/a and muted when the node exports the capacity but not the
+// length. The caller has already checked the capacity is non-zero.
+func dingoHeaderQueueFill(metrics *PromMetrics) (uiSeverity, string, float64, bool) {
+	if !metrics.exports("dingo_chain_header_queue_length") {
+		return uiSeverityMuted, dingoNotAvailable(), 0, false
 	}
 	severity := dingoHeaderQueueSeverity(
 		metrics.DingoHeaderQueueLength,
@@ -1398,31 +1435,34 @@ func dingoSyncBacklogRows(metrics *PromMetrics, innerWidth int, compact bool) []
 	)
 	percent := float64(metrics.DingoHeaderQueueLength) /
 		float64(metrics.DingoHeaderQueueCapacity) * 100
-	backlog := dingoMetricStyled(
-		"Backlog",
-		uiSeverityValue(fmt.Sprintf("%5.1f%%", percent), severity)+
-			" "+
-			uiProgressBar(percent, 20, severity),
+	text := uiSeverityValue(
+		fmt.Sprintf(
+			"%d/%d",
+			metrics.DingoHeaderQueueLength,
+			metrics.DingoHeaderQueueCapacity,
+		),
 		severity,
 	)
+	return severity, text, percent, true
+}
+
+// dingoSyncBacklogRows renders the header queue fill and the blocks in flight.
+// It returns nothing when the node does not export the header queue capacity.
+func dingoSyncBacklogRows(metrics *PromMetrics, innerWidth int, compact bool) []string {
+	if metrics.DingoHeaderQueueCapacity == 0 {
+		return nil
+	}
+	severity, queueText, percent, known := dingoHeaderQueueFill(metrics)
+	backlogText := dingoNotAvailable()
+	if known {
+		backlogText = uiSeverityValue(fmt.Sprintf("%5.1f%%", percent), severity) +
+			" " +
+			uiProgressBar(percent, 20, severity)
+	}
+	backlog := dingoMetricStyled("Backlog", backlogText, severity)
 	backlog.Span = 2
-	queue := dingoMetric(
-		"Queue",
-		uiSeverityValue(
-			fmt.Sprintf(
-				"%d/%d",
-				metrics.DingoHeaderQueueLength,
-				metrics.DingoHeaderQueueCapacity,
-			),
-			severity,
-		),
-	)
-	inflight := dingoMetric(
-		"Inflight",
-		uiValue(strconv.FormatUint(metrics.DingoBlockfetchInflightBlocks, 10))+
-			uiUnit(" blk / ")+
-			uiValue(formatDingoBytes(metrics.DingoBlockfetchInflightBytes)),
-	)
+	queue := dingoMetric("Queue", queueText)
+	inflight := dingoMetric("Inflight", dingoInflightValue(metrics))
 	if compact {
 		return []string{
 			dingoMetricRowColumns(innerWidth, 2, backlog),
@@ -1506,35 +1546,37 @@ func mithrilRestoreRow(metrics *PromMetrics, innerWidth int) string {
 	return dingoMetricRow(
 		innerWidth,
 		dingoMetricStyled("Restore", uiSeverityValue(label, severity), severity),
-		dingoMetric("Source", uiValue(strconv.FormatUint(metrics.MithrilSourceDecisions, 10))),
-		dingoMetric("Fallback", uiValue(strconv.FormatUint(metrics.MithrilFallbacks, 10))),
+		dingoMetric("Source", dingoCountValue(metrics, "dingo_mithril_source_decisions_total", metrics.MithrilSourceDecisions)),
+		dingoMetric("Fallback", dingoCountValue(metrics, "dingo_mithril_fallbacks_total", metrics.MithrilFallbacks)),
 	)
+}
+
+// mithrilBackfillSlotValue shows the backfill position and rate, each n/a when
+// the node does not export it.
+func mithrilBackfillSlotValue(metrics *PromMetrics) string {
+	return dingoCountValue(metrics, "dingo_mithril_sync_backfill_current_slot", metrics.MithrilBackfillCurrentSlot) +
+		uiUnit("/") +
+		dingoCountValue(metrics, "dingo_mithril_sync_backfill_tip_slot", metrics.MithrilBackfillTipSlot) +
+		"  " +
+		dingoRateValue(metrics, "dingo_mithril_sync_backfill_blocks_per_second", metrics.MithrilBackfillBlocksPerSecond) +
+		uiUnit(" blk/s")
 }
 
 func mithrilBackfillRow(metrics *PromMetrics, innerWidth, barWidth int) string {
 	// The bar shares the row with the slot and rate, so it must not take more
 	// than a quarter of the panel.
 	barWidth = min(barWidth, innerWidth/4)
-	severity := mithrilProgressSeverity(metrics.MithrilBackfillPercent)
+	progress := dingoNotAvailable()
+	if metrics.exports("dingo_mithril_sync_backfill_percent") {
+		severity := mithrilProgressSeverity(metrics.MithrilBackfillPercent)
+		progress = uiSeverityValue(fmt.Sprintf("%5.1f%%", metrics.MithrilBackfillPercent), severity) +
+			" " +
+			uiProgressBar(metrics.MithrilBackfillPercent, barWidth, severity)
+	}
 	return dingoMetricRow(
 		innerWidth,
-		dingoMetricSpan(
-			"Backfill",
-			uiSeverityValue(fmt.Sprintf("%5.1f%%", metrics.MithrilBackfillPercent), severity)+
-				" "+
-				uiProgressBar(metrics.MithrilBackfillPercent, barWidth, severity),
-			2,
-		),
-		dingoMetricSpan(
-			"Slot",
-			uiValue(strconv.FormatUint(metrics.MithrilBackfillCurrentSlot, 10))+
-				uiUnit("/")+
-				uiValue(strconv.FormatUint(metrics.MithrilBackfillTipSlot, 10))+
-				"  "+
-				uiValue(fmt.Sprintf("%.1f", metrics.MithrilBackfillBlocksPerSecond))+
-				uiUnit(" blk/s"),
-			2,
-		),
+		dingoMetricSpan("Backfill", progress, 2),
+		dingoMetricSpan("Slot", mithrilBackfillSlotValue(metrics), 2),
 	)
 }
 
@@ -3026,6 +3068,7 @@ func main() {
 			}
 			applyDefaultSecondaryView()
 			promMetrics.Store(prom)
+			recordDingoSample(prom)
 			updateMithrilView()
 			select {
 			case <-ctx.Done():
@@ -3471,22 +3514,40 @@ func formatSeverityPercentRatio(value uint64, percent float32, severity uiSeveri
 		uiSeverityValue(fmt.Sprintf("%.2f%%", percent), severity)
 }
 
-// dingoPreviousSample records src as the latest scrape and returns the scrape
-// before it with the time between them. It returns nil when there is no earlier
-// scrape. Repeated calls for the same scrape return the same previous sample, so
-// every view can ask once per render.
+// recordDingoSampleLocked makes src the latest scrape and the one before it the
+// baseline. A scrape already recorded is left alone. The caller holds
+// lastDingoSampleMu.
+func recordDingoSampleLocked(src *PromMetrics, now time.Time) {
+	if src == lastDingoSampleSrc {
+		return
+	}
+	curr := *src
+	lastDingoRateBase = lastDingoSample
+	lastDingoRateBaseAt = lastDingoSampleAt
+	lastDingoSample = &curr
+	lastDingoSampleAt = now
+	lastDingoSampleSrc = src
+}
+
+// recordDingoSample records a freshly stored scrape. The polling loop calls it
+// once per scrape, so the baseline moves one scrape at a time whichever page is
+// open, instead of only when a page that reads it is drawn.
+func recordDingoSample(src *PromMetrics) {
+	now := time.Now()
+	lastDingoSampleMu.Lock()
+	defer lastDingoSampleMu.Unlock()
+	recordDingoSampleLocked(src, now)
+}
+
+// dingoPreviousSample returns the scrape before src with the time between them,
+// or nil when there is no earlier scrape. It records src first if the polling
+// loop has not, so a repeated call for the same scrape returns the same
+// baseline.
 func dingoPreviousSample(src *PromMetrics) (*PromMetrics, time.Duration) {
 	now := time.Now()
 	lastDingoSampleMu.Lock()
 	defer lastDingoSampleMu.Unlock()
-	if src != lastDingoSampleSrc {
-		curr := *src
-		lastDingoRateBase = lastDingoSample
-		lastDingoRateBaseAt = lastDingoSampleAt
-		lastDingoSample = &curr
-		lastDingoSampleAt = now
-		lastDingoSampleSrc = src
-	}
+	recordDingoSampleLocked(src, now)
 	if lastDingoRateBase == nil {
 		return nil, 0
 	}
@@ -3494,10 +3555,11 @@ func dingoPreviousSample(src *PromMetrics) (*PromMetrics, time.Duration) {
 }
 
 // dingoAnomalyCells shows the network anomaly counters with their increase
-// since the previous scrape; prev is nil when there is none.
+// since the previous scrape; prev is nil when there is none. An increase is
+// shown only when the previous scrape exported the counter too, because an
+// absent one reads as zero and would turn the whole total into an increase.
 func dingoAnomalyCells(metrics, prev *PromMetrics) []dingoMetricCell {
-	havePrev := prev != nil
-	if !havePrev {
+	if prev == nil {
 		prev = &PromMetrics{}
 	}
 	counters := []struct {
@@ -3520,7 +3582,7 @@ func dingoAnomalyCells(metrics, prev *PromMetrics) []dingoMetricCell {
 			))
 			continue
 		}
-		text, severity := formatDingoAnomaly(c.curr, c.prev, havePrev)
+		text, severity := formatDingoAnomaly(c.curr, c.prev, prev.exports(c.name))
 		cells = append(cells, dingoMetricStyled(
 			c.label,
 			uiStatusGlyph(severity)+" "+uiSeverityValue(text, severity),
@@ -3645,21 +3707,13 @@ func getDingoStats() string {
 
 	sb.WriteString(uiSection("Sync Backlog / Anomalies"))
 	if curr.DingoHeaderQueueCapacity > 0 {
-		queueSeverity := dingoHeaderQueueSeverity(
-			curr.DingoHeaderQueueLength,
-			curr.DingoHeaderQueueCapacity,
-		)
-		fmt.Fprintf(&sb, " %s %s %s   %s %s%s%s\n",
+		queueSeverity, queueText, _, _ := dingoHeaderQueueFill(&curr)
+		fmt.Fprintf(&sb, " %s %s %s   %s %s\n",
 			uiLabel("Header Queue"),
 			uiStatusGlyph(queueSeverity),
-			uiSeverityValue(
-				fmt.Sprintf("%d/%d", curr.DingoHeaderQueueLength, curr.DingoHeaderQueueCapacity),
-				queueSeverity,
-			),
+			queueText,
 			uiLabel("Inflight"),
-			uiValue(strconv.FormatUint(curr.DingoBlockfetchInflightBlocks, 10)),
-			uiUnit(" blk / "),
-			uiValue(formatDingoBytes(curr.DingoBlockfetchInflightBytes)),
+			dingoInflightValue(&curr),
 		)
 	}
 	havePrev := prev != nil
@@ -3667,7 +3721,7 @@ func getDingoStats() string {
 		if !curr.exports(name) {
 			return fmt.Sprintf("%s %s %s", uiLabel(label), uiStatusGlyph(uiSeverityMuted), uiSeverityValue("n/a", uiSeverityMuted))
 		}
-		text, severity := formatDingoAnomaly(currValue, prevValue, havePrev)
+		text, severity := formatDingoAnomaly(currValue, prevValue, havePrev && prevMetrics.exports(name))
 		return fmt.Sprintf("%s %s %s", uiLabel(label), uiStatusGlyph(severity), uiSeverityValue(text, severity))
 	}
 	fmt.Fprintf(&sb, " %s   %s\n",
@@ -4003,8 +4057,8 @@ func getMithrilStats() string {
 		uiLabel("Restore"),
 		uiStatusGlyph(restoreSeverity),
 		uiSeverityValue(restoreLabel, restoreSeverity),
-		uiKV("Source Picks", uiValue(strconv.FormatUint(m.MithrilSourceDecisions, 10))),
-		uiKV("Fallbacks", uiValue(strconv.FormatUint(m.MithrilFallbacks, 10))),
+		uiKV("Source Picks", dingoCountValue(m, "dingo_mithril_source_decisions_total", m.MithrilSourceDecisions)),
+		uiKV("Fallbacks", dingoCountValue(m, "dingo_mithril_fallbacks_total", m.MithrilFallbacks)),
 	)
 
 	sb.WriteString(uiSection("Progress"))
@@ -4098,19 +4152,22 @@ func getMithrilStats() string {
 	))
 
 	if mithrilBackfillActive(m) {
-		sb.WriteString(formatMithrilProgressLine(
-			"Backfill",
-			m.MithrilBackfillPercent,
-			fmt.Sprintf(
-				"%s%s%s   %s%s",
-				uiValue(strconv.FormatUint(m.MithrilBackfillCurrentSlot, 10)),
-				uiUnit("/"),
-				uiValue(strconv.FormatUint(m.MithrilBackfillTipSlot, 10)),
-				uiValue(fmt.Sprintf("%.1f", m.MithrilBackfillBlocksPerSecond)),
-				uiUnit(" blk/s"),
-			),
-			mithrilProgressSeverity(m.MithrilBackfillPercent),
-		))
+		if m.exports("dingo_mithril_sync_backfill_percent") {
+			sb.WriteString(formatMithrilProgressLine(
+				"Backfill",
+				m.MithrilBackfillPercent,
+				mithrilBackfillSlotValue(m),
+				mithrilProgressSeverity(m.MithrilBackfillPercent),
+			))
+		} else {
+			fmt.Fprintf(
+				&sb,
+				" %s %s  %s\n",
+				uiLabel(fmt.Sprintf("%-13s", "Backfill")),
+				dingoNotAvailable(),
+				mithrilBackfillSlotValue(m),
+			)
+		}
 	}
 
 	sb.WriteString(uiSection("Slots / Gap"))

@@ -2840,12 +2840,12 @@ func TestMithrilRestoreStateLabel(t *testing.T) {
 // TestDingoSyncBacklogViews checks the backlog gauge in the chain views, and
 // that it is hidden when the node does not export the header queue.
 func TestDingoSyncBacklogViews(t *testing.T) {
-	withBacklog := &PromMetrics{
+	withBacklog := dingoSyncExported(&PromMetrics{
 		DingoHeaderQueueLength:        2500,
 		DingoHeaderQueueCapacity:      10000,
 		DingoBlockfetchInflightBlocks: 4,
 		DingoBlockfetchInflightBytes:  1048576,
-	}
+	})
 	views := map[string]string{
 		"full":    dingoConsoleChainLane(withBacklog, 120),
 		"compact": dingoConsoleChainCompact(withBacklog, 60),
@@ -2908,12 +2908,12 @@ func TestGetDingoStatsShowsAnomaliesAndBacklog(t *testing.T) {
 	lastDingoRateBase = nil
 	lastDingoRateBaseAt = time.Time{}
 	lastDingoSampleSrc = nil
-	lastDingoSample = &PromMetrics{
+	lastDingoSample = dingoSyncExported(&PromMetrics{
 		DingoChainselectionStalled:        10,
 		DingoChainselectionGDDDisconnects: 0,
 		DingoChainsyncPlateauDecisions:    4,
 		DingoKeepaliveTimeouts:            7,
-	}
+	})
 	lastDingoSampleAt = time.Now().Add(-10 * time.Second)
 	promMetrics.Store(dingoSyncExported(&PromMetrics{
 		DingoHeaderQueueLength:            100,
@@ -3017,10 +3017,10 @@ func TestDingoConsoleViewsShowAnomalies(t *testing.T) {
 		}
 	}
 
-	reset(&PromMetrics{
+	reset(dingoSyncExported(&PromMetrics{
 		DingoChainselectionStalled: 10,
 		DingoKeepaliveTimeouts:     7,
-	})
+	}))
 	for name, text := range render(dingoSyncExported(&PromMetrics{
 		DingoChainselectionStalled: 13,
 		DingoKeepaliveTimeouts:     7,
@@ -3113,14 +3113,21 @@ func TestGetDingoStatsReportsMissingAnomalyCountersAsUnavailable(t *testing.T) {
 	promMetrics.Store(&PromMetrics{})
 
 	result := getDingoStats()
-	for _, label := range []string{"Stalled", "GDD Disconnects", "Plateau", "Keepalive Timeouts"} {
+	labels := []string{"Stalled", "GDD Disconnects", "Plateau", "Keepalive Timeouts"}
+	for _, label := range labels {
 		found := false
 		for _, line := range strings.Split(result, "\n") {
 			if idx := strings.Index(line, label); idx >= 0 {
 				found = true
-				// Each counter's value follows its own label on the line.
+				// Two counters share a line, so the value is what lies between
+				// this label and the next one, not the rest of the line.
 				rest := line[idx+len(label):]
-				if next := strings.Index(rest, "n/a"); next < 0 {
+				for _, other := range labels {
+					if end := strings.Index(rest, other); end >= 0 {
+						rest = rest[:end]
+					}
+				}
+				if !strings.Contains(rest, "n/a") {
 					t.Errorf("%s should read n/a:\n%s", label, line)
 				}
 			}
@@ -3128,5 +3135,149 @@ func TestGetDingoStatsReportsMissingAnomalyCountersAsUnavailable(t *testing.T) {
 		if !found {
 			t.Errorf("getDingoStats() missing %s:\n%s", label, result)
 		}
+	}
+}
+
+// withDingoSampleState isolates the previous-scrape state for one test.
+func withDingoSampleState(t *testing.T) {
+	t.Helper()
+	originalPromMetrics := promMetrics.Load()
+	originalSample := lastDingoSample
+	originalSampleAt := lastDingoSampleAt
+	originalBase := lastDingoRateBase
+	originalBaseAt := lastDingoRateBaseAt
+	originalSrc := lastDingoSampleSrc
+	t.Cleanup(func() {
+		promMetrics.Store(originalPromMetrics)
+		lastDingoSample = originalSample
+		lastDingoSampleAt = originalSampleAt
+		lastDingoRateBase = originalBase
+		lastDingoRateBaseAt = originalBaseAt
+		lastDingoSampleSrc = originalSrc
+	})
+	lastDingoSample = nil
+	lastDingoSampleAt = time.Time{}
+	lastDingoRateBase = nil
+	lastDingoRateBaseAt = time.Time{}
+	lastDingoSampleSrc = nil
+}
+
+// TestDingoSampleAdvancesOncePerScrape checks that the baseline moves one
+// scrape at a time even when no page that reads it is drawn in between, so an
+// increase never spans several scrape intervals.
+func TestDingoSampleAdvancesOncePerScrape(t *testing.T) {
+	withDingoSampleState(t)
+
+	first := dingoSyncExported(&PromMetrics{DingoKeepaliveTimeouts: 10})
+	second := dingoSyncExported(&PromMetrics{DingoKeepaliveTimeouts: 12})
+	third := dingoSyncExported(&PromMetrics{DingoKeepaliveTimeouts: 15})
+	recordDingoSample(first)
+	recordDingoSample(second)
+	recordDingoSample(third)
+
+	prev, _ := dingoPreviousSample(third)
+	if prev == nil || prev.DingoKeepaliveTimeouts != 12 {
+		t.Fatalf("baseline = %+v, expected the scrape before the latest (12)", prev)
+	}
+	again, _ := dingoPreviousSample(third)
+	if again != prev {
+		t.Error("a second read of the same scrape moved the baseline")
+	}
+	recordDingoSample(third)
+	if again, _ = dingoPreviousSample(third); again != prev {
+		t.Error("recording the same scrape twice moved the baseline")
+	}
+}
+
+// TestDingoAnomalyNeedsPreviousExport checks that a counter the previous scrape
+// did not export is not treated as zero: its whole total would read as an
+// increase.
+func TestDingoAnomalyNeedsPreviousExport(t *testing.T) {
+	current := dingoSyncExported(&PromMetrics{DingoChainselectionStalled: 13})
+	for name, prev := range map[string]*PromMetrics{
+		"previous scrape without the counter": {},
+		"no previous scrape":                  nil,
+	} {
+		for _, cell := range dingoAnomalyCells(current, prev) {
+			if cell.Label != "Stalled" {
+				continue
+			}
+			if strings.Contains(cell.Value, "+") {
+				t.Errorf("%s: Stalled = %q, expected a total with no increase", name, cell.Value)
+			}
+		}
+	}
+
+	withDingoSampleState(t)
+	lastDingoSample = &PromMetrics{}
+	lastDingoSampleAt = time.Now().Add(-10 * time.Second)
+	promMetrics.Store(current)
+	if stats := getDingoStats(); strings.Contains(stats, "+13") {
+		t.Errorf("getDingoStats() shows the whole total as an increase:\n%s", stats)
+	}
+}
+
+// TestDingoPartialExportsReportMissingAsUnavailable checks that a series the
+// node leaves out reads n/a in each view instead of a zero beside a series it
+// did export.
+func TestDingoPartialExportsReportMissingAsUnavailable(t *testing.T) {
+	capacityOnly := &PromMetrics{
+		DingoHeaderQueueCapacity: 10000,
+		DingoPresentMetrics:      map[string]bool{},
+	}
+	for name, text := range map[string]string{
+		"full":    dingoConsoleChainLane(capacityOnly, 120),
+		"compact": dingoConsoleChainCompact(capacityOnly, 60),
+	} {
+		if strings.Contains(text, "0/10000") {
+			t.Errorf("%s chain view invents a queue length:\n%s", name, text)
+		}
+		for _, line := range strings.Split(text, "\n") {
+			if strings.Contains(line, "Backlog") && strings.Contains(line, "%") {
+				t.Errorf("%s chain view invents a backlog percentage:\n%s", name, line)
+			}
+		}
+		if !strings.Contains(text, "n/a") {
+			t.Errorf("%s chain view should read n/a for the unexported series:\n%s", name, text)
+		}
+		if strings.Contains(text, "0 blk") {
+			t.Errorf("%s chain view invents blocks in flight:\n%s", name, text)
+		}
+	}
+
+	if got := dingoInflightValue(capacityOnly); strings.Count(got, "n/a") != 2 {
+		t.Errorf("dingoInflightValue() = %q, expected n/a for both blocks and bytes", got)
+	}
+	bytesOnly := &PromMetrics{
+		DingoBlockfetchInflightBytes: 2048,
+		DingoPresentMetrics:          map[string]bool{"dingo_blockfetch_inflight_bytes": true},
+	}
+	if got := dingoInflightValue(bytesOnly); strings.Count(got, "n/a") != 1 {
+		t.Errorf("dingoInflightValue() = %q, expected n/a for the blocks only", got)
+	}
+
+	mithrilMissing := &PromMetrics{
+		MithrilPhaseBackfill: 1,
+		DingoPresentMetrics:  map[string]bool{"dingo_mithril_snapshot_restore_state": true},
+	}
+	row := mithrilRestoreRow(mithrilMissing, 80)
+	if strings.Count(row, "n/a") != 2 {
+		t.Errorf("restore row should read n/a for the source and fallback totals:\n%s", row)
+	}
+	backfill := mithrilBackfillRow(mithrilMissing, 80, 20)
+	if strings.Count(backfill, "n/a") < 4 {
+		t.Errorf("backfill row should read n/a for percent, slots and rate:\n%s", backfill)
+	}
+	if strings.Contains(backfill, "0.0%") || strings.Contains(backfill, "0/0") {
+		t.Errorf("backfill row invents zero progress:\n%s", backfill)
+	}
+
+	withDingoSampleState(t)
+	promMetrics.Store(&PromMetrics{
+		DingoHeaderQueueCapacity: 10000,
+		DingoPresentMetrics:      map[string]bool{},
+	})
+	if stats := getDingoStats(); strings.Contains(stats, "0/10000") || strings.Contains(stats, "0 blk") {
+		t.Errorf("getDingoStats() invents a queue length or blocks in flight:\n%s", stats)
 	}
 }
