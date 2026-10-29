@@ -168,9 +168,15 @@ var (
 	lastDingoRateBase     *PromMetrics
 	lastDingoRateBaseAt   time.Time
 	lastDingoSampleSrc    *PromMetrics
-	lastDingoSampleMu     sync.Mutex
-	compactDingoPage      atomic.Int32
-	peerOverlayActive     atomic.Bool
+	// The entry before the latest one, so a render still holding the previous
+	// scrape gets its own baseline rather than the newer scrape's.
+	priorDingoRateBase   *PromMetrics
+	priorDingoRateBaseAt time.Time
+	priorDingoSampleAt   time.Time
+	priorDingoSampleSrc  *PromMetrics
+	lastDingoSampleMu    sync.Mutex
+	compactDingoPage     atomic.Int32
+	peerOverlayActive    atomic.Bool
 )
 
 // Global command line flags
@@ -3522,6 +3528,10 @@ func recordDingoSampleLocked(src *PromMetrics, now time.Time) {
 		return
 	}
 	curr := *src
+	priorDingoRateBase = lastDingoRateBase
+	priorDingoRateBaseAt = lastDingoRateBaseAt
+	priorDingoSampleAt = lastDingoSampleAt
+	priorDingoSampleSrc = lastDingoSampleSrc
 	lastDingoRateBase = lastDingoSample
 	lastDingoRateBaseAt = lastDingoSampleAt
 	lastDingoSample = &curr
@@ -3540,18 +3550,32 @@ func recordDingoSample(src *PromMetrics) {
 }
 
 // dingoPreviousSample returns the scrape before src with the time between them,
-// or nil when there is no earlier scrape. It records src first if the polling
-// loop has not, so a repeated call for the same scrape returns the same
-// baseline.
+// or nil when there is none. The baseline is always the one recorded for src
+// itself: a render holding a scrape older than the latest never rotates the
+// history back, and gets the baseline of its own scrape or nil. A scrape the
+// polling loop has not recorded yet is recorded here only if it is still the
+// latest one stored.
 func dingoPreviousSample(src *PromMetrics) (*PromMetrics, time.Duration) {
 	now := time.Now()
 	lastDingoSampleMu.Lock()
 	defer lastDingoSampleMu.Unlock()
-	recordDingoSampleLocked(src, now)
-	if lastDingoRateBase == nil {
-		return nil, 0
+	if src != lastDingoSampleSrc && src != priorDingoSampleSrc &&
+		src == promMetrics.Load() {
+		recordDingoSampleLocked(src, now)
 	}
-	return lastDingoRateBase, lastDingoSampleAt.Sub(lastDingoRateBaseAt)
+	switch src {
+	case lastDingoSampleSrc:
+		if lastDingoRateBase == nil {
+			return nil, 0
+		}
+		return lastDingoRateBase, lastDingoSampleAt.Sub(lastDingoRateBaseAt)
+	case priorDingoSampleSrc:
+		if priorDingoRateBase == nil {
+			return nil, 0
+		}
+		return priorDingoRateBase, priorDingoSampleAt.Sub(priorDingoRateBaseAt)
+	}
+	return nil, 0
 }
 
 // dingoAnomalyCells shows the network anomaly counters with their increase

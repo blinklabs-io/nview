@@ -2995,22 +2995,28 @@ func TestDingoConsoleViewsShowAnomalies(t *testing.T) {
 	originalLastDingoRateBase := lastDingoRateBase
 	originalLastDingoRateBaseAt := lastDingoRateBaseAt
 	originalLastDingoSampleSrc := lastDingoSampleSrc
+	originalPriorDingoSampleSrc := priorDingoSampleSrc
+	originalPromMetrics := promMetrics.Load()
 	defer func() {
 		lastDingoSample = originalLastDingoSample
 		lastDingoSampleAt = originalLastDingoSampleAt
 		lastDingoRateBase = originalLastDingoRateBase
 		lastDingoRateBaseAt = originalLastDingoRateBaseAt
 		lastDingoSampleSrc = originalLastDingoSampleSrc
+		priorDingoSampleSrc = originalPriorDingoSampleSrc
+		promMetrics.Store(originalPromMetrics)
 	}()
 
 	reset := func(previous *PromMetrics) {
 		lastDingoRateBase = nil
 		lastDingoRateBaseAt = time.Time{}
 		lastDingoSampleSrc = nil
+		priorDingoSampleSrc = nil
 		lastDingoSample = previous
 		lastDingoSampleAt = time.Now().Add(-10 * time.Second)
 	}
 	render := func(current *PromMetrics) map[string]string {
+		promMetrics.Store(current)
 		return map[string]string{
 			"systems": dingoConsoleSystemsBand(current, 120),
 			"compact": dingoConsoleOperationsCompact(current, 60),
@@ -3147,7 +3153,9 @@ func withDingoSampleState(t *testing.T) {
 	originalBase := lastDingoRateBase
 	originalBaseAt := lastDingoRateBaseAt
 	originalSrc := lastDingoSampleSrc
+	originalPrior := priorDingoSampleSrc
 	t.Cleanup(func() {
+		priorDingoSampleSrc = originalPrior
 		promMetrics.Store(originalPromMetrics)
 		lastDingoSample = originalSample
 		lastDingoSampleAt = originalSampleAt
@@ -3160,6 +3168,55 @@ func withDingoSampleState(t *testing.T) {
 	lastDingoRateBase = nil
 	lastDingoRateBaseAt = time.Time{}
 	lastDingoSampleSrc = nil
+	priorDingoSampleSrc = nil
+}
+
+// TestDingoStaleRenderKeepsItsOwnBaseline checks that a render holding an older
+// scrape neither rotates the history back nor borrows the newer scrape's
+// baseline, so an old total is not shown as a fresh increase.
+func TestDingoStaleRenderKeepsItsOwnBaseline(t *testing.T) {
+	withDingoSampleState(t)
+
+	a := dingoSyncExported(&PromMetrics{DingoChainselectionStalled: 10})
+	b := dingoSyncExported(&PromMetrics{DingoChainselectionStalled: 11})
+	recordDingoSample(a)
+	recordDingoSample(b)
+	promMetrics.Store(b)
+
+	if prev, _ := dingoPreviousSample(a); prev != nil {
+		t.Fatalf("stale scrape got baseline %+v, expected none", prev)
+	}
+	prev, _ := dingoPreviousSample(b)
+	if prev == nil || prev.DingoChainselectionStalled != 10 {
+		t.Fatalf("latest baseline = %+v, expected scrape A (10)", prev)
+	}
+	for _, cell := range dingoAnomalyCells(a, nil) {
+		if cell.Label == "Stalled" && strings.Contains(cell.Value, "+") {
+			t.Errorf("stale frame Stalled = %q, expected no increase", cell.Value)
+		}
+	}
+
+	// A render that loaded scrape Z before the polling loop recorded it, then
+	// found newer scrape B already recorded, must not rotate B out.
+	z := dingoSyncExported(&PromMetrics{DingoChainselectionStalled: 9})
+	if prev, _ := dingoPreviousSample(z); prev != nil {
+		t.Fatalf("unrecorded stale scrape got baseline %+v, expected none", prev)
+	}
+	if prev, _ := dingoPreviousSample(b); prev == nil || prev.DingoChainselectionStalled != 10 {
+		t.Fatalf("latest baseline after stale read = %+v, expected A (10)", prev)
+	}
+
+	c := dingoSyncExported(&PromMetrics{DingoChainselectionStalled: 12})
+	recordDingoSample(c)
+	promMetrics.Store(c)
+	prevB, _ := dingoPreviousSample(b)
+	if prevB == nil || prevB.DingoChainselectionStalled != 10 {
+		t.Fatalf("scrape B baseline = %+v, expected A (10)", prevB)
+	}
+	prevC, _ := dingoPreviousSample(c)
+	if prevC == nil || prevC.DingoChainselectionStalled != 11 {
+		t.Fatalf("scrape C baseline = %+v, expected B (11)", prevC)
+	}
 }
 
 // TestDingoSampleAdvancesOncePerScrape checks that the baseline moves one
