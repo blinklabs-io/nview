@@ -1,0 +1,917 @@
+# HELP cardano_node_metrics_RTS_gcHeapBytes_int heap memory bytes obtained from the OS (Go runtime.MemStats.HeapSys)
+# TYPE cardano_node_metrics_RTS_gcHeapBytes_int gauge
+cardano_node_metrics_RTS_gcHeapBytes_int{network="preview"} 7.21813504e+08
+# HELP cardano_node_metrics_RTS_gcLiveBytes_int live heap bytes currently in use (Go runtime.MemStats.HeapAlloc)
+# TYPE cardano_node_metrics_RTS_gcLiveBytes_int gauge
+cardano_node_metrics_RTS_gcLiveBytes_int{network="preview"} 3.23902992e+08
+# HELP cardano_node_metrics_RTS_gcMajorNum_int count of forced GCs (Go runtime.MemStats.NumForcedGC)
+# TYPE cardano_node_metrics_RTS_gcMajorNum_int gauge
+cardano_node_metrics_RTS_gcMajorNum_int{network="preview"} 0
+# HELP cardano_node_metrics_RTS_gcMinorNum_int count of automatic GCs (Go runtime.MemStats.NumGC - NumForcedGC)
+# TYPE cardano_node_metrics_RTS_gcMinorNum_int gauge
+cardano_node_metrics_RTS_gcMinorNum_int{network="preview"} 63771
+# HELP cardano_node_metrics_blockNum_int current block number
+# TYPE cardano_node_metrics_blockNum_int gauge
+cardano_node_metrics_blockNum_int{network="preview"} 3284
+# HELP cardano_node_metrics_blockfetchclient_blockdelay_cdfFive percentage of blocks fetched in less than 5 seconds
+# TYPE cardano_node_metrics_blockfetchclient_blockdelay_cdfFive gauge
+cardano_node_metrics_blockfetchclient_blockdelay_cdfFive{network="preview"} 0
+# HELP cardano_node_metrics_blockfetchclient_blockdelay_cdfOne percentage of blocks fetched in less than 1 second
+# TYPE cardano_node_metrics_blockfetchclient_blockdelay_cdfOne gauge
+cardano_node_metrics_blockfetchclient_blockdelay_cdfOne{network="preview"} 0
+# HELP cardano_node_metrics_blockfetchclient_blockdelay_cdfThree percentage of blocks fetched in less than 3 seconds
+# TYPE cardano_node_metrics_blockfetchclient_blockdelay_cdfThree gauge
+cardano_node_metrics_blockfetchclient_blockdelay_cdfThree{network="preview"} 0
+# HELP cardano_node_metrics_blockfetchclient_blockdelay_s delay in seconds for the most recent block fetch
+# TYPE cardano_node_metrics_blockfetchclient_blockdelay_s gauge
+cardano_node_metrics_blockfetchclient_blockdelay_s{network="preview"} 0
+# HELP cardano_node_metrics_blockfetchclient_lateblocks blocks that took more than 5 seconds to fetch
+# TYPE cardano_node_metrics_blockfetchclient_lateblocks counter
+cardano_node_metrics_blockfetchclient_lateblocks{network="preview"} 0
+# HELP cardano_node_metrics_blocksForgedNum_int total number of blocks forged by this node
+# TYPE cardano_node_metrics_blocksForgedNum_int counter
+cardano_node_metrics_blocksForgedNum_int{network="preview"} 0
+# HELP cardano_node_metrics_connectionManager_duplexConns number of peers with duplex connections
+# TYPE cardano_node_metrics_connectionManager_duplexConns gauge
+cardano_node_metrics_connectionManager_duplexConns{network="preview"} 0
+# HELP cardano_node_metrics_connectionManager_fullDuplexConns number of full-duplex connections
+# TYPE cardano_node_metrics_connectionManager_fullDuplexConns gauge
+cardano_node_metrics_connectionManager_fullDuplexConns{network="preview"} 0
+# HELP cardano_node_metrics_connectionManager_incomingConns number of incoming connections
+# TYPE cardano_node_metrics_connectionManager_incomingConns gauge
+cardano_node_metrics_connectionManager_incomingConns{network="preview"} 0
+# HELP cardano_node_metrics_connectionManager_ntcRemoteBufferedBytes bytes reserved by incomplete message reassembly on remote node-to-client connections
+# TYPE cardano_node_metrics_connectionManager_ntcRemoteBufferedBytes gauge
+cardano_node_metrics_connectionManager_ntcRemoteBufferedBytes{network="preview"} 0
+# HELP cardano_node_metrics_connectionManager_ntcTrustedLocalBufferedBytes bytes reserved by incomplete message reassembly on trusted local node-to-client connections
+# TYPE cardano_node_metrics_connectionManager_ntcTrustedLocalBufferedBytes gauge
+cardano_node_metrics_connectionManager_ntcTrustedLocalBufferedBytes{network="preview"} 0
+# HELP cardano_node_metrics_connectionManager_outgoingConns number of outgoing connections
+# TYPE cardano_node_metrics_connectionManager_outgoingConns gauge
+cardano_node_metrics_connectionManager_outgoingConns{network="preview"} 16
+# HELP cardano_node_metrics_connectionManager_prunableConns number of prunable connections
+# TYPE cardano_node_metrics_connectionManager_prunableConns gauge
+cardano_node_metrics_connectionManager_prunableConns{network="preview"} 0
+# HELP cardano_node_metrics_connectionManager_unidirectionalConns number of peers with unidirectional connections
+# TYPE cardano_node_metrics_connectionManager_unidirectionalConns gauge
+cardano_node_metrics_connectionManager_unidirectionalConns{network="preview"} 15
+# HELP cardano_node_metrics_density_real chain density
+# TYPE cardano_node_metrics_density_real gauge
+cardano_node_metrics_density_real{network="preview"} 0.05
+# HELP cardano_node_metrics_epoch_int current epoch number
+# TYPE cardano_node_metrics_epoch_int gauge
+cardano_node_metrics_epoch_int{network="preview"} 0
+# HELP cardano_node_metrics_forging_enabled whether block forging is enabled (0 or 1)
+# TYPE cardano_node_metrics_forging_enabled gauge
+cardano_node_metrics_forging_enabled{network="preview"} 0
+# HELP cardano_node_metrics_forks_int number of forks seen
+# TYPE cardano_node_metrics_forks_int gauge
+cardano_node_metrics_forks_int{network="preview"} 0
+# HELP cardano_node_metrics_mempoolBytes_int current size of mempool transactions in bytes
+# TYPE cardano_node_metrics_mempoolBytes_int gauge
+cardano_node_metrics_mempoolBytes_int{network="preview"} 0
+# HELP cardano_node_metrics_nodeStartTime_int unix timestamp when the node started
+# TYPE cardano_node_metrics_nodeStartTime_int gauge
+cardano_node_metrics_nodeStartTime_int{network="preview"} 1.79319277e+09
+# HELP cardano_node_metrics_peerSelection_ActiveNonRootPeersDemotions number of non-root active peers demoted
+# TYPE cardano_node_metrics_peerSelection_ActiveNonRootPeersDemotions counter
+cardano_node_metrics_peerSelection_ActiveNonRootPeersDemotions{network="preview"} 16
+# HELP cardano_node_metrics_peerSelection_ActivePeers number of active peers
+# TYPE cardano_node_metrics_peerSelection_ActivePeers gauge
+cardano_node_metrics_peerSelection_ActivePeers{network="preview"} 16
+# HELP cardano_node_metrics_peerSelection_ColdPeersPromotions number of cold peers promoted to warm
+# TYPE cardano_node_metrics_peerSelection_ColdPeersPromotions counter
+cardano_node_metrics_peerSelection_ColdPeersPromotions{network="preview"} 0
+# HELP cardano_node_metrics_peerSelection_EstablishedPeers number of established peers
+# TYPE cardano_node_metrics_peerSelection_EstablishedPeers gauge
+cardano_node_metrics_peerSelection_EstablishedPeers{network="preview"} 15
+# HELP cardano_node_metrics_peerSelection_KnownPeers number of known peers
+# TYPE cardano_node_metrics_peerSelection_KnownPeers gauge
+cardano_node_metrics_peerSelection_KnownPeers{network="preview"} 28
+# HELP cardano_node_metrics_peerSelection_WarmNonRootPeersDemotions number of non-root warm peers demoted
+# TYPE cardano_node_metrics_peerSelection_WarmNonRootPeersDemotions counter
+cardano_node_metrics_peerSelection_WarmNonRootPeersDemotions{network="preview"} 0
+# HELP cardano_node_metrics_peerSelection_WarmNonRootPeersPromotions number of non-root warm peers promoted to hot
+# TYPE cardano_node_metrics_peerSelection_WarmNonRootPeersPromotions counter
+cardano_node_metrics_peerSelection_WarmNonRootPeersPromotions{network="preview"} 16
+# HELP cardano_node_metrics_peerSelection_WarmPeersDemotions number of hot peers demoted to warm
+# TYPE cardano_node_metrics_peerSelection_WarmPeersDemotions counter
+cardano_node_metrics_peerSelection_WarmPeersDemotions{network="preview"} 0
+# HELP cardano_node_metrics_peerSelection_WarmPeersPromotions number of warm peers promoted to hot
+# TYPE cardano_node_metrics_peerSelection_WarmPeersPromotions counter
+cardano_node_metrics_peerSelection_WarmPeersPromotions{network="preview"} 1
+# HELP cardano_node_metrics_peerSelection_churn_DecreasedActivePeers number of active peers decreased
+# TYPE cardano_node_metrics_peerSelection_churn_DecreasedActivePeers counter
+cardano_node_metrics_peerSelection_churn_DecreasedActivePeers{network="preview"} 0
+# HELP cardano_node_metrics_peerSelection_churn_DecreasedKnownPeers number of peers removed from known set
+# TYPE cardano_node_metrics_peerSelection_churn_DecreasedKnownPeers counter
+cardano_node_metrics_peerSelection_churn_DecreasedKnownPeers{network="preview"} 5
+# HELP cardano_node_metrics_peerSelection_churn_IncreasedActivePeers number of active peers increased
+# TYPE cardano_node_metrics_peerSelection_churn_IncreasedActivePeers counter
+cardano_node_metrics_peerSelection_churn_IncreasedActivePeers{network="preview"} 1
+# HELP cardano_node_metrics_peerSelection_churn_IncreasedKnownPeers number of peers added to known set
+# TYPE cardano_node_metrics_peerSelection_churn_IncreasedKnownPeers counter
+cardano_node_metrics_peerSelection_churn_IncreasedKnownPeers{network="preview"} 422
+# HELP cardano_node_metrics_peerSelection_cold number of cold peers
+# TYPE cardano_node_metrics_peerSelection_cold gauge
+cardano_node_metrics_peerSelection_cold{network="preview"} 13
+# HELP cardano_node_metrics_peerSelection_hot number of hot peers
+# TYPE cardano_node_metrics_peerSelection_hot gauge
+cardano_node_metrics_peerSelection_hot{network="preview"} 15
+# HELP cardano_node_metrics_peerSelection_warm number of warm peers
+# TYPE cardano_node_metrics_peerSelection_warm gauge
+cardano_node_metrics_peerSelection_warm{network="preview"} 0
+# HELP cardano_node_metrics_served_block_count_int total blocks served to clients
+# TYPE cardano_node_metrics_served_block_count_int counter
+cardano_node_metrics_served_block_count_int{network="preview"} 0
+# HELP cardano_node_metrics_slotInEpoch_int current relative slot number in epoch
+# TYPE cardano_node_metrics_slotInEpoch_int gauge
+cardano_node_metrics_slotInEpoch_int{network="preview"} 65680
+# HELP cardano_node_metrics_slotNum_int current slot number
+# TYPE cardano_node_metrics_slotNum_int gauge
+cardano_node_metrics_slotNum_int{network="preview"} 65680
+# HELP cardano_node_metrics_txsInMempool_int current count of mempool transactions
+# TYPE cardano_node_metrics_txsInMempool_int gauge
+cardano_node_metrics_txsInMempool_int{network="preview"} 0
+# HELP cardano_node_metrics_txsProcessedNum_int total transactions processed
+# TYPE cardano_node_metrics_txsProcessedNum_int counter
+cardano_node_metrics_txsProcessedNum_int{network="preview"} 0
+# HELP database_blob_block_cache_cost_bytes Current block cache cost in bytes (added - evicted)
+# TYPE database_blob_block_cache_cost_bytes gauge
+database_blob_block_cache_cost_bytes{network="preview"} 0
+# HELP database_blob_block_cache_hit_ratio Block cache hit ratio (0.0-1.0)
+# TYPE database_blob_block_cache_hit_ratio gauge
+database_blob_block_cache_hit_ratio{network="preview"} 0
+# HELP database_blob_block_cache_hits_total Total block cache hits
+# TYPE database_blob_block_cache_hits_total gauge
+database_blob_block_cache_hits_total{network="preview"} 0
+# HELP database_blob_block_cache_keys_added_total Total keys added to block cache
+# TYPE database_blob_block_cache_keys_added_total gauge
+database_blob_block_cache_keys_added_total{network="preview"} 0
+# HELP database_blob_block_cache_keys_evicted_total Total keys evicted from block cache
+# TYPE database_blob_block_cache_keys_evicted_total gauge
+database_blob_block_cache_keys_evicted_total{network="preview"} 0
+# HELP database_blob_block_cache_misses_total Total block cache misses
+# TYPE database_blob_block_cache_misses_total gauge
+database_blob_block_cache_misses_total{network="preview"} 0
+# HELP database_blob_compaction_current_num_lsm 
+# TYPE database_blob_compaction_current_num_lsm untyped
+database_blob_compaction_current_num_lsm{network="preview"} 0
+# HELP database_blob_gc_attempts_total Total Badger value-log GC attempts.
+# TYPE database_blob_gc_attempts_total counter
+database_blob_gc_attempts_total{network="preview",store="store-1"} 125
+# HELP database_blob_gc_consecutive_successes Successful value-log GC rewrites in the current cycle, retaining the last completed count while idle.
+# TYPE database_blob_gc_consecutive_successes gauge
+database_blob_gc_consecutive_successes{network="preview",store="store-1"} 0
+# HELP database_blob_gc_errors_total Total Badger value-log GC errors.
+# TYPE database_blob_gc_errors_total counter
+database_blob_gc_errors_total{network="preview",store="store-1"} 0
+# HELP database_blob_gc_last_success_timestamp_seconds Unix timestamp of the last successful value-log GC rewrite.
+# TYPE database_blob_gc_last_success_timestamp_seconds gauge
+database_blob_gc_last_success_timestamp_seconds{network="preview",store="store-1"} 0
+# HELP database_blob_gc_lsm_bytes Badger LSM size after the last successful value-log GC rewrite.
+# TYPE database_blob_gc_lsm_bytes gauge
+database_blob_gc_lsm_bytes{network="preview",store="store-1"} 0
+# HELP database_blob_gc_no_rewrite_total Total Badger value-log GC attempts with no rewrite.
+# TYPE database_blob_gc_no_rewrite_total counter
+database_blob_gc_no_rewrite_total{network="preview",store="store-1"} 125
+# HELP database_blob_gc_reclaimed_bytes Bytes reclaimed in the current Badger GC cycle, retaining the last completed total while idle.
+# TYPE database_blob_gc_reclaimed_bytes gauge
+database_blob_gc_reclaimed_bytes{network="preview",store="store-1"} 0
+# HELP database_blob_gc_successes_total Total successful Badger value-log GC rewrites.
+# TYPE database_blob_gc_successes_total counter
+database_blob_gc_successes_total{network="preview",store="store-1"} 0
+# HELP database_blob_gc_vlog_bytes Badger value-log size after the last successful GC rewrite.
+# TYPE database_blob_gc_vlog_bytes gauge
+database_blob_gc_vlog_bytes{network="preview",store="store-1"} 0
+# HELP database_blob_get_num_memtable 
+# TYPE database_blob_get_num_memtable untyped
+database_blob_get_num_memtable{network="preview"} 6.526065146e+09
+# HELP database_blob_get_num_user 
+# TYPE database_blob_get_num_user untyped
+database_blob_get_num_user{network="preview"} 6.526065144e+09
+# HELP database_blob_get_with_result_num_user 
+# TYPE database_blob_get_with_result_num_user untyped
+database_blob_get_with_result_num_user{network="preview"} 2.043577e+06
+# HELP database_blob_index_cache_hit_ratio Index cache hit ratio (0.0-1.0)
+# TYPE database_blob_index_cache_hit_ratio gauge
+database_blob_index_cache_hit_ratio{network="preview"} 0
+# HELP database_blob_index_cache_hits_total Total index cache hits
+# TYPE database_blob_index_cache_hits_total gauge
+database_blob_index_cache_hits_total{network="preview"} 0
+# HELP database_blob_index_cache_misses_total Total index cache misses
+# TYPE database_blob_index_cache_misses_total gauge
+database_blob_index_cache_misses_total{network="preview"} 0
+# HELP database_blob_iterator_num_user 
+# TYPE database_blob_iterator_num_user untyped
+database_blob_iterator_num_user{network="preview"} 2
+# HELP database_blob_put_num_user 
+# TYPE database_blob_put_num_user untyped
+database_blob_put_num_user{network="preview"} 1502
+# HELP database_blob_read_bytes_lsm 
+# TYPE database_blob_read_bytes_lsm untyped
+database_blob_read_bytes_lsm{network="preview"} 1.21095637e+08
+# HELP database_blob_read_bytes_vlog 
+# TYPE database_blob_read_bytes_vlog untyped
+database_blob_read_bytes_vlog{network="preview"} 0
+# HELP database_blob_read_num_vlog 
+# TYPE database_blob_read_num_vlog untyped
+database_blob_read_num_vlog{network="preview"} 0
+# HELP database_blob_write_bytes_l0 
+# TYPE database_blob_write_bytes_l0 untyped
+database_blob_write_bytes_l0{network="preview"} 261482
+# HELP database_blob_write_bytes_user 
+# TYPE database_blob_write_bytes_user untyped
+database_blob_write_bytes_user{network="preview"} 269382
+# HELP database_blob_write_bytes_vlog 
+# TYPE database_blob_write_bytes_vlog untyped
+database_blob_write_bytes_vlog{network="preview"} 0
+# HELP database_blob_write_num_vlog 
+# TYPE database_blob_write_num_vlog untyped
+database_blob_write_num_vlog{network="preview"} 0
+# HELP dingo_blockfetch_forward_overflow_total connections closed because their queue of blockfetch events awaiting the ledger reached its byte or event limit
+# TYPE dingo_blockfetch_forward_overflow_total counter
+dingo_blockfetch_forward_overflow_total{network="preview"} 0
+# HELP dingo_blockfetch_inflight_blocks aggregate count of blockfetch events (blocks and batch-done markers) received from peers but not yet handed to the ledger, across all connections
+# TYPE dingo_blockfetch_inflight_blocks gauge
+dingo_blockfetch_inflight_blocks{network="preview"} 0
+# HELP dingo_blockfetch_inflight_bytes aggregate bytes of blockfetch blocks received from peers but not yet handed to the ledger, across all connections
+# TYPE dingo_blockfetch_inflight_bytes gauge
+dingo_blockfetch_inflight_bytes{network="preview"} 0
+# HELP dingo_blockfetch_last_request_timestamp_seconds unix time the most recent blockfetch range request was issued, or 0 when none has been issued since start
+# TYPE dingo_blockfetch_last_request_timestamp_seconds gauge
+dingo_blockfetch_last_request_timestamp_seconds{network="preview"} 1.7932276478053448e+09
+# HELP dingo_blockfetch_peer_handoffs_total blockfetch peer selections that moved to a different peer than the previous selection
+# TYPE dingo_blockfetch_peer_handoffs_total counter
+dingo_blockfetch_peer_handoffs_total{network="preview"} 7
+# HELP dingo_blockfetch_peer_selections_total blockfetch peer selection decisions, by decision; one per selection-policy invocation for a blockfetch window, made before that window's request is issued, so it also counts windows whose request then fails to start; it does not move while a batch drains and is not a count of requests (see dingo_blockfetch_requests_issued_total)
+# TYPE dingo_blockfetch_peer_selections_total counter
+dingo_blockfetch_peer_selections_total{decision="explore",network="preview"} 2
+dingo_blockfetch_peer_selections_total{decision="model",network="preview"} 6
+dingo_blockfetch_peer_selections_total{decision="only_holder",network="preview"} 1
+dingo_blockfetch_peer_selections_total{decision="unmeasured",network="preview"} 1
+# HELP dingo_blockfetch_requests_completed_total blockfetch range requests counted in dingo_blockfetch_requests_issued_total that reached a terminal outcome, by result: ok, or error (NoBlocks or any transport or protocol failure); never exceeds the issued count
+# TYPE dingo_blockfetch_requests_completed_total counter
+dingo_blockfetch_requests_completed_total{network="preview",result="error"} 1
+dingo_blockfetch_requests_completed_total{network="preview",result="ok"} 18
+# HELP dingo_blockfetch_requests_issued_total blockfetch range requests accepted by a peer's blockfetch client; flat while headers are queued means no new request is being accepted, though one already accepted may still be delivering (compare dingo_blockfetch_requests_completed_total)
+# TYPE dingo_blockfetch_requests_issued_total counter
+dingo_blockfetch_requests_issued_total{network="preview"} 19
+# HELP dingo_blockfetch_shadow_gate_decisions_total shadow blockfetch gate decisions, by path and cutoff source
+# TYPE dingo_blockfetch_shadow_gate_decisions_total counter
+dingo_blockfetch_shadow_gate_decisions_total{cutoff="no_sample",network="preview",path="skipped_unwired"} 11
+# HELP dingo_build_info dingo build information
+# TYPE dingo_build_info gauge
+dingo_build_info{commit="a61675f32bebc83d929437f9bb909410948332a3",goversion="go1.27.3",network="preview",version="v0.88.1 (commit a61675f32bebc83d929437f9bb909410948332a3)"} 1
+# HELP dingo_cbor_cache_block_lru_hits_total Total number of block LRU cache hits
+# TYPE dingo_cbor_cache_block_lru_hits_total counter
+dingo_cbor_cache_block_lru_hits_total{network="preview"} 0
+# HELP dingo_cbor_cache_block_lru_misses_total Total number of block LRU cache misses
+# TYPE dingo_cbor_cache_block_lru_misses_total counter
+dingo_cbor_cache_block_lru_misses_total{network="preview"} 0
+# HELP dingo_cbor_cache_cold_extractions_total Total number of cold CBOR extractions from blob store
+# TYPE dingo_cbor_cache_cold_extractions_total counter
+dingo_cbor_cache_cold_extractions_total{network="preview"} 0
+# HELP dingo_cbor_cache_tx_hot_hits_total Total number of TX CBOR hot cache hits
+# TYPE dingo_cbor_cache_tx_hot_hits_total counter
+dingo_cbor_cache_tx_hot_hits_total{network="preview"} 0
+# HELP dingo_cbor_cache_tx_hot_misses_total Total number of TX CBOR hot cache misses
+# TYPE dingo_cbor_cache_tx_hot_misses_total counter
+dingo_cbor_cache_tx_hot_misses_total{network="preview"} 0
+# HELP dingo_cbor_cache_utxo_hot_hits_total Total number of UTxO CBOR hot cache hits
+# TYPE dingo_cbor_cache_utxo_hot_hits_total counter
+dingo_cbor_cache_utxo_hot_hits_total{network="preview"} 0
+# HELP dingo_cbor_cache_utxo_hot_misses_total Total number of UTxO CBOR hot cache misses
+# TYPE dingo_cbor_cache_utxo_hot_misses_total counter
+dingo_cbor_cache_utxo_hot_misses_total{network="preview"} 0
+# HELP dingo_chain_header_queue_capacity maximum headers the primary chain's header queue accepts before rejecting with a queue-full error
+# TYPE dingo_chain_header_queue_capacity gauge
+dingo_chain_header_queue_capacity{network="preview"} 10000
+# HELP dingo_chain_header_queue_full_total headers rejected because the primary chain's header queue was at capacity
+# TYPE dingo_chain_header_queue_full_total counter
+dingo_chain_header_queue_full_total{network="preview"} 0
+# HELP dingo_chain_header_queue_length headers queued on the primary chain awaiting their block bodies
+# TYPE dingo_chain_header_queue_length gauge
+dingo_chain_header_queue_length{network="preview"} 0
+# HELP dingo_chain_manager_cached_blocks current number of cached blocks in the chain manager LRU cache
+# TYPE dingo_chain_manager_cached_blocks gauge
+dingo_chain_manager_cached_blocks{network="preview"} 0
+# HELP dingo_chain_rollback_point_not_on_chain_total rollback targets rejected because the chain no longer holds the resolved block at its retained index
+# TYPE dingo_chain_rollback_point_not_on_chain_total counter
+dingo_chain_rollback_point_not_on_chain_total{network="preview"} 0
+# HELP dingo_chainselection_gdd_disconnects_total peers the Genesis Density Disconnector reported for serving a provably sparser chain, counted whether or not the connection was still open to close
+# TYPE dingo_chainselection_gdd_disconnects_total counter
+dingo_chainselection_gdd_disconnects_total{network="preview"} 0
+# HELP dingo_chainselection_loe_block_number highest block number chain selection may reach under the Limit on Eagerness, 0 when the cap is inactive
+# TYPE dingo_chainselection_loe_block_number gauge
+dingo_chainselection_loe_block_number{network="preview"} 3716
+# HELP dingo_chainselection_loe_intersection_slot slot of the point the Limit on Eagerness is measured from: the point common to all candidate fragments, or the last one they shared once they stop overlapping; 0 when inactive or measured from the local tip
+# TYPE dingo_chainselection_loe_intersection_slot gauge
+dingo_chainselection_loe_intersection_slot{network="preview"} 0
+# HELP dingo_chainselection_peer_tip_rejections_total peer tips refused by chain selection as implausible, by the bound that refused them: observed_frontier (delivered frontier too far ahead of the trusted reference) or advertised_tip (advertised tip beyond the bootstrap bound)
+# TYPE dingo_chainselection_peer_tip_rejections_total counter
+dingo_chainselection_peer_tip_rejections_total{network="preview",reason="advertised_tip"} 0
+dingo_chainselection_peer_tip_rejections_total{network="preview",reason="observed_frontier"} 0
+# HELP dingo_chainselection_rollback_registrations_total attempts to register a peer into chain selection from a chainsync rollback on an untracked connection, by outcome
+# TYPE dingo_chainselection_rollback_registrations_total counter
+dingo_chainselection_rollback_registrations_total{network="preview",outcome="registered"} 84
+dingo_chainselection_rollback_registrations_total{network="preview",outcome="rejected_at_capacity"} 0
+dingo_chainselection_rollback_registrations_total{network="preview",outcome="rejected_closed_connection"} 0
+dingo_chainselection_rollback_registrations_total{network="preview",outcome="rejected_implausible_tip"} 0
+# HELP dingo_chainselection_stalled_total times chain selection transitioned to having no selectable peer
+# TYPE dingo_chainselection_stalled_total counter
+dingo_chainselection_stalled_total{network="preview",reason="genesis_corroboration"} 11
+dingo_chainselection_stalled_total{network="preview",reason="no_selectable_peer"} 0
+# HELP dingo_chainsync_behind_peers_total times a chainsync peer asked for a rollback past the security parameter while its own tip was a strict ancestor of ours (peer behind on our chain, kept attached rather than denied)
+# TYPE dingo_chainsync_behind_peers_total counter
+dingo_chainsync_behind_peers_total{network="preview"} 0
+# HELP dingo_chainsync_non_extending_block_flood_recycles_total connections recycled for repeatedly serving blocks that do not extend the chain tip within a bounded window (issue #4272)
+# TYPE dingo_chainsync_non_extending_block_flood_recycles_total counter
+dingo_chainsync_non_extending_block_flood_recycles_total{network="preview"} 0
+# HELP dingo_chainsync_non_extending_blocks_total fetched blocks that failed to extend the chain tip (chain.BlockNotFitChainTipError). A handful is normal during a brief rollback/reorg race; a sustained high rate from one connection triggers recycling it, see dingo_chainsync_non_extending_block_flood_recycles_total
+# TYPE dingo_chainsync_non_extending_blocks_total counter
+dingo_chainsync_non_extending_blocks_total{network="preview"} 0
+# HELP dingo_chainsync_patience_exhausted_total chainsync clients disconnected for exhausting the Genesis Limit on Patience
+# TYPE dingo_chainsync_patience_exhausted_total counter
+dingo_chainsync_patience_exhausted_total{network="preview"} 0
+# HELP dingo_chainsync_plateau_decisions_total local-tip plateau watchdog decisions, by outcome: reconciled (ledger reconcile repaired the plateau), backlog_not_recycled (ledger-application backlog, chainsync left running) resync (chainsync client resync requested) or eagerness_held (primary held at the Limit on Eagerness, chainsync left running)
+# TYPE dingo_chainsync_plateau_decisions_total counter
+dingo_chainsync_plateau_decisions_total{network="preview",outcome="backlog_not_recycled"} 0
+dingo_chainsync_plateau_decisions_total{network="preview",outcome="eagerness_held"} 0
+dingo_chainsync_plateau_decisions_total{network="preview",outcome="reconciled"} 0
+dingo_chainsync_plateau_decisions_total{network="preview",outcome="resync"} 0
+# HELP dingo_chainsync_seen_headers current number of slots retained in the chainsync header deduplication cache
+# TYPE dingo_chainsync_seen_headers gauge
+dingo_chainsync_seen_headers{network="preview"} 0
+# HELP dingo_chainsync_unrecoverable_rollback_total times a peer repeatedly requested a rollback we cannot cross to (local chain diverged, operator intervention required)
+# TYPE dingo_chainsync_unrecoverable_rollback_total counter
+dingo_chainsync_unrecoverable_rollback_total{network="preview"} 0
+# HELP dingo_database_blob_orphans_total Blob objects whose delete failed before their authoritative metadata was removed, leaving them unreachable
+# TYPE dingo_database_blob_orphans_total counter
+dingo_database_blob_orphans_total{network="preview"} 0
+# HELP dingo_database_block_hash_index_hits_total Total block-hash index lookups resolved via the O(1) fast path
+# TYPE dingo_database_block_hash_index_hits_total counter
+dingo_database_block_hash_index_hits_total{network="preview"} 541
+# HELP dingo_database_block_hash_index_misses_total Total block-hash index lookups that were a hard miss (ErrBlockNotFound)
+# TYPE dingo_database_block_hash_index_misses_total counter
+dingo_database_block_hash_index_misses_total{network="preview"} 3.273591721e+09
+# HELP dingo_database_size_bytes on-disk size of the database in bytes
+# TYPE dingo_database_size_bytes gauge
+dingo_database_size_bytes{network="preview",store="blob"} 2.152057638e+09
+dingo_database_size_bytes{network="preview",store="metadata"} 2.646072e+06
+# HELP dingo_database_sql_disk_bytes Total on-disk size of the SQLite metadata store: max(page_count*page_size, main file size) plus the WAL and shared-memory files, per Store.DiskSize.
+# TYPE dingo_database_sql_disk_bytes gauge
+dingo_database_sql_disk_bytes{network="preview"} 2.64192e+06
+# HELP dingo_database_sql_operations_total Total SQL statements issued against the metadata store, classified by leading SQL keyword (insert/update/delete/select/other). Counted at Store's single query chokepoint (instrumentedQueryer), so this covers every domain query, not only the hand-picked hot statements prepared_stmt.go caches, plus the transactionBatchAccumulator's own prepared batch-insert path (transaction_write.go), which counts itself for the same reason prepared_stmt.go's cache hits do.
+# TYPE dingo_database_sql_operations_total counter
+dingo_database_sql_operations_total{network="preview",op="delete"} 6
+dingo_database_sql_operations_total{network="preview",op="insert"} 348
+dingo_database_sql_operations_total{network="preview",op="other"} 6
+dingo_database_sql_operations_total{network="preview",op="select"} 3532
+dingo_database_sql_operations_total{network="preview",op="update"} 174
+# HELP dingo_database_sql_planner_stats_errors_total Failed incremental planner-statistics runs.
+# TYPE dingo_database_sql_planner_stats_errors_total counter
+dingo_database_sql_planner_stats_errors_total{network="preview"} 0
+# HELP dingo_database_sql_planner_stats_runs_total Incremental planner-statistics runs by trigger (startup, epoch, periodic) and result (changed, unchanged, skipped, error).
+# TYPE dingo_database_sql_planner_stats_runs_total counter
+dingo_database_sql_planner_stats_runs_total{network="preview",result="changed",trigger="epoch"} 0
+dingo_database_sql_planner_stats_runs_total{network="preview",result="changed",trigger="periodic"} 1
+dingo_database_sql_planner_stats_runs_total{network="preview",result="changed",trigger="startup"} 0
+dingo_database_sql_planner_stats_runs_total{network="preview",result="error",trigger="epoch"} 0
+dingo_database_sql_planner_stats_runs_total{network="preview",result="error",trigger="periodic"} 0
+dingo_database_sql_planner_stats_runs_total{network="preview",result="error",trigger="startup"} 0
+dingo_database_sql_planner_stats_runs_total{network="preview",result="skipped",trigger="epoch"} 0
+dingo_database_sql_planner_stats_runs_total{network="preview",result="skipped",trigger="periodic"} 0
+dingo_database_sql_planner_stats_runs_total{network="preview",result="skipped",trigger="startup"} 0
+dingo_database_sql_planner_stats_runs_total{network="preview",result="unchanged",trigger="epoch"} 0
+dingo_database_sql_planner_stats_runs_total{network="preview",result="unchanged",trigger="periodic"} 625
+dingo_database_sql_planner_stats_runs_total{network="preview",result="unchanged",trigger="startup"} 1
+# HELP dingo_database_sql_pool_idle_connections Current number of idle (open but unused) connections in this pool, from sql.DBStats.Idle. Sampled live on each scrape. Labeled pool="write"|"read".
+# TYPE dingo_database_sql_pool_idle_connections gauge
+dingo_database_sql_pool_idle_connections{network="preview",pool="read"} 3
+dingo_database_sql_pool_idle_connections{network="preview",pool="write"} 1
+# HELP dingo_database_sql_pool_in_use_connections Current number of connections in this pool currently checked out and in use, from sql.DBStats.InUse. Sampled live on each scrape. Labeled pool="write"|"read".
+# TYPE dingo_database_sql_pool_in_use_connections gauge
+dingo_database_sql_pool_in_use_connections{network="preview",pool="read"} 1
+dingo_database_sql_pool_in_use_connections{network="preview",pool="write"} 0
+# HELP dingo_database_sql_pool_max_open_connections Configured SetMaxOpenConns limit for this pool, from sql.DBStats.MaxOpenConnections. Every current provider caps the write pool at 1 -- the underlying store allows only one writer regardless of connection count -- so pool="write" is expected to read 1. Labeled pool="write"|"read".
+# TYPE dingo_database_sql_pool_max_open_connections gauge
+dingo_database_sql_pool_max_open_connections{network="preview",pool="read"} 5
+dingo_database_sql_pool_max_open_connections{network="preview",pool="write"} 1
+# HELP dingo_database_sql_pool_open_connections Current number of established database/sql connections (in use plus idle) in this pool, from sql.DBStats.OpenConnections. Sampled live on each scrape. Labeled pool="write"|"read".
+# TYPE dingo_database_sql_pool_open_connections gauge
+dingo_database_sql_pool_open_connections{network="preview",pool="read"} 3
+dingo_database_sql_pool_open_connections{network="preview",pool="write"} 1
+# HELP dingo_database_sql_pool_wait_count_total Cumulative number of times a caller had to wait for a connection from this pool, from sql.DBStats.WaitCount. For pool="write" (capped at one connection; see dingo_database_sql_pool_max_open_connections' help) this counts every time one write path queued behind another already holding that connection. Labeled pool="write"|"read".
+# TYPE dingo_database_sql_pool_wait_count_total counter
+dingo_database_sql_pool_wait_count_total{network="preview",pool="read"} 0
+dingo_database_sql_pool_wait_count_total{network="preview",pool="write"} 3
+# HELP dingo_database_sql_pool_wait_duration_seconds_total Cumulative time callers have spent waiting for a connection from this pool, from sql.DBStats.WaitDuration. rate() of this over a window is the average number of callers waiting concurrently, not a value capped at 1.0: for pool="write", a sustained value near 1.0 already means a caller is waiting essentially continuously, and concurrent waiters each accrue wait time independently, so real contention can push it well above 1.0. Labeled pool="write"|"read".
+# TYPE dingo_database_sql_pool_wait_duration_seconds_total counter
+dingo_database_sql_pool_wait_duration_seconds_total{network="preview",pool="read"} 0
+dingo_database_sql_pool_wait_duration_seconds_total{network="preview",pool="write"} 0.006089584
+# HELP dingo_database_sql_wal_bytes Current size in bytes of the SQLite WAL file (metadata.sqlite-wal). Sampled live from the filesystem on each scrape. Not a checkpoint-health signal on its own: PASSIVE/FULL/RESTART checkpoints never shrink the file, only journal_size_limit can cap it at 64MiB after a WAL reset and a periodic TRUNCATE checkpoint can bring it to zero. Neither bounds an active WAL or one held by a reader, so a steady non-zero value (~40MB or more at the configured wal_autocheckpoint threshold) is expected and a persistent reader can keep it above either limit.
+# TYPE dingo_database_sql_wal_bytes gauge
+dingo_database_sql_wal_bytes{network="preview"} 0
+# HELP dingo_decode_cache_block_hits_total blocks served from the shared decode cache instead of being re-decoded
+# TYPE dingo_decode_cache_block_hits_total counter
+dingo_decode_cache_block_hits_total{network="preview"} 0
+# HELP dingo_decode_cache_block_misses_total blocks actually decoded (cache miss)
+# TYPE dingo_decode_cache_block_misses_total counter
+dingo_decode_cache_block_misses_total{network="preview"} 174
+# HELP dingo_decode_cache_header_hits_total headers served from the shared decode cache instead of being re-decoded
+# TYPE dingo_decode_cache_header_hits_total counter
+dingo_decode_cache_header_hits_total{network="preview"} 1.3885672e+07
+# HELP dingo_decode_cache_header_misses_total headers actually decoded (cache miss)
+# TYPE dingo_decode_cache_header_misses_total counter
+dingo_decode_cache_header_misses_total{network="preview"} 1.26680156e+08
+# HELP dingo_epoch_length_slots slots per epoch for the current network
+# TYPE dingo_epoch_length_slots gauge
+dingo_epoch_length_slots{network="preview"} 86400
+# HELP dingo_governance_proposal_decode_failures_total stored governance proposals whose CBOR failed to decode during ratifiability checks
+# TYPE dingo_governance_proposal_decode_failures_total counter
+dingo_governance_proposal_decode_failures_total{network="preview"} 0
+# HELP dingo_hot_cache_cas_attempts_total Total non-blocking update attempts across Put and access tracking
+# TYPE dingo_hot_cache_cas_attempts_total counter
+dingo_hot_cache_cas_attempts_total{cache="tx",network="preview"} 0
+dingo_hot_cache_cas_attempts_total{cache="utxo",network="preview"} 0
+# HELP dingo_hot_cache_successful_commit_backoff_seconds_total Cumulative backoff time spent by updates that succeeded after backing off
+# TYPE dingo_hot_cache_successful_commit_backoff_seconds_total counter
+dingo_hot_cache_successful_commit_backoff_seconds_total{cache="tx",network="preview"} 0
+dingo_hot_cache_successful_commit_backoff_seconds_total{cache="utxo",network="preview"} 0
+# HELP dingo_hot_cache_successful_commits_after_backoff_total Total updates that succeeded only after backing off at least once
+# TYPE dingo_hot_cache_successful_commits_after_backoff_total counter
+dingo_hot_cache_successful_commits_after_backoff_total{cache="tx",network="preview"} 0
+dingo_hot_cache_successful_commits_after_backoff_total{cache="utxo",network="preview"} 0
+# HELP dingo_hot_cache_writers_aborted_after_budget_total Total best-effort updates dropped after exhausting the retry budget
+# TYPE dingo_hot_cache_writers_aborted_after_budget_total counter
+dingo_hot_cache_writers_aborted_after_budget_total{cache="tx",network="preview"} 0
+dingo_hot_cache_writers_aborted_after_budget_total{cache="utxo",network="preview"} 0
+# HELP dingo_keepalive_timeout_total connections closed because this node's keep-alive client timed out waiting for a pong
+# TYPE dingo_keepalive_timeout_total counter
+dingo_keepalive_timeout_total{network="preview"} 29
+# HELP dingo_ledger_attip_recovery_epoch_boundary_clamped_total times an at-tip validation recovery rewind target below the most recent epoch boundary was clamped to the first applied block at or after it, or held at the ledger tip when none is applied, to avoid recomputing a completed epoch rollover
+# TYPE dingo_ledger_attip_recovery_epoch_boundary_clamped_total counter
+dingo_ledger_attip_recovery_epoch_boundary_clamped_total{network="preview"} 0
+# HELP dingo_ledger_attip_recovery_nonconverging_total times at-tip validation recovery held at the ledger tip instead of rewinding the primary chain deeper, because a descending series of distinct failures indicated local validation divergence (operator intervention required)
+# TYPE dingo_ledger_attip_recovery_nonconverging_total counter
+dingo_ledger_attip_recovery_nonconverging_total{network="preview"} 0
+# HELP dingo_ledger_attip_recovery_prune_floor_clamped_total times an at-tip validation recovery rewind target below the consumed-UTxO prune floor was clamped to the ledger tip, because UTxOs consumed above that floor were hard-deleted and cannot be restored by a rewind
+# TYPE dingo_ledger_attip_recovery_prune_floor_clamped_total counter
+dingo_ledger_attip_recovery_prune_floor_clamped_total{network="preview"} 0
+# HELP dingo_ledger_block_apply_batch_max_latency_seconds maximum wall-clock duration ever observed for dingo_ledger_block_apply_batch_latency_seconds, since process start; monotonically non-decreasing and exact rather than bucket-bounded
+# TYPE dingo_ledger_block_apply_batch_max_latency_seconds gauge
+dingo_ledger_block_apply_batch_max_latency_seconds{network="preview"} 0.011657042
+# HELP dingo_ledger_block_pipeline_blocks_decoded cumulative blocks successfully decoded by the block-processing pipeline (issue #1894); 0 unless blockPipelineEnabled is set
+# TYPE dingo_ledger_block_pipeline_blocks_decoded gauge
+dingo_ledger_block_pipeline_blocks_decoded{network="preview"} 0
+# HELP dingo_ledger_block_pipeline_blocks_validated cumulative blocks that passed the block-processing pipeline's VRF/KES/OpCert validate stage; 0 unless blockPipelineValidateEnabled is set
+# TYPE dingo_ledger_block_pipeline_blocks_validated gauge
+dingo_ledger_block_pipeline_blocks_validated{network="preview"} 0
+# HELP dingo_ledger_block_pipeline_decode_errors cumulative block-processing pipeline decode failures
+# TYPE dingo_ledger_block_pipeline_decode_errors gauge
+dingo_ledger_block_pipeline_decode_errors{network="preview"} 0
+# HELP dingo_ledger_block_pipeline_deferred_epoch_cache_errors_total block-processing pipeline validate-stage errors drained from errorsChan classified as a transient epoch-cache lag behind an already-committed block; expected to resolve once the epoch cache catches up
+# TYPE dingo_ledger_block_pipeline_deferred_epoch_cache_errors_total counter
+dingo_ledger_block_pipeline_deferred_epoch_cache_errors_total{network="preview"} 0
+# HELP dingo_ledger_block_pipeline_expected_eta0_errors_total block-processing pipeline validate-stage errors drained from errorsChan because a cached epoch has no Praos nonce
+# TYPE dingo_ledger_block_pipeline_expected_eta0_errors_total counter
+dingo_ledger_block_pipeline_expected_eta0_errors_total{network="preview"} 0
+# HELP dingo_ledger_block_pipeline_queue_depth current number of blocks buffered inside the block-processing pipeline's inter-stage channels
+# TYPE dingo_ledger_block_pipeline_queue_depth gauge
+dingo_ledger_block_pipeline_queue_depth{network="preview"} 0
+# HELP dingo_ledger_block_pipeline_shutdown_errors_total block-processing pipeline stage-worker context cancellations drained from errorsChan while the pipeline was stopping; expected on any shutdown with blocks still in flight and not a block failure
+# TYPE dingo_ledger_block_pipeline_shutdown_errors_total counter
+dingo_ledger_block_pipeline_shutdown_errors_total{network="preview"} 0
+# HELP dingo_ledger_block_pipeline_unexpected_errors_total block-processing pipeline errors drained from errorsChan that are not one of the expected/transient cases above; a nonzero value indicates a decode, validation, or apply-stage problem worth investigating
+# TYPE dingo_ledger_block_pipeline_unexpected_errors_total counter
+dingo_ledger_block_pipeline_unexpected_errors_total{network="preview"} 0
+# HELP dingo_ledger_block_pipeline_validation_errors cumulative block-processing pipeline VRF/KES/OpCert validation failures, including expected Byron-era non-validation
+# TYPE dingo_ledger_block_pipeline_validation_errors gauge
+dingo_ledger_block_pipeline_validation_errors{network="preview"} 0
+# HELP dingo_ledger_block_stage_max_duration_seconds maximum wall-clock duration ever observed for each ledger-owned per-block processing stage (see dingo_ledger_block_stage_duration_seconds), since process start; monotonically non-decreasing, and exact rather than bucket-bounded
+# TYPE dingo_ledger_block_stage_max_duration_seconds gauge
+dingo_ledger_block_stage_max_duration_seconds{network="preview",stage="apply"} 1.45e-05
+dingo_ledger_block_stage_max_duration_seconds{network="preview",stage="commit"} 0.004375875
+dingo_ledger_block_stage_max_duration_seconds{network="preview",stage="deferred_header_verify"} 0.002815125
+dingo_ledger_block_stage_max_duration_seconds{network="preview",stage="epoch_rollover"} 0
+dingo_ledger_block_stage_max_duration_seconds{network="preview",stage="header_verify"} 0.001148916
+dingo_ledger_block_stage_max_duration_seconds{network="preview",stage="prepare"} 0.000633292
+dingo_ledger_block_stage_max_duration_seconds{network="preview",stage="validate"} 1.2958e-05
+# HELP dingo_ledger_block_transactions_total transactions in applied blocks, by era
+# TYPE dingo_ledger_block_transactions_total counter
+dingo_ledger_block_transactions_total{era="Alonzo",network="preview"} 0
+# HELP dingo_ledger_blockfetch_batch_in_flight 1 while a blockfetch batch is in flight, else 0
+# TYPE dingo_ledger_blockfetch_batch_in_flight gauge
+dingo_ledger_blockfetch_batch_in_flight{network="preview"} 0
+# HELP dingo_ledger_blockfetch_connection_selected 1 while the blockfetch scheduler has a connection selected for the next batch, else 0
+# TYPE dingo_ledger_blockfetch_connection_selected gauge
+dingo_ledger_blockfetch_connection_selected{network="preview"} 0
+# HELP dingo_ledger_blockfetch_continuation_pending 1 while a blockfetch continuation is scheduled but has not yet started, else 0
+# TYPE dingo_ledger_blockfetch_continuation_pending gauge
+dingo_ledger_blockfetch_continuation_pending{network="preview"} 0
+# HELP dingo_ledger_blockfetch_event_in_progress_seconds wall-clock time since the oldest active blockfetch event handler began, or zero when no blockfetch event is being handled
+# TYPE dingo_ledger_blockfetch_event_in_progress_seconds gauge
+dingo_ledger_blockfetch_event_in_progress_seconds{network="preview"} 0
+# HELP dingo_ledger_blocks_total blocks processed by the ledger apply path, by era; a block reprocessed after an apply retry is counted again, so this tracks processing rate rather than an exact durably-applied count
+# TYPE dingo_ledger_blocks_total counter
+dingo_ledger_blocks_total{era="Alonzo",network="preview"} 174
+# HELP dingo_ledger_certificates_total certificates in applied blocks, by era
+# TYPE dingo_ledger_certificates_total counter
+dingo_ledger_certificates_total{era="Alonzo",network="preview"} 0
+# HELP dingo_ledger_continuation_audit_outcomes_total cross-fork continuation audit verdicts by result; clean/missing_producer/inconclusive_eb_pending count audited inputs, skipped_budget counts audited blocks, ref_unresolvable counts abandoned endorser-block references, disarmed_cap counts audit windows
+# TYPE dingo_ledger_continuation_audit_outcomes_total counter
+dingo_ledger_continuation_audit_outcomes_total{network="preview",result="clean"} 0
+dingo_ledger_continuation_audit_outcomes_total{network="preview",result="disarmed_cap"} 0
+dingo_ledger_continuation_audit_outcomes_total{network="preview",result="inconclusive_eb_pending"} 0
+dingo_ledger_continuation_audit_outcomes_total{network="preview",result="missing_producer"} 0
+dingo_ledger_continuation_audit_outcomes_total{network="preview",result="ref_unresolvable"} 0
+dingo_ledger_continuation_audit_outcomes_total{network="preview",result="skipped_budget"} 0
+# HELP dingo_ledger_continuation_input_unresolved_total inputs in freshly fetched continuation blocks whose producing transaction is not on the local applied chain (cross-fork splice indicator)
+# TYPE dingo_ledger_continuation_input_unresolved_total counter
+dingo_ledger_continuation_input_unresolved_total{network="preview"} 0
+# HELP dingo_ledger_last_block_added_timestamp_seconds unix time a fetched block was last added to the chain, or 0 when none has been since start
+# TYPE dingo_ledger_last_block_added_timestamp_seconds gauge
+dingo_ledger_last_block_added_timestamp_seconds{network="preview"} 1.7932276478873699e+09
+# HELP dingo_ledger_leader_threshold_rejections_total headers rejected because the producer's VRF output did not satisfy finite E34 leader eligibility
+# TYPE dingo_ledger_leader_threshold_rejections_total counter
+dingo_ledger_leader_threshold_rejections_total{network="preview"} 0
+# HELP dingo_ledger_mithril_trust_window_unrepairable_total validation failures declared unrepairable because every legal rewind target lay inside the Mithril protected window; the state the failing block needs predates the anchor and cannot be re-derived without crossing it
+# TYPE dingo_ledger_mithril_trust_window_unrepairable_total counter
+dingo_ledger_mithril_trust_window_unrepairable_total{network="preview"} 0
+# HELP dingo_ledger_pipeline_halted 1 once the ledger pipeline has stopped retrying on an unrepairable validation failure; terminal, so the node is no longer following the chain and requires operator intervention
+# TYPE dingo_ledger_pipeline_halted gauge
+dingo_ledger_pipeline_halted{network="preview"} 0
+# HELP dingo_ledger_pipeline_no_progress_restarts consecutive ledger-pipeline restarts that made no tip progress; resets to zero as soon as the tip advances
+# TYPE dingo_ledger_pipeline_no_progress_restarts gauge
+dingo_ledger_pipeline_no_progress_restarts{network="preview"} 0
+# HELP dingo_ledger_pipeline_stuck 1 while the ledger pipeline has restarted without tip progress often enough to be treated as stuck on a deterministic failure (operator intervention required), 0 otherwise
+# TYPE dingo_ledger_pipeline_stuck gauge
+dingo_ledger_pipeline_stuck{network="preview"} 0
+# HELP dingo_ledger_pool_stake_distribution_omitted_pools_total pools omitted from GetStakeDistribution/GetPoolDistr2 because they held snapshot stake but had no resolvable registration/VRF key hash on record
+# TYPE dingo_ledger_pool_stake_distribution_omitted_pools_total counter
+dingo_ledger_pool_stake_distribution_omitted_pools_total{network="preview"} 0
+# HELP dingo_ledger_reconciliation_undo_missing_record_total applied blocks in a reconciliation undo range with no block_nonce row at all, not merely unresolvable content -- the shape of a Byron-era block applied before applied points were recorded for every era
+# TYPE dingo_ledger_reconciliation_undo_missing_record_total counter
+dingo_ledger_reconciliation_undo_missing_record_total{network="preview"} 0
+# HELP dingo_ledger_reconciliation_undo_unresolved_total applied blocks the primary-chain/ledger divergence reconciler could not resolve to build ledger.tx undo events (block already replaced by chain selection and no longer cached, typically after a restart)
+# TYPE dingo_ledger_reconciliation_undo_unresolved_total counter
+dingo_ledger_reconciliation_undo_unresolved_total{network="preview"} 0
+# HELP dingo_ledger_redeemers_total redeemers in applied blocks, by era; a finer-grained proxy for Plutus script-validation volume than dingo_ledger_blocks_with_scripts_total
+# TYPE dingo_ledger_redeemers_total counter
+dingo_ledger_redeemers_total{era="Alonzo",network="preview"} 0
+# HELP dingo_ledger_replay_recovery_nonconverging_total times unresolved-producer replay recovery held at the applied ledger tip because repeated recovery attempts made no forward progress
+# TYPE dingo_ledger_replay_recovery_nonconverging_total counter
+dingo_ledger_replay_recovery_nonconverging_total{network="preview"} 0
+# HELP dingo_ledger_skipped_stake_reward_rounds_total epoch-boundary reward rounds skipped for want of their inputs; each one leaves reward balances and the leadership stake distribution permanently short by that epoch's rewards, which makes the node reject canonical blocks near the leader-eligibility threshold
+# TYPE dingo_ledger_skipped_stake_reward_rounds_total counter
+dingo_ledger_skipped_stake_reward_rounds_total{network="preview"} 0
+# HELP dingo_ledger_slot_clock_fallback_total number of ledger slot clock fallbacks to the current tip
+# TYPE dingo_ledger_slot_clock_fallback_total counter
+dingo_ledger_slot_clock_fallback_total{network="preview"} 0
+# HELP dingo_ledger_trusted_batch_overlay_fallbacks_total trusted batches whose batch UTxO overlay hit a write conflict and were applied again on the per-row path
+# TYPE dingo_ledger_trusted_batch_overlay_fallbacks_total counter
+dingo_ledger_trusted_batch_overlay_fallbacks_total{network="preview"} 0
+# HELP dingo_ledger_utxo_consumed_total UTxOs consumed by applied blocks, by era; a phase-2-failed transaction contributes only its collateral inputs, not its ordinary inputs
+# TYPE dingo_ledger_utxo_consumed_total counter
+dingo_ledger_utxo_consumed_total{era="Alonzo",network="preview"} 0
+# HELP dingo_ledger_utxo_created_total UTxOs created by applied blocks, by era; a phase-2-failed transaction contributes only its collateral return, not its ordinary outputs
+# TYPE dingo_ledger_utxo_created_total counter
+dingo_ledger_utxo_created_total{era="Alonzo",network="preview"} 0
+# HELP dingo_metrics_consumerCacheBytesSkippedNum_int total tx bodies skipped for exceeding a consumer's byte budget
+# TYPE dingo_metrics_consumerCacheBytesSkippedNum_int counter
+dingo_metrics_consumerCacheBytesSkippedNum_int{network="preview"} 0
+# HELP dingo_metrics_leios_eb_wait_timeouts_total ledger apply-path waits for a referenced Leios endorser block that ran the full diffusion window without it arriving
+# TYPE dingo_metrics_leios_eb_wait_timeouts_total counter
+dingo_metrics_leios_eb_wait_timeouts_total{network="preview"} 0
+# HELP dingo_metrics_mempool_info mempool implementation identity
+# TYPE dingo_metrics_mempool_info gauge
+dingo_metrics_mempool_info{implementation="fifo",network="preview"} 1
+# HELP dingo_metrics_peerSelection_InboundArrivalsTotal total inbound connection events observed since startup (includes re-arrivals)
+# TYPE dingo_metrics_peerSelection_InboundArrivalsTotal counter
+dingo_metrics_peerSelection_InboundArrivalsTotal{network="preview"} 0
+# HELP dingo_metrics_peerSelection_InboundDuplexHeld current number of inbound peers on full-duplex connections
+# TYPE dingo_metrics_peerSelection_InboundDuplexHeld gauge
+dingo_metrics_peerSelection_InboundDuplexHeld{network="preview"} 0
+# HELP dingo_metrics_peerSelection_InboundHotHeld current number of inbound peers held hot
+# TYPE dingo_metrics_peerSelection_InboundHotHeld gauge
+dingo_metrics_peerSelection_InboundHotHeld{network="preview"} 0
+# HELP dingo_metrics_peerSelection_InboundHotQuota configured inbound hot peer quota
+# TYPE dingo_metrics_peerSelection_InboundHotQuota gauge
+dingo_metrics_peerSelection_InboundHotQuota{network="preview"} 2
+# HELP dingo_metrics_peerSelection_InboundHotQuotaUsage fraction of inbound hot quota currently occupied (>=0; may exceed 1 when over quota)
+# TYPE dingo_metrics_peerSelection_InboundHotQuotaUsage gauge
+dingo_metrics_peerSelection_InboundHotQuotaUsage{network="preview"} 0
+# HELP dingo_metrics_peerSelection_InboundPruned total inbound peers pruned from governed sets
+# TYPE dingo_metrics_peerSelection_InboundPruned counter
+dingo_metrics_peerSelection_InboundPruned{network="preview"} 0
+# HELP dingo_metrics_peerSelection_InboundTopologyMatched current number of peers whose inbound arrival was identified as a configured topology peer
+# TYPE dingo_metrics_peerSelection_InboundTopologyMatched gauge
+dingo_metrics_peerSelection_InboundTopologyMatched{network="preview"} 0
+# HELP dingo_metrics_peerSelection_InboundWarmHeld current number of inbound peers held warm
+# TYPE dingo_metrics_peerSelection_InboundWarmHeld gauge
+dingo_metrics_peerSelection_InboundWarmHeld{network="preview"} 0
+# HELP dingo_metrics_peerSelection_InboundWarmTarget configured inbound warm peer target
+# TYPE dingo_metrics_peerSelection_InboundWarmTarget gauge
+dingo_metrics_peerSelection_InboundWarmTarget{network="preview"} 10
+# HELP dingo_metrics_peerSelection_InboundWarmTargetOccupancy fraction of inbound warm target currently occupied (>=0; may exceed 1 when over target)
+# TYPE dingo_metrics_peerSelection_InboundWarmTargetOccupancy gauge
+dingo_metrics_peerSelection_InboundWarmTargetOccupancy{network="preview"} 0
+# HELP dingo_metrics_peerSelection_churn_demotions_by_source number of churn demotions by source
+# TYPE dingo_metrics_peerSelection_churn_demotions_by_source counter
+dingo_metrics_peerSelection_churn_demotions_by_source{network="preview",source="ledger"} 16
+# HELP dingo_metrics_peerSelection_churn_demotions_skipped_total number of gossip churn demotions skipped, by reason
+# TYPE dingo_metrics_peerSelection_churn_demotions_skipped_total counter
+dingo_metrics_peerSelection_churn_demotions_skipped_total{network="preview",reason="last_eligible_upstream"} 0
+dingo_metrics_peerSelection_churn_demotions_skipped_total{network="preview",reason="no_replacement"} 1824
+# HELP dingo_metrics_peerSelection_churn_promotions_by_source number of churn promotions by source
+# TYPE dingo_metrics_peerSelection_churn_promotions_by_source counter
+dingo_metrics_peerSelection_churn_promotions_by_source{network="preview",source="ledger"} 16
+# HELP dingo_metrics_peerSelection_cold_peer_redials_total number of cold gossip/ledger peer redials, by trigger
+# TYPE dingo_metrics_peerSelection_cold_peer_redials_total counter
+dingo_metrics_peerSelection_cold_peer_redials_total{network="preview",trigger="hot_deficit"} 6
+dingo_metrics_peerSelection_cold_peer_redials_total{network="preview",trigger="zero_upstream"} 0
+# HELP dingo_metrics_peerSelection_hot_set_deficit MinHotPeers minus the current hot peer count, floored at 0
+# TYPE dingo_metrics_peerSelection_hot_set_deficit gauge
+dingo_metrics_peerSelection_hot_set_deficit{network="preview"} 0
+# HELP dingo_metrics_peerSelection_peers_by_source number of peers by source and state
+# TYPE dingo_metrics_peerSelection_peers_by_source gauge
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="gossip",state="cold"} 0
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="gossip",state="hot"} 0
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="gossip",state="warm"} 0
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="inbound",state="cold"} 0
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="inbound",state="hot"} 0
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="inbound",state="warm"} 0
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="ledger",state="cold"} 12
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="ledger",state="hot"} 15
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="ledger",state="warm"} 0
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="topology-bootstrap",state="cold"} 1
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="topology-bootstrap",state="hot"} 0
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="topology-bootstrap",state="warm"} 0
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="topology-local-root",state="cold"} 0
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="topology-local-root",state="hot"} 0
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="topology-local-root",state="warm"} 0
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="topology-public-root",state="cold"} 0
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="topology-public-root",state="hot"} 0
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="topology-public-root",state="warm"} 0
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="unknown",state="cold"} 0
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="unknown",state="hot"} 0
+dingo_metrics_peerSelection_peers_by_source{network="preview",source="unknown",state="warm"} 0
+# HELP dingo_metrics_stake_snapshot_capture_failure_total failed stake snapshot captures
+# TYPE dingo_metrics_stake_snapshot_capture_failure_total counter
+dingo_metrics_stake_snapshot_capture_failure_total{network="preview"} 0
+# HELP dingo_metrics_stake_snapshot_capture_success_total successful stake snapshot captures
+# TYPE dingo_metrics_stake_snapshot_capture_success_total counter
+dingo_metrics_stake_snapshot_capture_success_total{network="preview"} 1
+# HELP dingo_metrics_stake_snapshot_last_successful_epoch_int epoch of the latest successful snapshot capture
+# TYPE dingo_metrics_stake_snapshot_last_successful_epoch_int gauge
+dingo_metrics_stake_snapshot_last_successful_epoch_int{network="preview"} 0
+# HELP dingo_metrics_stake_snapshot_pool_count_int number of pools in the latest captured snapshot
+# TYPE dingo_metrics_stake_snapshot_pool_count_int gauge
+dingo_metrics_stake_snapshot_pool_count_int{network="preview"} 0
+# HELP dingo_metrics_stake_snapshot_total_active_stake_lovelace total active stake in the latest captured snapshot
+# TYPE dingo_metrics_stake_snapshot_total_active_stake_lovelace gauge
+dingo_metrics_stake_snapshot_total_active_stake_lovelace{network="preview"} 0
+# HELP dingo_metrics_txsEvictedNum_int total transactions evicted from mempool
+# TYPE dingo_metrics_txsEvictedNum_int counter
+dingo_metrics_txsEvictedNum_int{network="preview"} 0
+# HELP dingo_metrics_txsExpiredNum_int total transactions expired from mempool by TTL
+# TYPE dingo_metrics_txsExpiredNum_int counter
+dingo_metrics_txsExpiredNum_int{network="preview"} 0
+# HELP dingo_mithril_fallbacks_total Node-managed Mithril failures that left the node syncing from Ouroboros, by reason.
+# TYPE dingo_mithril_fallbacks_total counter
+dingo_mithril_fallbacks_total{network="preview",reason="catch_up"} 0
+dingo_mithril_fallbacks_total{network="preview",reason="config"} 0
+dingo_mithril_fallbacks_total{network="preview",reason="probe"} 0
+dingo_mithril_fallbacks_total{network="preview",reason="snapshot_restore"} 0
+# HELP dingo_mithril_snapshot_restore_state startup Mithril snapshot restore: 0 none running, 1 restoring, 2 stuck (failing without progress), 3 waiting on the Mithril source
+# TYPE dingo_mithril_snapshot_restore_state gauge
+dingo_mithril_snapshot_restore_state{network="preview"} 0
+# HELP dingo_mithril_source_decisions_total Node-managed Mithril sync source decisions, by the source chosen.
+# TYPE dingo_mithril_source_decisions_total counter
+dingo_mithril_source_decisions_total{network="preview",source="mithril"} 0
+dingo_mithril_source_decisions_total{network="preview",source="ouroboros"} 0
+# HELP dingo_peer_demotion_total total peer state transitions toward cold
+# TYPE dingo_peer_demotion_total counter
+dingo_peer_demotion_total{from="hot",network="preview",to="cold"} 15812
+dingo_peer_demotion_total{from="hot",network="preview",to="warm"} 0
+dingo_peer_demotion_total{from="warm",network="preview",to="cold"} 193
+# HELP dingo_peer_promotion_total total peer state transitions toward hot
+# TYPE dingo_peer_promotion_total counter
+dingo_peer_promotion_total{from="cold",network="preview",to="hot"} 0
+dingo_peer_promotion_total{from="cold",network="preview",to="warm"} 16021
+dingo_peer_promotion_total{from="warm",network="preview",to="hot"} 15828
+# HELP dingo_protocol_messages_received_total total mini-protocol messages received, by protocol and callback outcome
+# TYPE dingo_protocol_messages_received_total counter
+dingo_protocol_messages_received_total{network="preview",outcome="error",protocol="chainsync"} 3
+dingo_protocol_messages_received_total{network="preview",outcome="success",protocol="blockfetch"} 193
+dingo_protocol_messages_received_total{network="preview",outcome="success",protocol="chainsync"} 1.40581714e+08
+dingo_protocol_messages_received_total{network="preview",outcome="success",protocol="keepalive"} 18180
+dingo_protocol_messages_received_total{network="preview",outcome="success",protocol="txsubmission"} 2002
+# HELP dingo_shelley_start_time Shelley genesis start as unix timestamp
+# TYPE dingo_shelley_start_time gauge
+dingo_shelley_start_time{network="preview"} 1.666656e+09
+# HELP dingo_tip_gap_slots slots between wall-clock slot and chain tip
+# TYPE dingo_tip_gap_slots gauge
+dingo_tip_gap_slots{network="preview"} 1.2650867e+08
+# HELP dingo_txsubmission_reply_size_mismatch_total tx-submission reply bodies, counted in bodies not replies, whose length differed from the size the peer advertised: accepted_wire_size counts bodies advertised at the wrapped wire size, rejected counts every body of a reply dropped for a size mismatch since the whole reply is dropped
+# TYPE dingo_txsubmission_reply_size_mismatch_total counter
+dingo_txsubmission_reply_size_mismatch_total{network="preview",outcome="accepted_wire_size"} 0
+dingo_txsubmission_reply_size_mismatch_total{network="preview",outcome="rejected"} 0
+# HELP event_subscriber_handler_stalled_total observations of a subscriber handler that had not returned within the progress interval, by event type
+# TYPE event_subscriber_handler_stalled_total counter
+event_subscriber_handler_stalled_total{network="preview",type="chain.fork_detected"} 0
+event_subscriber_handler_stalled_total{network="preview",type="chain.update"} 0
+event_subscriber_handler_stalled_total{network="preview",type="chainselection.chain_switch"} 0
+event_subscriber_handler_stalled_total{network="preview",type="chainselection.peer_activity"} 0
+event_subscriber_handler_stalled_total{network="preview",type="chainselection.peer_rollback"} 0
+event_subscriber_handler_stalled_total{network="preview",type="chainselection.peer_tip_update"} 0
+event_subscriber_handler_stalled_total{network="preview",type="chainselection.selected_none"} 0
+event_subscriber_handler_stalled_total{network="preview",type="chainsync.client_remove_requested"} 0
+event_subscriber_handler_stalled_total{network="preview",type="chainsync.resync"} 0
+event_subscriber_handler_stalled_total{network="preview",type="connmanager.conn_closed"} 0
+event_subscriber_handler_stalled_total{network="preview",type="connmanager.connection_recycle_requested"} 0
+event_subscriber_handler_stalled_total{network="preview",type="connmanager.inbound_conn"} 0
+event_subscriber_handler_stalled_total{network="preview",type="epoch.transition"} 0
+event_subscriber_handler_stalled_total{network="preview",type="ledger.blockfetch"} 0
+event_subscriber_handler_stalled_total{network="preview",type="ledger.chainsync"} 0
+event_subscriber_handler_stalled_total{network="preview",type="ledger.chainsync_await_reply"} 0
+event_subscriber_handler_stalled_total{network="preview",type="ledger.conn_closed"} 0
+event_subscriber_handler_stalled_total{network="preview",type="ledger.connection_recycle_requested"} 0
+event_subscriber_handler_stalled_total{network="preview",type="ledger.pool_restored"} 0
+event_subscriber_handler_stalled_total{network="preview",type="peergov.outbound_conn"} 0
+event_subscriber_handler_stalled_total{network="preview",type="peergov.peer_eligibility_changed"} 0
+event_subscriber_handler_stalled_total{network="preview",type="peergov.peer_priority_changed"} 0
+# HELP event_subscribers subscribers by event type and kind
+# TYPE event_subscribers gauge
+event_subscribers{kind="in-memory",network="preview",type="chain.fork_detected"} 1
+event_subscribers{kind="in-memory",network="preview",type="chain.update"} 5
+event_subscribers{kind="in-memory",network="preview",type="chainselection.chain_switch"} 2
+event_subscribers{kind="in-memory",network="preview",type="chainselection.peer_activity"} 1
+event_subscribers{kind="in-memory",network="preview",type="chainselection.peer_rollback"} 1
+event_subscribers{kind="in-memory",network="preview",type="chainselection.peer_tip_update"} 2
+event_subscribers{kind="in-memory",network="preview",type="chainselection.selected_none"} 1
+event_subscribers{kind="in-memory",network="preview",type="chainsync.client_remove_requested"} 1
+event_subscribers{kind="in-memory",network="preview",type="chainsync.resync"} 1
+event_subscribers{kind="in-memory",network="preview",type="connmanager.conn_closed"} 4
+event_subscribers{kind="in-memory",network="preview",type="connmanager.connection_recycle_requested"} 1
+event_subscribers{kind="in-memory",network="preview",type="connmanager.inbound_conn"} 2
+event_subscribers{kind="in-memory",network="preview",type="epoch.transition"} 3
+event_subscribers{kind="in-memory",network="preview",type="ledger.blockfetch"} 1
+event_subscribers{kind="in-memory",network="preview",type="ledger.chainsync"} 1
+event_subscribers{kind="in-memory",network="preview",type="ledger.chainsync_await_reply"} 1
+event_subscribers{kind="in-memory",network="preview",type="ledger.conn_closed"} 1
+event_subscribers{kind="in-memory",network="preview",type="ledger.connection_recycle_requested"} 1
+event_subscribers{kind="in-memory",network="preview",type="ledger.pool_restored"} 1
+event_subscribers{kind="in-memory",network="preview",type="mempool.add_tx"} 2
+event_subscribers{kind="in-memory",network="preview",type="peergov.outbound_conn"} 1
+event_subscribers{kind="in-memory",network="preview",type="peergov.peer_eligibility_changed"} 3
+event_subscribers{kind="in-memory",network="preview",type="peergov.peer_priority_changed"} 1
+# HELP event_total total events by type
+# TYPE event_total counter
+event_total{network="preview",type="chain.header"} 3
+event_total{network="preview",type="chain.update"} 174
+event_total{network="preview",type="chainselection.chain_switch"} 20
+event_total{network="preview",type="chainselection.genesis_corroboration_failed"} 88
+event_total{network="preview",type="chainselection.peer_activity"} 18180
+event_total{network="preview",type="chainselection.peer_tip_update"} 431
+event_total{network="preview",type="chainselection.selected_none"} 11
+event_total{network="preview",type="chainselection.selection"} 860
+event_total{network="preview",type="chainsync.client_added"} 15836
+event_total{network="preview",type="chainsync.client_removed"} 15833
+event_total{network="preview",type="chainsync.resync"} 15828
+event_total{network="preview",type="connmanager.conn_closed"} 16005
+event_total{network="preview",type="ledger.block"} 174
+event_total{network="preview",type="ledger.blockfetch"} 193
+event_total{network="preview",type="ledger.chainsync"} 491
+event_total{network="preview",type="ledger.conn_closed"} 16005
+event_total{network="preview",type="peergov.bootstrap_exited"} 6
+event_total{network="preview",type="peergov.bootstrap_recovery"} 5
+event_total{network="preview",type="peergov.outbound_conn"} 16020
+event_total{network="preview",type="peergov.peer_added"} 422
+event_total{network="preview",type="peergov.peer_churn"} 32
+event_total{network="preview",type="peergov.peer_demoted"} 16
+event_total{network="preview",type="peergov.peer_eligibility_changed"} 32025
+event_total{network="preview",type="peergov.peer_priority_changed"} 32025
+event_total{network="preview",type="peergov.peer_promoted"} 17
+event_total{network="preview",type="peergov.peer_removed"} 395
+event_total{network="preview",type="peergov.quota_status"} 126
+# HELP go_gc_gogc_percent Heap size target percentage configured by the user, otherwise 100. This value is set by the GOGC environment variable, and the runtime/debug.SetGCPercent function. Sourced from /gc/gogc:percent.
+# TYPE go_gc_gogc_percent gauge
+go_gc_gogc_percent 100
+# HELP go_gc_gomemlimit_bytes Go runtime memory limit configured by the user, otherwise math.MaxInt64. This value is set by the GOMEMLIMIT environment variable, and the runtime/debug.SetMemoryLimit function. Sourced from /gc/gomemlimit:bytes.
+# TYPE go_gc_gomemlimit_bytes gauge
+go_gc_gomemlimit_bytes 9.223372036854776e+18
+# HELP go_goroutines Number of goroutines that currently exist.
+# TYPE go_goroutines gauge
+go_goroutines 1448
+# HELP go_info Information about the Go environment.
+# TYPE go_info gauge
+go_info{version="go1.27.3"} 1
+# HELP go_memstats_alloc_bytes Number of bytes allocated in heap and currently in use. Equals to /memory/classes/heap/objects:bytes.
+# TYPE go_memstats_alloc_bytes gauge
+go_memstats_alloc_bytes 4.53947528e+08
+# HELP go_memstats_alloc_bytes_total Total number of bytes allocated in heap until now, even if released already. Equals to /gc/heap/allocs:bytes.
+# TYPE go_memstats_alloc_bytes_total counter
+go_memstats_alloc_bytes_total 1.3922427802712e+13
+# HELP go_memstats_buck_hash_sys_bytes Number of bytes used by the profiling bucket hash table. Equals to /memory/classes/profiling/buckets:bytes.
+# TYPE go_memstats_buck_hash_sys_bytes gauge
+go_memstats_buck_hash_sys_bytes 2.188234e+06
+# HELP go_memstats_frees_total Total number of heap objects frees. Equals to /gc/heap/frees:objects + /gc/heap/tiny/allocs:objects.
+# TYPE go_memstats_frees_total counter
+go_memstats_frees_total 2.57842478889e+11
+# HELP go_memstats_gc_sys_bytes Number of bytes used for garbage collection system metadata. Equals to /memory/classes/metadata/other:bytes.
+# TYPE go_memstats_gc_sys_bytes gauge
+go_memstats_gc_sys_bytes 1.0241984e+07
+# HELP go_memstats_heap_alloc_bytes Number of heap bytes allocated and currently in use, same as go_memstats_alloc_bytes. Equals to /memory/classes/heap/objects:bytes.
+# TYPE go_memstats_heap_alloc_bytes gauge
+go_memstats_heap_alloc_bytes 4.53947528e+08
+# HELP go_memstats_heap_idle_bytes Number of heap bytes waiting to be used. Equals to /memory/classes/heap/released:bytes + /memory/classes/heap/free:bytes.
+# TYPE go_memstats_heap_idle_bytes gauge
+go_memstats_heap_idle_bytes 2.49290752e+08
+# HELP go_memstats_heap_inuse_bytes Number of heap bytes that are in use. Equals to /memory/classes/heap/objects:bytes + /memory/classes/heap/unused:bytes
+# TYPE go_memstats_heap_inuse_bytes gauge
+go_memstats_heap_inuse_bytes 4.72358912e+08
+# HELP go_memstats_heap_objects Number of currently allocated objects. Equals to /gc/heap/objects:objects.
+# TYPE go_memstats_heap_objects gauge
+go_memstats_heap_objects 4.0479e+06
+# HELP go_memstats_heap_released_bytes Number of heap bytes released to OS. Equals to /memory/classes/heap/released:bytes.
+# TYPE go_memstats_heap_released_bytes gauge
+go_memstats_heap_released_bytes 2.31743488e+08
+# HELP go_memstats_heap_sys_bytes Number of heap bytes obtained from system. Equals to /memory/classes/heap/objects:bytes + /memory/classes/heap/unused:bytes + /memory/classes/heap/released:bytes + /memory/classes/heap/free:bytes.
+# TYPE go_memstats_heap_sys_bytes gauge
+go_memstats_heap_sys_bytes 7.21649664e+08
+# HELP go_memstats_last_gc_time_seconds Number of seconds since 1970 of last garbage collection.
+# TYPE go_memstats_last_gc_time_seconds gauge
+go_memstats_last_gc_time_seconds 1.793230349608293e+09
+# HELP go_memstats_mallocs_total Total number of heap objects allocated, both live and gc-ed. Semantically a counter version for go_memstats_heap_objects gauge. Equals to /gc/heap/allocs:objects + /gc/heap/tiny/allocs:objects.
+# TYPE go_memstats_mallocs_total counter
+go_memstats_mallocs_total 2.57846526789e+11
+# HELP go_memstats_mcache_inuse_bytes Number of bytes in use by mcache structures. Equals to /memory/classes/metadata/mcache/inuse:bytes.
+# TYPE go_memstats_mcache_inuse_bytes gauge
+go_memstats_mcache_inuse_bytes 22960
+# HELP go_memstats_mcache_sys_bytes Number of bytes used for mcache structures obtained from system. Equals to /memory/classes/metadata/mcache/inuse:bytes + /memory/classes/metadata/mcache/free:bytes.
+# TYPE go_memstats_mcache_sys_bytes gauge
+go_memstats_mcache_sys_bytes 32144
+# HELP go_memstats_mspan_inuse_bytes Number of bytes in use by mspan structures. Equals to /memory/classes/metadata/mspan/inuse:bytes.
+# TYPE go_memstats_mspan_inuse_bytes gauge
+go_memstats_mspan_inuse_bytes 5.2208e+06
+# HELP go_memstats_mspan_sys_bytes Number of bytes used for mspan structures obtained from system. Equals to /memory/classes/metadata/mspan/inuse:bytes + /memory/classes/metadata/mspan/free:bytes.
+# TYPE go_memstats_mspan_sys_bytes gauge
+go_memstats_mspan_sys_bytes 6.12e+06
+# HELP go_memstats_next_gc_bytes Number of heap bytes when next garbage collection will take place. Equals to /gc/heap/goal:bytes.
+# TYPE go_memstats_next_gc_bytes gauge
+go_memstats_next_gc_bytes 4.73040474e+08
+# HELP go_memstats_other_sys_bytes Number of bytes used for other system allocations. Equals to /memory/classes/other:bytes.
+# TYPE go_memstats_other_sys_bytes gauge
+go_memstats_other_sys_bytes 2.444926e+06
+# HELP go_memstats_stack_inuse_bytes Number of bytes obtained from system for stack allocator in non-CGO environments. Equals to /memory/classes/heap/stacks:bytes.
+# TYPE go_memstats_stack_inuse_bytes gauge
+go_memstats_stack_inuse_bytes 8.093696e+06
+# HELP go_memstats_stack_sys_bytes Number of bytes obtained from system for stack allocator. Equals to /memory/classes/heap/stacks:bytes + /memory/classes/os-stacks:bytes.
+# TYPE go_memstats_stack_sys_bytes gauge
+go_memstats_stack_sys_bytes 8.093696e+06
+# HELP go_memstats_sys_bytes Number of bytes obtained from system. Equals to /memory/classes/total:byte.
+# TYPE go_memstats_sys_bytes gauge
+go_memstats_sys_bytes 7.50770648e+08
+# HELP go_sched_gomaxprocs_threads The current runtime.GOMAXPROCS setting, or the number of operating system threads that can execute user-level Go code simultaneously. Sourced from /sched/gomaxprocs:threads.
+# TYPE go_sched_gomaxprocs_threads gauge
+go_sched_gomaxprocs_threads 10
+# HELP go_threads Number of OS threads created.
+# TYPE go_threads gauge
+go_threads 16
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 53694.47
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1.048576e+06
+# HELP process_network_receive_bytes_total Number of bytes received by the process over the network.
+# TYPE process_network_receive_bytes_total counter
+process_network_receive_bytes_total 1.46927279828e+11
+# HELP process_network_transmit_bytes_total Number of bytes sent by the process over the network.
+# TYPE process_network_transmit_bytes_total counter
+process_network_transmit_bytes_total 1.928234154e+09
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 51
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 6.11700736e+08
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.79319276984e+09
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 4.71160832e+09
+# HELP process_virtual_memory_max_bytes Maximum amount of virtual memory available in bytes.
+# TYPE process_virtual_memory_max_bytes gauge
+process_virtual_memory_max_bytes 1.8446744073709552e+19
+# HELP promhttp_metric_handler_requests_in_flight Current number of scrapes being served.
+# TYPE promhttp_metric_handler_requests_in_flight gauge
+promhttp_metric_handler_requests_in_flight 1
+# HELP promhttp_metric_handler_requests_total Total number of scrapes by HTTP status code.
+# TYPE promhttp_metric_handler_requests_total counter
+promhttp_metric_handler_requests_total{code="200"} 358
+promhttp_metric_handler_requests_total{code="500"} 0
+promhttp_metric_handler_requests_total{code="503"} 0
