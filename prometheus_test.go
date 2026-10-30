@@ -1324,3 +1324,145 @@ cardano_node_metrics_blockfetchclient_blockdelay_real 0.25
 		t.Errorf("BlockDelay = %v, expected 0.25", metrics.BlockDelay)
 	}
 }
+
+// TestPromMetricsDingoPipelineNames decodes the ledger pipeline health gauges
+// Dingo exports, with the network label a live Dingo 0.88.1 adds to each
+// series. The timestamp is in float scientific notation, as exported.
+func TestPromMetricsDingoPipelineNames(t *testing.T) {
+	prom := []byte(`
+dingo_ledger_pipeline_halted{network="preview"} 1
+dingo_ledger_pipeline_stuck{network="preview"} 1
+dingo_ledger_pipeline_no_progress_restarts{network="preview"} 3
+dingo_ledger_last_block_added_timestamp_seconds{network="preview"} 1.7931402904092171e+09
+`)
+
+	metrics := decodePromMetrics(t, prom)
+
+	if metrics.DingoPipelineHalted != 1 {
+		t.Errorf("DingoPipelineHalted = %d, expected 1", metrics.DingoPipelineHalted)
+	}
+	if metrics.DingoPipelineStuck != 1 {
+		t.Errorf("DingoPipelineStuck = %d, expected 1", metrics.DingoPipelineStuck)
+	}
+	if !metrics.DingoPipelinePresent {
+		t.Error("DingoPipelinePresent = false, expected true")
+	}
+	if metrics.DingoPipelineRestarts != 3 {
+		t.Errorf("DingoPipelineRestarts = %d, expected 3", metrics.DingoPipelineRestarts)
+	}
+	if metrics.DingoLastBlockAdded != 1.7931402904092171e+09 {
+		t.Errorf("DingoLastBlockAdded = %v, expected 1.7931402904092171e+09", metrics.DingoLastBlockAdded)
+	}
+}
+
+// TestPromMetricsDingoPipelineAbsent checks that a scrape missing either
+// pipeline gauge is not reported as present, so it cannot read as healthy.
+func TestPromMetricsDingoPipelineAbsent(t *testing.T) {
+	for name, prom := range map[string]string{
+		"none":        "dingo_ledger_last_block_added_timestamp_seconds 1.7e+09\n",
+		"halted only": "dingo_ledger_pipeline_halted 0\n",
+		"stuck only":  "dingo_ledger_pipeline_stuck 0\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if decodePromMetrics(t, []byte(prom)).DingoPipelinePresent {
+				t.Error("DingoPipelinePresent = true, expected false")
+			}
+		})
+	}
+	both := decodePromMetrics(t, []byte(
+		"dingo_ledger_pipeline_halted 0\ndingo_ledger_pipeline_stuck 0\n"))
+	if !both.DingoPipelinePresent {
+		t.Error("DingoPipelinePresent = false with both gauges, expected true")
+	}
+}
+
+// TestPromMetricsDingoSyncAndAnomalyNames decodes the sync backlog, anomaly,
+// hot-peer deficit and Mithril restore series from a labelled Dingo scrape.
+// Labelled counters must add up across their label values.
+func TestPromMetricsDingoSyncAndAnomalyNames(t *testing.T) {
+	prom := []byte(`
+dingo_chain_header_queue_length{network="preview"} 250
+dingo_chain_header_queue_capacity{network="preview"} 10000
+dingo_blockfetch_inflight_blocks{network="preview"} 4
+dingo_blockfetch_inflight_bytes{network="preview"} 1.048576e+06
+dingo_chainselection_stalled_total{network="preview",reason="genesis_corroboration"} 10
+dingo_chainselection_stalled_total{network="preview",reason="no_selectable_peer"} 3
+dingo_chainselection_gdd_disconnects_total{network="preview"} 2
+dingo_chainsync_plateau_decisions_total{network="preview",outcome="resync"} 1
+dingo_chainsync_plateau_decisions_total{network="preview",outcome="reconciled"} 5
+dingo_keepalive_timeout_total{network="preview"} 7
+dingo_metrics_peerSelection_hot_set_deficit{network="preview"} 2
+dingo_mithril_snapshot_restore_state{network="preview"} 2
+dingo_mithril_source_decisions_total{network="preview",source="mithril"} 6
+dingo_mithril_source_decisions_total{network="preview",source="ouroboros"} 1
+dingo_mithril_fallbacks_total{network="preview",reason="catch_up"} 2
+dingo_mithril_fallbacks_total{network="preview",reason="probe"} 1
+dingo_mithril_sync_backfill_current_slot{network="preview"} 500
+dingo_mithril_sync_backfill_tip_slot{network="preview"} 1000
+dingo_mithril_sync_backfill_blocks_per_second{network="preview"} 12.5
+dingo_mithril_sync_backfill_percent{network="preview"} 50
+`)
+
+	m := decodePromMetrics(t, prom)
+
+	checks := []struct {
+		name string
+		got  uint64
+		want uint64
+	}{
+		{"header queue length", m.DingoHeaderQueueLength, 250},
+		{"header queue capacity", m.DingoHeaderQueueCapacity, 10000},
+		{"inflight blocks", m.DingoBlockfetchInflightBlocks, 4},
+		{"inflight bytes", m.DingoBlockfetchInflightBytes, 1048576},
+		{"stalled summed over reasons", m.DingoChainselectionStalled, 13},
+		{"gdd disconnects", m.DingoChainselectionGDDDisconnects, 2},
+		{"plateau summed over outcomes", m.DingoChainsyncPlateauDecisions, 6},
+		{"keepalive timeouts", m.DingoKeepaliveTimeouts, 7},
+		{"hot set deficit", m.DingoHotSetDeficit, 2},
+		{"mithril restore state", m.MithrilRestoreState, 2},
+		{"source decisions summed", m.MithrilSourceDecisions, 7},
+		{"fallbacks summed", m.MithrilFallbacks, 3},
+		{"backfill current slot", m.MithrilBackfillCurrentSlot, 500},
+		{"backfill tip slot", m.MithrilBackfillTipSlot, 1000},
+	}
+	for _, c := range checks {
+		if c.got != c.want {
+			t.Errorf("%s = %d, expected %d", c.name, c.got, c.want)
+		}
+	}
+	if m.MithrilBackfillBlocksPerSecond != 12.5 {
+		t.Errorf("backfill rate = %v, expected 12.5", m.MithrilBackfillBlocksPerSecond)
+	}
+	if m.MithrilBackfillPercent != 50 {
+		t.Errorf("backfill percent = %v, expected 50", m.MithrilBackfillPercent)
+	}
+}
+
+// TestPromMetricsDingoPresence checks that the decoder records which of the
+// optional Dingo series a scrape carried, so a missing series can be told apart
+// from one that reads zero.
+func TestPromMetricsDingoPresence(t *testing.T) {
+	m := decodePromMetrics(t, []byte(`
+dingo_metrics_peerSelection_hot_set_deficit{network="preview"} 0
+dingo_chainselection_stalled_total{network="preview",reason="no_selectable_peer"} 0
+dingo_keepalive_timeout_total{network="preview"} 0
+`))
+	for _, name := range []string{
+		"dingo_metrics_peerSelection_hot_set_deficit",
+		"dingo_chainselection_stalled_total",
+		"dingo_keepalive_timeout_total",
+	} {
+		if !m.exports(name) {
+			t.Errorf("exports(%q) = false for a scrape that carries it", name)
+		}
+	}
+	for _, name := range []string{
+		"dingo_chainselection_gdd_disconnects_total",
+		"dingo_chainsync_plateau_decisions_total",
+		"dingo_mithril_snapshot_restore_state",
+	} {
+		if m.exports(name) {
+			t.Errorf("exports(%q) = true for a scrape that lacks it", name)
+		}
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -107,5 +108,84 @@ func TestPromMetricsRecordedCardanoNode11BlockProducer(t *testing.T) {
 		if tt.got != tt.want {
 			t.Errorf("%s = %d, expected %d", tt.name, tt.got, tt.want)
 		}
+	}
+}
+
+// decodeTextFixture decodes a recorded scrape the way nview does when the node
+// answers in the Prometheus text format, as Dingo does.
+func decodeTextFixture(t *testing.T, name string) PromMetrics {
+	t.Helper()
+
+	b, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	out, err := prom2jsonWithContentType(
+		b,
+		"text/plain; version=0.0.4; charset=utf-8; escaping=underscores",
+	)
+	if err != nil {
+		t.Fatalf("prom2jsonWithContentType() error = %v", err)
+	}
+	var metrics PromMetrics
+	if err := json.Unmarshal(out, &metrics); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	return metrics
+}
+
+// TestPromMetricsRecordedDingo088Preview decodes a scrape recorded from a
+// Dingo 0.88.1 preview relay with the histogram families removed. It pins the
+// sync backlog, anomaly, hot-peer deficit and Mithril restore series to the
+// recorded values, and checks the views render them as exported zeros rather
+// than as unavailable.
+func TestPromMetricsRecordedDingo088Preview(t *testing.T) {
+	m := decodeTextFixture(t, "dingo-0.88.1-preview.prom.txt")
+
+	counts := []struct {
+		name string
+		got  uint64
+		want uint64
+	}{
+		{"header queue length", m.DingoHeaderQueueLength, 0},
+		{"header queue capacity", m.DingoHeaderQueueCapacity, 10000},
+		{"inflight blocks", m.DingoBlockfetchInflightBlocks, 0},
+		{"inflight bytes", m.DingoBlockfetchInflightBytes, 0},
+		{"stalled, summed over reasons", m.DingoChainselectionStalled, 11},
+		{"gdd disconnects", m.DingoChainselectionGDDDisconnects, 0},
+		{"plateau decisions, summed over outcomes", m.DingoChainsyncPlateauDecisions, 0},
+		{"keepalive timeouts", m.DingoKeepaliveTimeouts, 29},
+		{"hot set deficit", m.DingoHotSetDeficit, 0},
+		{"mithril restore state", m.MithrilRestoreState, 0},
+		{"mithril source decisions", m.MithrilSourceDecisions, 0},
+		{"mithril fallbacks", m.MithrilFallbacks, 0},
+	}
+	for _, c := range counts {
+		if c.got != c.want {
+			t.Errorf("%s = %d, expected %d", c.name, c.got, c.want)
+		}
+	}
+	for name := range presenceTrackedPromMetrics {
+		// The backfill series only exist while a backfill runs, which the
+		// recorded node was not doing.
+		backfill := strings.HasPrefix(name, "dingo_mithril_sync_backfill_")
+		if got := m.exports(name); got == backfill {
+			t.Errorf("exports(%q) = %v for a recorded Dingo 0.88.1 scrape", name, got)
+		}
+	}
+
+	chain := dingoConsoleChainLane(&m, 120)
+	for _, expected := range []string{"Backlog", "0/10000", "Inflight"} {
+		if !strings.Contains(chain, expected) {
+			t.Errorf("chain view of the recorded scrape missing %q:\n%s", expected, chain)
+		}
+	}
+	for _, cell := range dingoAnomalyCells(&m, nil) {
+		if strings.Contains(cell.Value, "n/a") {
+			t.Errorf("anomaly %s reads n/a for a scrape that exports it", cell.Label)
+		}
+	}
+	if label, _ := dingoHotSetDeficit(&m); label != "0" {
+		t.Errorf("hot set deficit = %q, expected 0", label)
 	}
 }

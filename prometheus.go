@@ -155,16 +155,23 @@ type PromMetrics struct {
 	DingoBuildGoVersion   string `json:"dingo_build_info_goversion"`
 
 	// Dingo-native metrics
-	DingoDbSizeBytes          uint64  `json:"dingo_database_size_bytes"`
-	DingoDbBlobSizeBytes      uint64  `json:"dingo_database_size_bytes_blob"`
-	DingoDbMetadataSizeBytes  uint64  `json:"dingo_database_size_bytes_metadata"`
-	DingoChainCachedBlocks    uint64  `json:"dingo_chain_manager_cached_blocks"`
-	DingoChainsyncSeenHeaders uint64  `json:"dingo_chainsync_seen_headers"`
-	DingoTipGapSlots          uint64  `json:"dingo_tip_gap_slots"`
-	DingoForgeTipGapSlots     uint64  `json:"dingo_forge_tip_gap_slots"`
-	DingoSlotClockFallback    uint64  `json:"dingo_ledger_slot_clock_fallback_total"`
-	DingoForgeSlotClockErr    uint64  `json:"dingo_forge_slot_clock_errors_total"`
-	DingoForgeSyncSkip        uint64  `json:"dingo_forge_sync_skip_total"`
+	DingoDbSizeBytes          uint64 `json:"dingo_database_size_bytes"`
+	DingoDbBlobSizeBytes      uint64 `json:"dingo_database_size_bytes_blob"`
+	DingoDbMetadataSizeBytes  uint64 `json:"dingo_database_size_bytes_metadata"`
+	DingoChainCachedBlocks    uint64 `json:"dingo_chain_manager_cached_blocks"`
+	DingoChainsyncSeenHeaders uint64 `json:"dingo_chainsync_seen_headers"`
+	DingoTipGapSlots          uint64 `json:"dingo_tip_gap_slots"`
+	DingoForgeTipGapSlots     uint64 `json:"dingo_forge_tip_gap_slots"`
+	DingoSlotClockFallback    uint64 `json:"dingo_ledger_slot_clock_fallback_total"`
+	DingoForgeSlotClockErr    uint64 `json:"dingo_forge_slot_clock_errors_total"`
+	DingoForgeSyncSkip        uint64 `json:"dingo_forge_sync_skip_total"`
+	DingoPipelineHalted       uint64 `json:"dingo_ledger_pipeline_halted"`
+	DingoPipelineStuck        uint64 `json:"dingo_ledger_pipeline_stuck"`
+	// DingoPipelinePresent is set when the scrape carried both pipeline
+	// gauges; Dingo builds without them would otherwise read as healthy.
+	DingoPipelinePresent      bool    `json:"dingo_ledger_pipeline_present"`
+	DingoPipelineRestarts     uint64  `json:"dingo_ledger_pipeline_no_progress_restarts"`
+	DingoLastBlockAdded       float64 `json:"dingo_ledger_last_block_added_timestamp_seconds"`
 	DingoTxsEvicted           uint64  `json:"dingo_metrics_txsEvictedNum_int"`
 	DingoTxsExpired           uint64  `json:"dingo_metrics_txsExpiredNum_int"`
 	DingoBlockForgingLatencyN uint64  `json:"dingo_metrics_blockForgingLatency_seconds_count"`
@@ -184,6 +191,18 @@ type PromMetrics struct {
 	DingoPeersBySourceGossip  uint64  `json:"dingo_metrics_peerSelection_peers_by_source_gossip"`
 	DingoPeerPromotionsLedger uint64  `json:"dingo_metrics_peerSelection_churn_promotions_by_source_ledger"`
 	DingoPeerDemotionsLedger  uint64  `json:"dingo_metrics_peerSelection_churn_demotions_by_source_ledger"`
+	DingoHotSetDeficit        uint64  `json:"dingo_metrics_peerSelection_hot_set_deficit"`
+
+	// Sync backlog and network anomaly counters. The counters are cumulative
+	// and labelled by reason or outcome; the labelled series are summed.
+	DingoHeaderQueueLength            uint64 `json:"dingo_chain_header_queue_length"`
+	DingoHeaderQueueCapacity          uint64 `json:"dingo_chain_header_queue_capacity"`
+	DingoBlockfetchInflightBlocks     uint64 `json:"dingo_blockfetch_inflight_blocks"`
+	DingoBlockfetchInflightBytes      uint64 `json:"dingo_blockfetch_inflight_bytes"`
+	DingoChainselectionStalled        uint64 `json:"dingo_chainselection_stalled_total"`
+	DingoChainselectionGDDDisconnects uint64 `json:"dingo_chainselection_gdd_disconnects_total"`
+	DingoChainsyncPlateauDecisions    uint64 `json:"dingo_chainsync_plateau_decisions_total"`
+	DingoKeepaliveTimeouts            uint64 `json:"dingo_keepalive_timeout_total"`
 
 	// CBOR cache counters (cumulative)
 	DingoCacheUtxoHotHits  uint64 `json:"dingo_cbor_cache_utxo_hot_hits_total"`
@@ -236,6 +255,15 @@ type PromMetrics struct {
 	MithrilSyncImmutableCurrentSlot   uint64                              `json:"dingo_mithril_sync_immutable_current_slot"`
 	MithrilSyncImmutableTipSlot       uint64                              `json:"dingo_mithril_sync_immutable_tip_slot"`
 	MithrilSyncGapBlocks              uint64                              `json:"dingo_mithril_sync_gap_blocks"`
+	// MithrilRestoreState is the startup snapshot restore state: 0 idle,
+	// 1 restoring, 2 stuck, 3 waiting on the Mithril source.
+	MithrilRestoreState            uint64  `json:"dingo_mithril_snapshot_restore_state"`
+	MithrilSourceDecisions         uint64  `json:"dingo_mithril_source_decisions_total"`
+	MithrilFallbacks               uint64  `json:"dingo_mithril_fallbacks_total"`
+	MithrilBackfillCurrentSlot     uint64  `json:"dingo_mithril_sync_backfill_current_slot"`
+	MithrilBackfillTipSlot         uint64  `json:"dingo_mithril_sync_backfill_tip_slot"`
+	MithrilBackfillBlocksPerSecond float64 `json:"dingo_mithril_sync_backfill_blocks_per_second"`
+	MithrilBackfillPercent         float64 `json:"dingo_mithril_sync_backfill_percent"`
 	// Phase active flags — populated from dingo_mithril_sync_phase_active{phase="..."} labels
 	MithrilPhaseBootstrap  float64 `json:"dingo_mithril_sync_phase_active_bootstrap"`
 	MithrilPhaseImmutable  float64 `json:"dingo_mithril_sync_phase_active_immutable_copy"`
@@ -271,6 +299,10 @@ type PromMetrics struct {
 	PromMetricPresent           map[string]bool    `json:"prom_metric_present"`
 	CollectedAt                 time.Time          `json:"-"`
 	DingoCounterWindow          DingoCounterWindow `json:"-"`
+
+	// DingoPresentMetrics records which optional Dingo series the scrape
+	// carried, so a series a node does not export is not read as a zero.
+	DingoPresentMetrics map[string]bool `json:"dingo_present_metrics"`
 
 	// Generic future protocol metrics. Current Dingo scrapes do not expose
 	// Leios, but any metric family containing "leios" is collected here.
@@ -633,6 +665,24 @@ func setPromMetricValueWithLabels(out map[string]any, name string, value float64
 			out["network"] = network
 		}
 	}
+	switch name {
+	case "dingo_ledger_pipeline_halted":
+		out["dingo_ledger_pipeline_halted_seen"] = true
+	case "dingo_ledger_pipeline_stuck":
+		out["dingo_ledger_pipeline_stuck_seen"] = true
+	}
+	if out["dingo_ledger_pipeline_halted_seen"] == true &&
+		out["dingo_ledger_pipeline_stuck_seen"] == true {
+		out["dingo_ledger_pipeline_present"] = true
+	}
+	if _, ok := presenceTrackedPromMetrics[name]; ok {
+		present, _ := out["dingo_present_metrics"].(map[string]bool)
+		if present == nil {
+			present = make(map[string]bool)
+			out["dingo_present_metrics"] = present
+		}
+		present[name] = true
+	}
 	if isLeiosPromMetric(name) {
 		setNamedMetricValue(out, "leios_metrics", name, value, labels)
 	}
@@ -783,11 +833,40 @@ func normalizedMetricLabelPart(value string) string {
 	return strings.ToLower(replacer.Replace(value))
 }
 
+// presenceTrackedPromMetrics are the optional Dingo series whose absence must
+// not read as a healthy zero.
+var presenceTrackedPromMetrics = map[string]struct{}{
+	"dingo_metrics_peerSelection_hot_set_deficit":   {},
+	"dingo_chain_header_queue_length":               {},
+	"dingo_blockfetch_inflight_blocks":              {},
+	"dingo_blockfetch_inflight_bytes":               {},
+	"dingo_mithril_source_decisions_total":          {},
+	"dingo_mithril_fallbacks_total":                 {},
+	"dingo_mithril_sync_backfill_current_slot":      {},
+	"dingo_mithril_sync_backfill_tip_slot":          {},
+	"dingo_mithril_sync_backfill_blocks_per_second": {},
+	"dingo_mithril_sync_backfill_percent":           {},
+	"dingo_chainselection_stalled_total":            {},
+	"dingo_chainselection_gdd_disconnects_total":    {},
+	"dingo_chainsync_plateau_decisions_total":       {},
+	"dingo_keepalive_timeout_total":                 {},
+	"dingo_mithril_snapshot_restore_state":          {},
+}
+
+// exports reports whether the scrape carried the named series.
+func (m *PromMetrics) exports(name string) bool {
+	return m != nil && m.DingoPresentMetrics[name]
+}
+
 func shouldAggregatePromMetric(name string) bool {
 	return strings.HasPrefix(name, "event_") ||
 		name == "dingo_database_size_bytes" ||
 		name == "dingo_protocol_messages_received_total" ||
 		name == "dingo_blockfetch_shadow_gate_decisions_total" ||
+		name == "dingo_chainselection_stalled_total" ||
+		name == "dingo_chainsync_plateau_decisions_total" ||
+		name == "dingo_mithril_source_decisions_total" ||
+		name == "dingo_mithril_fallbacks_total" ||
 		name == "dingo_protocol_message_duration_seconds_count" ||
 		name == "dingo_protocol_message_duration_seconds_sum" ||
 		name == "dingo_metrics_peerSelection_churn_promotions_by_source" ||
