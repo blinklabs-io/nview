@@ -247,13 +247,12 @@ func dingoDiskRows(innerWidth int) []string {
 	return []string{dingoMetricRowColumns(
 		innerWidth,
 		2,
-		dingoMetricStyledSpan(
+		dingoMetricStyledWide(
 			"Disk",
 			diskPercentText(snap)+" "+
 				uiProgressBar(snap.Percent, 10, severity)+" "+
 				uiValue(diskUsedText(snap)),
 			severity,
-			2,
 		),
 	)}
 }
