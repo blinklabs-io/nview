@@ -190,6 +190,18 @@ type PromMetrics struct {
 	DingoPeersBySourceGossip  uint64  `json:"dingo_metrics_peerSelection_peers_by_source_gossip"`
 	DingoPeerPromotionsLedger uint64  `json:"dingo_metrics_peerSelection_churn_promotions_by_source_ledger"`
 	DingoPeerDemotionsLedger  uint64  `json:"dingo_metrics_peerSelection_churn_demotions_by_source_ledger"`
+	DingoHotSetDeficit        uint64  `json:"dingo_metrics_peerSelection_hot_set_deficit"`
+
+	// Sync backlog and network anomaly counters. The counters are cumulative
+	// and labelled by reason or outcome; the labelled series are summed.
+	DingoHeaderQueueLength            uint64 `json:"dingo_chain_header_queue_length"`
+	DingoHeaderQueueCapacity          uint64 `json:"dingo_chain_header_queue_capacity"`
+	DingoBlockfetchInflightBlocks     uint64 `json:"dingo_blockfetch_inflight_blocks"`
+	DingoBlockfetchInflightBytes      uint64 `json:"dingo_blockfetch_inflight_bytes"`
+	DingoChainselectionStalled        uint64 `json:"dingo_chainselection_stalled_total"`
+	DingoChainselectionGDDDisconnects uint64 `json:"dingo_chainselection_gdd_disconnects_total"`
+	DingoChainsyncPlateauDecisions    uint64 `json:"dingo_chainsync_plateau_decisions_total"`
+	DingoKeepaliveTimeouts            uint64 `json:"dingo_keepalive_timeout_total"`
 
 	// CBOR cache counters (cumulative)
 	DingoCacheUtxoHotHits  uint64 `json:"dingo_cbor_cache_utxo_hot_hits_total"`
@@ -242,6 +254,15 @@ type PromMetrics struct {
 	MithrilSyncImmutableCurrentSlot   uint64                              `json:"dingo_mithril_sync_immutable_current_slot"`
 	MithrilSyncImmutableTipSlot       uint64                              `json:"dingo_mithril_sync_immutable_tip_slot"`
 	MithrilSyncGapBlocks              uint64                              `json:"dingo_mithril_sync_gap_blocks"`
+	// MithrilRestoreState is the startup snapshot restore state: 0 idle,
+	// 1 restoring, 2 stuck, 3 waiting on the Mithril source.
+	MithrilRestoreState            uint64  `json:"dingo_mithril_snapshot_restore_state"`
+	MithrilSourceDecisions         uint64  `json:"dingo_mithril_source_decisions_total"`
+	MithrilFallbacks               uint64  `json:"dingo_mithril_fallbacks_total"`
+	MithrilBackfillCurrentSlot     uint64  `json:"dingo_mithril_sync_backfill_current_slot"`
+	MithrilBackfillTipSlot         uint64  `json:"dingo_mithril_sync_backfill_tip_slot"`
+	MithrilBackfillBlocksPerSecond float64 `json:"dingo_mithril_sync_backfill_blocks_per_second"`
+	MithrilBackfillPercent         float64 `json:"dingo_mithril_sync_backfill_percent"`
 	// Phase active flags — populated from dingo_mithril_sync_phase_active{phase="..."} labels
 	MithrilPhaseBootstrap  float64 `json:"dingo_mithril_sync_phase_active_bootstrap"`
 	MithrilPhaseImmutable  float64 `json:"dingo_mithril_sync_phase_active_immutable_copy"`
@@ -257,6 +278,10 @@ type PromMetrics struct {
 	DingoStakeSnapshotLastEpoch   uint64 `json:"dingo_metrics_stake_snapshot_last_successful_epoch_int"`
 	DingoStakeSnapshotPoolCount   uint64 `json:"dingo_metrics_stake_snapshot_pool_count_int"`
 	DingoStakeSnapshotActiveStake uint64 `json:"dingo_metrics_stake_snapshot_total_active_stake_lovelace"`
+
+	// DingoPresentMetrics records which optional Dingo series the scrape
+	// carried, so a series a node does not export is not read as a zero.
+	DingoPresentMetrics map[string]bool `json:"dingo_present_metrics"`
 
 	// Generic future protocol metrics. Current Dingo scrapes do not expose
 	// Leios, but any metric family containing "leios" is collected here.
@@ -624,6 +649,14 @@ func setPromMetricValueWithLabels(out map[string]any, name string, value float64
 		out["dingo_ledger_pipeline_stuck_seen"] == true {
 		out["dingo_ledger_pipeline_present"] = true
 	}
+	if _, ok := presenceTrackedPromMetrics[name]; ok {
+		present, _ := out["dingo_present_metrics"].(map[string]bool)
+		if present == nil {
+			present = make(map[string]bool)
+			out["dingo_present_metrics"] = present
+		}
+		present[name] = true
+	}
 	if isLeiosPromMetric(name) {
 		setNamedMetricValue(out, "leios_metrics", name, value, labels)
 	}
@@ -763,11 +796,40 @@ func normalizedMetricLabelPart(value string) string {
 	return strings.ToLower(replacer.Replace(value))
 }
 
+// presenceTrackedPromMetrics are the optional Dingo series whose absence must
+// not read as a healthy zero.
+var presenceTrackedPromMetrics = map[string]struct{}{
+	"dingo_metrics_peerSelection_hot_set_deficit":   {},
+	"dingo_chain_header_queue_length":               {},
+	"dingo_blockfetch_inflight_blocks":              {},
+	"dingo_blockfetch_inflight_bytes":               {},
+	"dingo_mithril_source_decisions_total":          {},
+	"dingo_mithril_fallbacks_total":                 {},
+	"dingo_mithril_sync_backfill_current_slot":      {},
+	"dingo_mithril_sync_backfill_tip_slot":          {},
+	"dingo_mithril_sync_backfill_blocks_per_second": {},
+	"dingo_mithril_sync_backfill_percent":           {},
+	"dingo_chainselection_stalled_total":            {},
+	"dingo_chainselection_gdd_disconnects_total":    {},
+	"dingo_chainsync_plateau_decisions_total":       {},
+	"dingo_keepalive_timeout_total":                 {},
+	"dingo_mithril_snapshot_restore_state":          {},
+}
+
+// exports reports whether the scrape carried the named series.
+func (m *PromMetrics) exports(name string) bool {
+	return m != nil && m.DingoPresentMetrics[name]
+}
+
 func shouldAggregatePromMetric(name string) bool {
 	return strings.HasPrefix(name, "event_") ||
 		name == "dingo_database_size_bytes" ||
 		name == "dingo_protocol_messages_received_total" ||
 		name == "dingo_blockfetch_shadow_gate_decisions_total" ||
+		name == "dingo_chainselection_stalled_total" ||
+		name == "dingo_chainsync_plateau_decisions_total" ||
+		name == "dingo_mithril_source_decisions_total" ||
+		name == "dingo_mithril_fallbacks_total" ||
 		name == "dingo_protocol_message_duration_seconds_count" ||
 		name == "dingo_protocol_message_duration_seconds_sum" ||
 		name == "dingo_metrics_peerSelection_churn_promotions_by_source" ||
