@@ -176,6 +176,47 @@ func TestDingoForgeCounterHistoryHandlesResetAndMissingSamples(t *testing.T) {
 	}
 }
 
+// Dingo registers dingo_equivocation_total as a labelled counter, so the
+// self_key="true" series does not exist until the node reports its own
+// equivocation. A healthy producer never exposes it.
+func TestDingoForgeCounterHistoryMissRatioWithoutOwnEquivocationSeries(t *testing.T) {
+	var history dingoForgeCounterHistory
+	base := time.Unix(1000, 0)
+	scrape := func(won, missed, battles uint64) *PromMetrics {
+		metrics := forgeCounterFixture(won, missed, battles, 0)
+		delete(metrics.PromMetricPresent, "dingo_equivocation_total_self")
+		return metrics
+	}
+	history.Apply(scrape(10, 2, 3), base)
+	second := scrape(14, 3, 5)
+	history.Apply(second, base.Add(5*time.Second))
+	if !second.DingoCounterWindow.Valid {
+		t.Fatal("window must not depend on the own-equivocation series")
+	}
+	if ratio, _ := dingoMissRatio(second); stripTviewTags(ratio) != "25.0%" {
+		t.Fatalf("miss ratio = %q, want 25.0%%", stripTviewTags(ratio))
+	}
+	if got := stripTviewTags(dingoCounterDisplay(second, dingoCounterOwnEquiv, 0)); got != "n/a" {
+		t.Fatalf("own equivocation = %q, want n/a", got)
+	}
+}
+
+func TestDingoForgeLeaderPanelLabelsFitWithoutTruncation(t *testing.T) {
+	now := time.Unix(2000, 0)
+	metrics := forgeCounterFixture(12, 3, 4, 0)
+	metrics.CollectedAt = now
+	metrics.DingoForgeCredentialsValid = 1
+	for _, name := range dingoForgeLeaderMetricNames {
+		metrics.PromMetricPresent[name] = true
+	}
+	for _, width := range []int{80, 118} {
+		panel := stripTviewTags(dingoConsoleForgeLeaderBandAt(metrics, width, now))
+		if strings.Contains(panel, "...") {
+			t.Errorf("width %d: panel truncates a label:\n%s", width, panel)
+		}
+	}
+}
+
 func TestDingoForgeLeaderPanelShowsProducerHealth(t *testing.T) {
 	now := time.Unix(2000, 0)
 	cfg := config.GetConfig()

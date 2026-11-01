@@ -130,8 +130,7 @@ func (h *dingoForgeCounterHistory) Apply(metrics *PromMetrics, at time.Time) {
 
 	window.Valid = window.Available[dingoCounterLeaderWon] &&
 		window.Available[dingoCounterMissed] &&
-		window.Available[dingoCounterBattles] &&
-		window.Available[dingoCounterOwnEquiv]
+		window.Available[dingoCounterBattles]
 	metrics.DingoCounterWindow = window
 	h.at = at
 }
@@ -255,7 +254,7 @@ func dingoConsoleForgeLeaderBandAt(
 		dingoCounterDisplay(metrics, dingoCounterOwnEquiv, metrics.DingoOwnEquivocations),
 		equivocationSeverity,
 	)
-	notWonCell := dingoMetric("Epoch Not Won", dingoLastEpochNotWon(metrics))
+	notWonCell := dingoMetric("Ep. Not Won", dingoLastEpochNotWon(metrics))
 
 	lines := []string{
 		dingoMetricRow(
