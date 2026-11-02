@@ -1285,9 +1285,9 @@ func dingoMetricSpan(label, value string, span int) dingoMetricCell {
 	return cell
 }
 
-func dingoMetricStyledSpan(label, value string, severity uiSeverity, span int) dingoMetricCell {
+func dingoMetricStyledWide(label, value string, severity uiSeverity) dingoMetricCell {
 	cell := dingoMetricStyled(label, value, severity)
-	cell.Span = span
+	cell.Span = 2
 	return cell
 }
 
@@ -1642,6 +1642,7 @@ func getDingoConsoleText(ctx context.Context) string {
 	sb.WriteString(dingoConsoleChainLane(m, width))
 	sb.WriteString(dingoConsolePeerLane(m, width))
 	sb.WriteString(dingoConsoleFlowLane(m, width))
+	sb.WriteString(dingoConsoleForgeLeaderBand(m, width))
 	sb.WriteString(dingoConsoleSystemsBand(m, width))
 	return sb.String()
 }
@@ -1684,6 +1685,7 @@ func getDingoConsoleCompactText(metrics *PromMetrics, width int) string {
 		sb.WriteString(dingoConsolePeerCompact(metrics, width))
 	case 3:
 		sb.WriteString(dingoConsoleOperationsCompact(metrics, width))
+		sb.WriteString(dingoConsoleForgeLeaderBand(metrics, width))
 	default:
 		sb.WriteString(dingoConsoleDashboardCompact(metrics, width))
 	}
@@ -1837,8 +1839,8 @@ func dingoConsoleSystemsBand(metrics *PromMetrics, width int) string {
 		),
 		dingoMetricRow(
 			innerWidth,
-			dingoMetricStyledSpan("UTxO Cache", utxoCache, utxoSeverity, 2),
-			dingoMetricStyledSpan("Block Cache", blockCache, blockSeverity, 2),
+			dingoMetricStyledWide("UTxO Cache", utxoCache, utxoSeverity),
+			dingoMetricStyledWide("Block Cache", blockCache, blockSeverity),
 		),
 		dingoMetricRow(
 			innerWidth,

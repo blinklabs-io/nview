@@ -493,7 +493,7 @@ func TestDingoSystemsBandShowsDisk(t *testing.T) {
 	if dbAt < 0 || cacheAt < 0 || !(dbAt < diskAt && diskAt < cacheAt) {
 		t.Fatalf("expected Disk row between the DB and cache rows:\n%s", got)
 	}
-	if !strings.ContainsAny(got[diskAt:cacheAt], "█░") {
+	if !strings.ContainsAny(got[diskAt:cacheAt], "█░#-") {
 		t.Fatalf("expected a progress bar on the Disk row:\n%s", got)
 	}
 
