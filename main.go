@@ -915,6 +915,37 @@ func getOverviewText(ctx context.Context) string {
 	return sb.String()
 }
 
+// amaruIntakeText shows what Amaru did with the headers and transactions it was
+// offered. A series the scrape does not export reads n/a, never zero.
+func amaruIntakeText(m *PromMetrics) string {
+	count := func(exported bool, value uint64, severity uiSeverity) string {
+		if !exported {
+			return uiMuted("n/a")
+		}
+		return formatSeverityCount(value, severity)
+	}
+	headers := m.exports("amaru_consensus_header_total")
+	mempool := m.exports("amaru_metrics_mempoolTxInsertionsNum_int")
+	rejectedHeaders := uint64(0)
+	if m.AmaruHeadersTotal > m.AmaruHeadersValid {
+		rejectedHeaders = m.AmaruHeadersTotal - m.AmaruHeadersValid
+	}
+	var sb strings.Builder
+	sb.WriteString(uiSection("Intake"))
+	fmt.Fprintf(&sb, " %s   %s\n",
+		uiKV("Headers", count(headers, m.AmaruHeadersTotal, uiSeverityNeutral)),
+		uiKV("Rejected", count(headers, rejectedHeaders, dingoCounterSeverity(rejectedHeaders, uiSeverityWarn))),
+	)
+	fmt.Fprintf(&sb, " %s   %s\n",
+		uiKV("Tx OK", count(mempool, m.AmaruMempoolAccepted, uiSeverityNeutral)),
+		uiKV("Tx Dup", count(mempool, m.AmaruMempoolDuplicate, uiSeverityNeutral)),
+	)
+	fmt.Fprintf(&sb, " %s\n",
+		uiKV("Tx Invalid", count(mempool, m.AmaruMempoolInvalid, dingoCounterSeverity(m.AmaruMempoolInvalid, uiSeverityWarn))),
+	)
+	return sb.String()
+}
+
 func getOperatorFocusText(ctx context.Context) string {
 	select {
 	case <-ctx.Done():
@@ -946,6 +977,9 @@ func getOperatorFocusText(ctx context.Context) string {
 		uiKV("Served", uiValue(strconv.FormatUint(promMetrics.BlocksServed, 10))),
 		uiKV("Late", formatSeverityCount(promMetrics.BlocksLate, lateSeverity)),
 	)
+	if getEffectiveNodeBinary() == AMARU_BINARY {
+		sb.WriteString(amaruIntakeText(promMetrics))
+	}
 	return sb.String()
 }
 
@@ -3098,21 +3132,15 @@ func main() {
 			default:
 			}
 			proc, err := getProcessMetrics(ctx)
-			if err != nil {
-				recordSubsystemFailure(healthSubsystemProcess)
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(time.Second * 1):
+			if !recordProcessLookup(proc, err) {
+				delay := time.Second * 1
+				if getEffectiveNodeBinary() == AMARU_BINARY {
+					delay = ProcessDiscoveryRefresh
 				}
-				continue
-			}
-			if proc == nil || proc.Pid <= 0 {
-				recordSubsystemFailure(healthSubsystemProcess)
 				select {
 				case <-ctx.Done():
 					return
-				case <-time.After(time.Second * 1):
+				case <-time.After(delay):
 				}
 				continue
 			}
@@ -3135,6 +3163,11 @@ func main() {
 			default:
 			}
 			uptime := getUptimes(ctx, processMetrics)
+			if m := promMetrics.Load(); m != nil &&
+				getEffectiveNodeBinary() == AMARU_BINARY &&
+				m.exports("process_runtime") {
+				uptime = m.AmaruProcessRuntime
+			}
 			if uptime != 0 {
 				uptimes = uptime
 			}
@@ -3307,12 +3340,15 @@ func main() {
 			default:
 			}
 			if failCount() >= cfg.App.Retries {
-				panic(
-					fmt.Errorf(
-						"COULD NOT CONNECT TO A RUNNING INSTANCE, %d FAILED ATTEMPTS IN A ROW",
-						failCount(),
-					),
+				// Stop the UI before reporting, so the terminal is restored
+				// instead of being left in raw mode by a panic.
+				err := fmt.Errorf(
+					"COULD NOT CONNECT TO A RUNNING INSTANCE, %d FAILED ATTEMPTS IN A ROW",
+					failCount(),
 				)
+				connectFailure.Store(&err)
+				app.Stop()
+				return
 			}
 
 			// Refresh all the things
@@ -3329,9 +3365,34 @@ func main() {
 	if err := app.SetRoot(pages, true).EnableMouse(false).Run(); err != nil {
 		panic(err)
 	}
+	if failure := connectFailure.Load(); failure != nil {
+		fmt.Fprintln(os.Stderr, "error:", *failure)
+		cancel()
+		os.Exit(1)
+	}
 }
 
+// connectFailure holds the error that made the refresh loop give up.
+var connectFailure atomic.Pointer[error]
+
 var uptimes uint64
+
+// recordProcessLookup records the outcome of a node process lookup and reports
+// whether a process was found. Amaru is scraped through a Collector that may
+// run on another host, so for it a missing local process is expected: its
+// resource use comes from the scrape and the lookup is never a failure.
+func recordProcessLookup(proc *process.Process, err error) bool {
+	found := err == nil && proc != nil && proc.Pid > 0
+	if found {
+		return true
+	}
+	if getEffectiveNodeBinary() == AMARU_BINARY {
+		recordSubsystemSuccess(healthSubsystemProcess)
+		return false
+	}
+	recordSubsystemFailure(healthSubsystemProcess)
+	return false
+}
 
 func getUptimes(ctx context.Context, processMetrics *process.Process) uint64 {
 	if processMetrics == nil {
@@ -4220,6 +4281,15 @@ func getMithrilStats() string {
 	return sb.String()
 }
 
+// displayEpoch prefers the epoch in the scrape being drawn over the cached one,
+// which is refreshed on a timer and reads 0 until its first update.
+func displayEpoch(metrics *PromMetrics) uint64 {
+	if metrics != nil && metrics.EpochNum != 0 {
+		return metrics.EpochNum
+	}
+	return currentEpoch
+}
+
 func getEpochProgress(metrics *PromMetrics) float32 {
 	cfg := config.GetConfig()
 	if cfg.Node.ShelleyTransEpoch < 0 {
@@ -4345,7 +4415,7 @@ func getEpochText(ctx context.Context) string {
 	severity := mithrilProgressSeverity(float64(epochProgress))
 
 	fmt.Fprintf(&sb, " %s   %s\n",
-		uiKV("Epoch", uiValue(strconv.FormatUint(currentEpoch, 10))),
+		uiKV("Epoch", uiValue(strconv.FormatUint(displayEpoch(promMetrics), 10))),
 		uiKV("Remaining", uiValue(formatEpochRemaining(promMetrics))),
 	)
 	fmt.Fprintf(&sb, " %s\n",
@@ -4427,6 +4497,13 @@ func getConnectionText(ctx context.Context) string {
 			return connectionText
 		}
 		fmt.Fprintf(&sb, " %s\n", uiPill("p2p", "enabled", uiSeverityOK))
+		if getEffectiveNodeBinary() == AMARU_BINARY && !promMetrics.NetworkExported {
+			// Amaru exports no connection or peer series, so zeros would claim
+			// a node with no peers.
+			fmt.Fprintf(&sb, " %s\n", uiKV("Connections", uiMuted("n/a")))
+			fmt.Fprintf(&sb, " %s\n", uiKV("Peers", uiMuted("n/a")))
+			return sb.String()
+		}
 		fmt.Fprintf(&sb, " %s   %s\n",
 			uiKV("Incoming", uiValue(strconv.FormatUint(promMetrics.ConnIncoming, 10))),
 			uiKV("Outgoing", uiValue(strconv.FormatUint(promMetrics.ConnOutgoing, 10))),
@@ -4829,6 +4906,19 @@ func formatBlockPropagationPercent(value float64) string {
 
 func currentNodeVersionInfo() (string, string) {
 	promMetrics := promMetrics.Load()
+	if promMetrics != nil && getEffectiveNodeBinary() == AMARU_BINARY {
+		version := strings.TrimSpace(promMetrics.AmaruBuildVersion)
+		revision := strings.TrimSpace(promMetrics.AmaruBuildRevision)
+		if version != "" {
+			if revision == "" {
+				revision = "metrics"
+			}
+			if len(revision) > 8 {
+				revision = revision[:8]
+			}
+			return version, revision
+		}
+	}
 	if promMetrics != nil && getEffectiveNodeBinary() == DINGO_BINARY {
 		version := strings.TrimSpace(promMetrics.DingoBuildVersion)
 		revision := strings.TrimSpace(promMetrics.DingoBuildCommit)
@@ -4930,16 +5020,20 @@ func getPeerText(ctx context.Context) string {
 
 	if promMetrics != nil {
 		sb.WriteString(uiSection("Selection"))
-		fmt.Fprintf(&sb, " %s   %s   %s\n",
-			uiKV("Known", uiValue(strconv.FormatUint(promMetrics.PeersKnown, 10))),
-			uiKV("Established", uiValue(strconv.FormatUint(promMetrics.PeersEstablished, 10))),
-			uiKV("Active", uiValue(strconv.FormatUint(promMetrics.PeersActive, 10))),
-		)
-		fmt.Fprintf(&sb, " %s   %s   %s\n",
-			uiKV("Hot", uiValue(strconv.FormatUint(promMetrics.PeersHot, 10))),
-			uiKV("Warm", uiValue(strconv.FormatUint(promMetrics.PeersWarm, 10))),
-			uiKV("Cold", uiValue(strconv.FormatUint(promMetrics.PeersCold, 10))),
-		)
+		if getEffectiveNodeBinary() == AMARU_BINARY && !promMetrics.NetworkExported {
+			fmt.Fprintf(&sb, " %s\n", uiKV("Peers", uiMuted("n/a")))
+		} else {
+			fmt.Fprintf(&sb, " %s   %s   %s\n",
+				uiKV("Known", uiValue(strconv.FormatUint(promMetrics.PeersKnown, 10))),
+				uiKV("Established", uiValue(strconv.FormatUint(promMetrics.PeersEstablished, 10))),
+				uiKV("Active", uiValue(strconv.FormatUint(promMetrics.PeersActive, 10))),
+			)
+			fmt.Fprintf(&sb, " %s   %s   %s\n",
+				uiKV("Hot", uiValue(strconv.FormatUint(promMetrics.PeersHot, 10))),
+				uiKV("Warm", uiValue(strconv.FormatUint(promMetrics.PeersWarm, 10))),
+				uiKV("Cold", uiValue(strconv.FormatUint(promMetrics.PeersCold, 10))),
+			)
+		}
 		if promMetrics.DingoPeerPromotionsLedger > 0 ||
 			promMetrics.DingoPeerDemotionsLedger > 0 ||
 			promMetrics.PeerWarmPromotions > 0 ||
@@ -5075,8 +5169,41 @@ func getPeerText(ctx context.Context) string {
 	return sb.String()
 }
 
+// amaruResourceText renders the resource use Amaru reports in its scrape. It
+// has no GC counters and its process is not necessarily on this host.
+func amaruResourceText(m *PromMetrics) string {
+	cpuPercent := m.AmaruProcessCPU
+	cpuSeverity := uiSeverityOK
+	if cpuPercent >= 90 {
+		cpuSeverity = uiSeverityCritical
+	} else if cpuPercent >= 70 {
+		cpuSeverity = uiSeverityWarn
+	}
+	var sb strings.Builder
+	fmt.Fprintf(&sb, " %s %s   %s\n",
+		uiLabel("CPU"),
+		uiSeverityValue(fmt.Sprintf("%.2f%%", cpuPercent), cpuSeverity),
+		uiProgressBar(cpuPercent, 14, cpuSeverity),
+	)
+	fmt.Fprintf(&sb, " %s   %s\n",
+		uiKV("RSS", uiValue(formatMemoryBytes(m.AmaruMemoryResident))),
+		uiKV("Footprint", uiValue(formatMemoryBytes(m.AmaruMemoryFootprint))),
+	)
+	fmt.Fprintf(&sb, " %s\n",
+		uiKV("Host Mem", uiValue(fmt.Sprintf("%s / %s",
+			formatMemoryBytes(m.AmaruHostMemoryUsed),
+			formatMemoryBytes(m.AmaruHostMemoryTotal),
+		))),
+	)
+	return sb.String()
+}
+
 func getResourceText(ctx context.Context) string {
 	promMetrics := promMetrics.Load()
+	if promMetrics != nil && getEffectiveNodeBinary() == AMARU_BINARY &&
+		promMetrics.exports("process_cpu_live") {
+		return amaruResourceText(promMetrics)
+	}
 	if processMetrics == nil || promMetrics == nil {
 		return resourceText
 	}

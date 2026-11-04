@@ -168,8 +168,12 @@ func TestPromMetricsRecordedDingo088Preview(t *testing.T) {
 	for name := range presenceTrackedPromMetrics {
 		// The backfill series only exist while a backfill runs, which the
 		// recorded node was not doing.
-		backfill := strings.HasPrefix(name, "dingo_mithril_sync_backfill_")
-		if got := m.exports(name); got == backfill {
+		// The Amaru series identify Amaru, so a Dingo scrape must not have them.
+		absent := strings.HasPrefix(name, "dingo_mithril_sync_backfill_") ||
+			name == "process_runtime" ||
+			name == "process_cpu_live" ||
+			strings.HasPrefix(name, "amaru_")
+		if got := m.exports(name); got == absent {
 			t.Errorf("exports(%q) = %v for a recorded Dingo 0.88.1 scrape", name, got)
 		}
 	}

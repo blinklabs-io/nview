@@ -97,7 +97,6 @@ func getDefaultConfig() *Config {
 			ImageProtocol: "auto",
 		},
 		Node: NodeConfig{
-			Binary:            "cardano-node",
 			Network:           "mainnet",
 			Port:              3001,
 			ShelleyTransEpoch: -1,

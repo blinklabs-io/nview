@@ -40,6 +40,26 @@ The tool automatically detects the running node type based on Prometheus metrics
 and adjusts its display accordingly. No configuration changes are needed - just
 run nview against any supported Cardano node.
 
+### Running with Amaru
+
+Amaru has no Prometheus endpoint of its own. It exports OpenTelemetry metrics to
+an OpenTelemetry Collector, and nview scrapes the Collector's Prometheus
+exporter.
+
+1. Start Amaru with `AMARU_WITH_OPEN_TELEMETRY=1` and
+   `OTEL_EXPORTER_OTLP_ENDPOINT` set to the Collector's OTLP/gRPC address.
+2. Configure the Collector's `prometheus` exporter with
+   `add_metric_suffixes: false`, so metric names stay `cardano_node_metrics_*`.
+3. Point nview at the exporter with `PROM_HOST` and `PROM_PORT`.
+
+Set `OTEL_METRIC_EXPORT_INTERVAL` below 60 seconds and the Collector's
+`metric_expiration` above it, or the series expire between exports.
+
+nview recognises Amaru from its `process_*` and `amaru_consensus_*` metrics. It
+reads the version, uptime, CPU and memory from the scrape, because the Collector
+may run on another host from the node. Amaru does not export peer counters, so
+those stay at zero.
+
 ## Usage
 
 Running nview against a running Cardano Node will work out of the box with a

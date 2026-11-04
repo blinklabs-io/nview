@@ -54,6 +54,12 @@ type peerProbe struct {
 func filterPeers(ctx context.Context) error {
 	var peers []string
 	if processMetrics == nil {
+		if getEffectiveNodeBinary() == AMARU_BINARY {
+			// Amaru is scraped through a Collector, so there may be no local
+			// process whose sockets could be listed.
+			resetPeers()
+			return nil
+		}
 		return errors.New("process metrics not available for peer filtering")
 	}
 	cfg := config.GetConfig()
