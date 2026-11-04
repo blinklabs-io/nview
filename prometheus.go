@@ -154,6 +154,32 @@ type PromMetrics struct {
 	DingoBuildCommit      string `json:"dingo_build_info_commit"`
 	DingoBuildGoVersion   string `json:"dingo_build_info_goversion"`
 
+	// Amaru exports resource use and build info through its OpenTelemetry
+	// Collector instead of a local process, so these replace the PID lookup.
+	AmaruProcessRuntime      uint64  `json:"process_runtime"`
+	AmaruProcessCPU          float64 `json:"process_cpu_live"`
+	AmaruMemoryResident      uint64  `json:"process_memory_live_resident"`
+	AmaruMemoryFootprint     uint64  `json:"process_memory_footprint"`
+	AmaruHostMemoryTotal     uint64  `json:"host_memory_total"`
+	AmaruHostMemoryUsed      uint64  `json:"host_memory_used"`
+	AmaruHeadersTotal        uint64  `json:"amaru_consensus_header_total"`
+	AmaruHeadersValid        uint64  `json:"amaru_consensus_header_total_valid"`
+	AmaruMempoolAccepted     uint64  `json:"amaru_metrics_mempoolTxInsertionsNum_int_accepted"`
+	AmaruMempoolDuplicate    uint64  `json:"amaru_metrics_mempoolTxInsertionsNum_int_rejected_duplicate"`
+	AmaruMempoolInvalid      uint64  `json:"amaru_metrics_mempoolTxInsertionsNum_int_rejected_invalid"`
+	AmaruBlockFetchSum       float64 `json:"amaru_consensus_block_fetch_duration_microseconds_sum"`
+	AmaruBlockFetchCount     uint64  `json:"amaru_consensus_block_fetch_duration_microseconds_count"`
+	AmaruBlockFetchWaitSum   float64 `json:"amaru_consensus_block_fetch_wait_duration_microseconds_sum"`
+	AmaruBlockFetchWaitCount uint64  `json:"amaru_consensus_block_fetch_wait_duration_microseconds_count"`
+	AmaruHeaderForwardSum    float64 `json:"amaru_consensus_header_forward_duration_microseconds_sum"`
+	AmaruHeaderForwardCount  uint64  `json:"amaru_consensus_header_forward_duration_microseconds_count"`
+	AmaruSlotToHeaderSum     float64 `json:"amaru_consensus_slot_start_to_header_duration_microseconds_sum"`
+	AmaruSlotToHeaderCount   uint64  `json:"amaru_consensus_slot_start_to_header_duration_microseconds_count"`
+	AmaruForkSwitchSum       float64 `json:"amaru_consensus_fork_switch_duration_microseconds_sum"`
+	AmaruForkSwitchCount     uint64  `json:"amaru_consensus_fork_switch_duration_microseconds_count"`
+	AmaruBuildVersion        string  `json:"cardano_node_metrics_cardano_build_info_version"`
+	AmaruBuildRevision       string  `json:"cardano_node_metrics_cardano_build_info_revision"`
+
 	// Dingo-native metrics
 	DingoDbSizeBytes          uint64 `json:"dingo_database_size_bytes"`
 	DingoDbBlobSizeBytes      uint64 `json:"dingo_database_size_bytes_blob"`
@@ -280,25 +306,30 @@ type PromMetrics struct {
 	DingoStakeSnapshotPoolCount   uint64 `json:"dingo_metrics_stake_snapshot_pool_count_int"`
 	DingoStakeSnapshotActiveStake uint64 `json:"dingo_metrics_stake_snapshot_total_active_stake_lovelace"`
 
-	DingoForgeCredentialsValid  uint64             `json:"dingo_forge_credentials_valid"`
-	DingoForgeOpCertLoaded      uint64             `json:"dingo_forge_opcert_counter_loaded"`
-	DingoForgeOpCertOnChain     uint64             `json:"dingo_forge_opcert_counter_onchain"`
-	DingoForgeSlotsPerKESPeriod uint64             `json:"dingo_forge_slots_per_kes_period"`
-	DingoKESAgentConnected      uint64             `json:"dingo_kes_agent_connected"`
-	DingoKESAgentSignSuccess    uint64             `json:"dingo_kes_agent_sign_success_total"`
-	DingoKESAgentSignFailure    uint64             `json:"dingo_kes_agent_sign_failure_total"`
-	DingoLeaderWon              uint64             `json:"dingo_metrics_leader_slot_won_total"`
-	DingoLeaderNotWon           uint64             `json:"dingo_metrics_leader_slot_not_won_total"`
-	DingoMissedLeaderSlots      uint64             `json:"dingo_forge_missed_leader_slots_total"`
-	DingoSlotBattles            uint64             `json:"dingo_metrics_slotBattlesTotal_int"`
-	DingoLeaderLastEpochChecked uint64             `json:"dingo_metrics_leader_last_epoch_slots_checked_int"`
-	DingoLeaderLastEpochWon     uint64             `json:"dingo_metrics_leader_last_epoch_slots_won_int"`
-	DingoLeaderLastEpochNotWon  uint64             `json:"dingo_metrics_leader_last_epoch_slots_not_won_int"`
-	DingoLeaderLastEpoch        uint64             `json:"dingo_metrics_leader_last_evaluated_epoch_int"`
-	DingoOwnEquivocations       uint64             `json:"dingo_equivocation_total_self"`
-	PromMetricPresent           map[string]bool    `json:"prom_metric_present"`
-	CollectedAt                 time.Time          `json:"-"`
-	DingoCounterWindow          DingoCounterWindow `json:"-"`
+	DingoForgeCredentialsValid  uint64          `json:"dingo_forge_credentials_valid"`
+	DingoForgeOpCertLoaded      uint64          `json:"dingo_forge_opcert_counter_loaded"`
+	DingoForgeOpCertOnChain     uint64          `json:"dingo_forge_opcert_counter_onchain"`
+	DingoForgeSlotsPerKESPeriod uint64          `json:"dingo_forge_slots_per_kes_period"`
+	DingoKESAgentConnected      uint64          `json:"dingo_kes_agent_connected"`
+	DingoKESAgentSignSuccess    uint64          `json:"dingo_kes_agent_sign_success_total"`
+	DingoKESAgentSignFailure    uint64          `json:"dingo_kes_agent_sign_failure_total"`
+	DingoLeaderWon              uint64          `json:"dingo_metrics_leader_slot_won_total"`
+	DingoLeaderNotWon           uint64          `json:"dingo_metrics_leader_slot_not_won_total"`
+	DingoMissedLeaderSlots      uint64          `json:"dingo_forge_missed_leader_slots_total"`
+	DingoSlotBattles            uint64          `json:"dingo_metrics_slotBattlesTotal_int"`
+	DingoLeaderLastEpochChecked uint64          `json:"dingo_metrics_leader_last_epoch_slots_checked_int"`
+	DingoLeaderLastEpochWon     uint64          `json:"dingo_metrics_leader_last_epoch_slots_won_int"`
+	DingoLeaderLastEpochNotWon  uint64          `json:"dingo_metrics_leader_last_epoch_slots_not_won_int"`
+	DingoLeaderLastEpoch        uint64          `json:"dingo_metrics_leader_last_evaluated_epoch_int"`
+	DingoOwnEquivocations       uint64          `json:"dingo_equivocation_total_self"`
+	PromMetricPresent           map[string]bool `json:"prom_metric_present"`
+	// ConnectionsExported and PeerSelectionExported report whether the scrape
+	// carried any connection or any peer selection series, so a node that
+	// exports none reads n/a, not zero.
+	ConnectionsExported   bool               `json:"connection_metrics_present"`
+	PeerSelectionExported bool               `json:"peer_selection_metrics_present"`
+	CollectedAt           time.Time          `json:"-"`
+	DingoCounterWindow    DingoCounterWindow `json:"-"`
 
 	// DingoPresentMetrics records which optional Dingo series the scrape
 	// carried, so a series a node does not export is not read as a zero.
@@ -364,11 +395,23 @@ func detectNodeType(metrics *PromMetrics) {
 		return
 	}
 
-	if metrics.GoMemAlloc > 0 && metrics.MemLive == 0 {
+	if metrics.exports("process_runtime") ||
+		metrics.exports("process_cpu_live") ||
+		metrics.exports("amaru_consensus_header_total") {
+		detectedNodeBinary.Store(AMARU_BINARY)
+	} else if metrics.GoMemAlloc > 0 && metrics.MemLive == 0 {
 		detectedNodeBinary.Store(DINGO_BINARY)
 	} else {
 		detectedNodeBinary.Store(CARDANO_BINARY)
 	}
+}
+
+// nodeBinaryDetected reports whether a scrape has established the node binary.
+// Until then the effective binary is only the default, so a failed local
+// process lookup says nothing about whether the node is running.
+func nodeBinaryDetected() bool {
+	val, _ := detectedNodeBinary.Load().(string)
+	return val != ""
 }
 
 // getEffectiveNodeBinary returns the detected node binary if available, otherwise the configured one
@@ -379,6 +422,9 @@ func getEffectiveNodeBinary() string {
 		}
 	}
 	cfg := config.GetConfig()
+	if cfg.Node.Binary == "" {
+		return CARDANO_BINARY
+	}
 	return cfg.Node.Binary
 }
 
@@ -686,6 +732,29 @@ func setPromMetricValueWithLabels(out map[string]any, name string, value float64
 	if isLeiosPromMetric(name) {
 		setNamedMetricValue(out, "leios_metrics", name, value, labels)
 	}
+	if strings.HasPrefix(name, "cardano_node_metrics_connectionManager_") {
+		out["connection_metrics_present"] = true
+	}
+	if strings.HasPrefix(name, "cardano_node_metrics_peerSelection_") {
+		out["peer_selection_metrics_present"] = true
+	}
+	switch name {
+	case "amaru_metrics_mempoolTxInsertionsNum_int":
+		// Summed over origin: the operator question is what was accepted or
+		// rejected, not who sent it.
+		bucketByLabel(out, name, value, labels, "result", false)
+		return
+	case "amaru_consensus_header_total":
+		bucketByLabel(out, name, value, labels, "outcome", true)
+		return
+	}
+	if name == "cardano_node_metrics_cardano_build_info" {
+		for _, label := range []string{"version", "revision"} {
+			if value := strings.TrimSpace(labelValue(labels, label)); value != "" {
+				out[name+"_"+label] = value
+			}
+		}
+	}
 	if name == "dingo_build_info" {
 		for _, label := range []string{"version", "commit", "goversion"} {
 			if value := strings.TrimSpace(labelValue(labels, label)); value != "" {
@@ -833,8 +902,8 @@ func normalizedMetricLabelPart(value string) string {
 	return strings.ToLower(replacer.Replace(value))
 }
 
-// presenceTrackedPromMetrics are the optional Dingo series whose absence must
-// not read as a healthy zero.
+// presenceTrackedPromMetrics are the optional series whose absence must not
+// read as a healthy zero. The Amaru entries are also how it is recognised.
 var presenceTrackedPromMetrics = map[string]struct{}{
 	"dingo_metrics_peerSelection_hot_set_deficit":   {},
 	"dingo_chain_header_queue_length":               {},
@@ -851,6 +920,14 @@ var presenceTrackedPromMetrics = map[string]struct{}{
 	"dingo_chainsync_plateau_decisions_total":       {},
 	"dingo_keepalive_timeout_total":                 {},
 	"dingo_mithril_snapshot_restore_state":          {},
+	"process_runtime":                               {},
+	"process_cpu_live":                              {},
+	"process_memory_live_resident":                  {},
+	"process_memory_footprint":                      {},
+	"host_memory_total":                             {},
+	"host_memory_used":                              {},
+	"amaru_consensus_header_total":                  {},
+	"amaru_metrics_mempoolTxInsertionsNum_int":      {},
 }
 
 // exports reports whether the scrape carried the named series.
@@ -860,6 +937,12 @@ func (m *PromMetrics) exports(name string) bool {
 
 func shouldAggregatePromMetric(name string) bool {
 	return strings.HasPrefix(name, "event_") ||
+		strings.HasPrefix(name, "amaru_metrics_mempoolTxInsertionsNum_int_") ||
+		name == "amaru_consensus_header_total" ||
+		(strings.HasPrefix(name, "amaru_consensus_") &&
+			(strings.HasSuffix(name, "_microseconds_sum") ||
+				strings.HasSuffix(name, "_microseconds_count"))) ||
+		strings.HasPrefix(name, "amaru_consensus_header_total_") ||
 		name == "dingo_database_size_bytes" ||
 		name == "dingo_protocol_messages_received_total" ||
 		name == "dingo_blockfetch_shadow_gate_decisions_total" ||

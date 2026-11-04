@@ -122,11 +122,11 @@ func TestDetectNodeType(t *testing.T) {
 			expectedNodeName: "My Custom Node",
 		},
 		{
-			name:             "Nil metrics - early return",
+			name:             "Nil metrics - falls back to cardano-node",
 			metrics:          nil,
 			initialBinary:    "",
 			initialNodeName:  "Cardano Node",
-			expectedBinary:   "",
+			expectedBinary:   "cardano-node",
 			expectedNodeName: "Cardano Node",
 		},
 	}
