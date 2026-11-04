@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -78,13 +79,25 @@ func withAmaruState(t *testing.T) {
 	originalDetected, _ := detectedNodeBinary.Load().(string)
 	originalProm := promMetrics.Load()
 	originalProc := processMetrics
+	originalFailures := subsystemFailures[healthSubsystemProcess].Load()
+	peersFilteredMu.Lock()
+	peerStatsMu.Lock()
+	originalPeers := slices.Clone(peersFiltered)
+	originalPeerStats := peerStats
+	peerStatsMu.Unlock()
+	peersFilteredMu.Unlock()
 	t.Cleanup(func() {
 		cfg.Node.Binary = originalBinary
 		detectedNodeBinary.Store(originalDetected)
 		promMetrics.Store(originalProm)
 		processMetrics = originalProc
-		resetPeers()
-		recordSubsystemSuccess(healthSubsystemProcess)
+		subsystemFailures[healthSubsystemProcess].Store(originalFailures)
+		peersFilteredMu.Lock()
+		peerStatsMu.Lock()
+		peersFiltered = originalPeers
+		peerStats = originalPeerStats
+		peerStatsMu.Unlock()
+		peersFilteredMu.Unlock()
 	})
 	cfg.Node.Binary = ""
 	processMetrics = nil
@@ -123,7 +136,7 @@ func TestAmaruShowsVersionUptimeAndResourcesFromScrape(t *testing.T) {
 	}
 
 	text := getResourceText(context.Background())
-	for _, expected := range []string{"CPU", "0.41%", "RSS", "459.4M", "Host Mem", "939.8M / 7.6G"} {
+	for _, expected := range []string{"CPU", "0.41%", "RSS", "459.4M", "Host Mem", "939.8M", "7.6G"} {
 		if !strings.Contains(text, expected) {
 			t.Errorf("resource text missing %q:\n%s", expected, text)
 		}
@@ -144,9 +157,10 @@ func TestAmaruWithoutLocalProcessIsNotAFailure(t *testing.T) {
 				t.Fatalf("%s: lookup of no process reported found", binary)
 			}
 		}
-		failed := failCount() > 0
+		failures := subsystemFailures[healthSubsystemProcess].Load()
+		failed := failures > 0
 		if binary == AMARU_BINARY && failed {
-			t.Errorf("%s: %d failures recorded, expected none", binary, failCount())
+			t.Errorf("%s: %d failures recorded, expected none", binary, failures)
 		}
 		if binary == CARDANO_BINARY && !failed {
 			t.Errorf("%s: a missing node process must still count as a failure", binary)
@@ -203,32 +217,36 @@ func TestAmaruWithoutNetworkSeriesReadsNotAvailable(t *testing.T) {
 	t.Cleanup(func() { p2p = originalP2P })
 
 	m := decodeAmaruFixture(t)
-	if m.NetworkExported {
+	if m.ConnectionsExported || m.PeerSelectionExported {
 		t.Fatal("the recorded Amaru scrape has no connection or peer series")
 	}
 	promMetrics.Store(m)
 	detectNodeType(m)
 	text := getConnectionText(context.Background())
-	if strings.Count(text, "n/a") < 2 || strings.Contains(text, "Incoming") {
-		t.Errorf("connection text should read n/a without counts:\n%s", text)
+	if strings.Count(text, "n/a") != 8 {
+		t.Errorf("all eight connection and peer rows should read n/a:\n%s", text)
 	}
 
-	exported := &PromMetrics{ConnIncoming: 3, NetworkExported: true}
+	exported := &PromMetrics{ConnIncoming: 3, ConnectionsExported: true, PeerSelectionExported: true}
 	promMetrics.Store(exported)
 	text = getConnectionText(context.Background())
-	if !strings.Contains(text, "Incoming") || strings.Contains(text, "n/a") {
+	if !strings.Contains(text, "Incoming") || !strings.Contains(text, "3") || strings.Contains(text, "n/a") {
 		t.Errorf("exported counts should be shown:\n%s", text)
 	}
 }
 
 func TestPromMetricsNetworkExportedFollowsSeries(t *testing.T) {
 	m := decodePromMetrics(t, []byte("cardano_node_metrics_connectionManager_inboundConns_int 2\n"))
-	if !m.NetworkExported {
-		t.Error("NetworkExported = false for a scrape with a connectionManager series")
+	if !m.ConnectionsExported || m.PeerSelectionExported {
+		t.Errorf("connection series: connections=%v peers=%v, expected true/false", m.ConnectionsExported, m.PeerSelectionExported)
+	}
+	m = decodePromMetrics(t, []byte("cardano_node_metrics_peerSelection_KnownPeers_int 9\n"))
+	if m.ConnectionsExported || !m.PeerSelectionExported {
+		t.Errorf("peer series: connections=%v peers=%v, expected false/true", m.ConnectionsExported, m.PeerSelectionExported)
 	}
 	m = decodePromMetrics(t, []byte("cardano_node_metrics_slotNum_int 5\n"))
-	if m.NetworkExported {
-		t.Error("NetworkExported = true for a scrape with no connection or peer series")
+	if m.ConnectionsExported || m.PeerSelectionExported {
+		t.Error("a scrape with no connection or peer series reads as exported")
 	}
 }
 
@@ -343,6 +361,97 @@ func TestAmaruFocusPaneShowsLatency(t *testing.T) {
 	for _, expected := range []string{"Latency", "Fetch", "225ms", "2.00s"} {
 		if !strings.Contains(text, expected) {
 			t.Errorf("focus pane missing %q:\n%s", expected, text)
+		}
+	}
+}
+
+// TestAmaruPartialNetworkSeriesAreJudgedSeparately checks that exporting only
+// connection series does not turn the peer rows into zeros, and the reverse.
+func TestAmaruPartialNetworkSeriesAreJudgedSeparately(t *testing.T) {
+	withAmaruState(t)
+	originalP2P := p2p
+	p2p = true
+	t.Cleanup(func() { p2p = originalP2P })
+	detectedNodeBinary.Store(AMARU_BINARY)
+
+	promMetrics.Store(&PromMetrics{ConnIncoming: 7, ConnectionsExported: true})
+	text := getConnectionText(context.Background())
+	if !strings.Contains(text, "7") || strings.Count(text, "n/a") != 3 {
+		t.Errorf("connections only: expected counts for connections and n/a for Cold, Warm and Hot:\n%s", text)
+	}
+	if peers := getPeerText(context.Background()); !strings.Contains(peers, "Peers") || !strings.Contains(peers, "n/a") {
+		t.Errorf("connections only: peer selection should read n/a:\n%s", peers)
+	}
+
+	promMetrics.Store(&PromMetrics{PeersHot: 5, PeerSelectionExported: true})
+	text = getConnectionText(context.Background())
+	if strings.Count(text, "n/a") != 5 {
+		t.Errorf("peers only: expected n/a for the five connection rows:\n%s", text)
+	}
+}
+
+func TestAmaruResourcesReadNotAvailablePerSeries(t *testing.T) {
+	withAmaruState(t)
+	detectedNodeBinary.Store(AMARU_BINARY)
+
+	// Identified by process_runtime alone, with no CPU series.
+	m := &PromMetrics{
+		AmaruMemoryResident: 1 << 30,
+		DingoPresentMetrics: map[string]bool{
+			"process_runtime":              true,
+			"process_memory_live_resident": true,
+		},
+	}
+	promMetrics.Store(m)
+	text := getResourceText(context.Background())
+	if !strings.Contains(text, "1.0G") {
+		t.Errorf("exported RSS missing:\n%s", text)
+	}
+	if strings.Count(text, "n/a") != 4 {
+		t.Errorf("CPU, footprint and both host memory values should read n/a:\n%s", text)
+	}
+}
+
+// TestProcessLookupIsNotAFailureBeforeDetection checks that a lookup made before
+// the first scrape identified the node, when the binary is only the default,
+// cannot count toward giving up on an Amaru node that is slow to answer.
+func TestProcessLookupIsNotAFailureBeforeDetection(t *testing.T) {
+	withAmaruState(t)
+	detectedNodeBinary.Store("")
+
+	if recordProcessLookup(nil, nil) {
+		t.Fatal("lookup of no process reported found")
+	}
+	if got := subsystemFailures[healthSubsystemProcess].Load(); got != 0 {
+		t.Errorf("failures before detection = %d, expected none", got)
+	}
+	if err := filterPeers(context.Background()); err != nil {
+		t.Errorf("filterPeers() before detection = %v, expected nil", err)
+	}
+
+	detectedNodeBinary.Store(CARDANO_BINARY)
+	recordProcessLookup(nil, nil)
+	if got := subsystemFailures[healthSubsystemProcess].Load(); got != 1 {
+		t.Errorf("failures after detection = %d, expected 1", got)
+	}
+}
+
+// TestPromMetricsAmaruResourcePresenceFollowsSeries checks the parser marks each
+// resource series as exported, so an absent one can read n/a.
+func TestPromMetricsAmaruResourcePresenceFollowsSeries(t *testing.T) {
+	m := decodeAmaruFixture(t)
+	for _, name := range []string{
+		"process_runtime", "process_cpu_live", "process_memory_live_resident",
+		"process_memory_footprint", "host_memory_total", "host_memory_used",
+	} {
+		if !m.exports(name) {
+			t.Errorf("exports(%q) = false for the recorded Amaru scrape", name)
+		}
+	}
+	bare := decodePromMetrics(t, []byte("process_runtime 5\n"))
+	for _, name := range []string{"process_memory_live_resident", "host_memory_total"} {
+		if bare.exports(name) {
+			t.Errorf("exports(%q) = true for a scrape without it", name)
 		}
 	}
 }

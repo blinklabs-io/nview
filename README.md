@@ -60,7 +60,8 @@ reads the version, uptime, CPU and memory from the scrape, because the Collector
 may run on another host from the node. The Amaru Focus pane also shows header
 and mempool outcomes and the consensus durations (block fetch, header forward,
 slot start to header, fork switch) as a lifetime average and the average since
-the previous scrape. Amaru does not export peer counters, so those read `n/a`.
+the previous scrape. Amaru does not export peer counters, so those display as
+`n/a`.
 
 ## Usage
 

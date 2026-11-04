@@ -323,11 +323,13 @@ type PromMetrics struct {
 	DingoLeaderLastEpoch        uint64          `json:"dingo_metrics_leader_last_evaluated_epoch_int"`
 	DingoOwnEquivocations       uint64          `json:"dingo_equivocation_total_self"`
 	PromMetricPresent           map[string]bool `json:"prom_metric_present"`
-	// NetworkExported reports whether the scrape carried any connection or peer
-	// selection series, so a node that exports none reads n/a, not zero.
-	NetworkExported    bool               `json:"network_metrics_present"`
-	CollectedAt        time.Time          `json:"-"`
-	DingoCounterWindow DingoCounterWindow `json:"-"`
+	// ConnectionsExported and PeerSelectionExported report whether the scrape
+	// carried any connection or any peer selection series, so a node that
+	// exports none reads n/a, not zero.
+	ConnectionsExported   bool               `json:"connection_metrics_present"`
+	PeerSelectionExported bool               `json:"peer_selection_metrics_present"`
+	CollectedAt           time.Time          `json:"-"`
+	DingoCounterWindow    DingoCounterWindow `json:"-"`
 
 	// DingoPresentMetrics records which optional Dingo series the scrape
 	// carried, so a series a node does not export is not read as a zero.
@@ -402,6 +404,14 @@ func detectNodeType(metrics *PromMetrics) {
 	} else {
 		detectedNodeBinary.Store(CARDANO_BINARY)
 	}
+}
+
+// nodeBinaryDetected reports whether a scrape has established the node binary.
+// Until then the effective binary is only the default, so a failed local
+// process lookup says nothing about whether the node is running.
+func nodeBinaryDetected() bool {
+	val, _ := detectedNodeBinary.Load().(string)
+	return val != ""
 }
 
 // getEffectiveNodeBinary returns the detected node binary if available, otherwise the configured one
@@ -722,9 +732,11 @@ func setPromMetricValueWithLabels(out map[string]any, name string, value float64
 	if isLeiosPromMetric(name) {
 		setNamedMetricValue(out, "leios_metrics", name, value, labels)
 	}
-	if strings.HasPrefix(name, "cardano_node_metrics_connectionManager_") ||
-		strings.HasPrefix(name, "cardano_node_metrics_peerSelection_") {
-		out["network_metrics_present"] = true
+	if strings.HasPrefix(name, "cardano_node_metrics_connectionManager_") {
+		out["connection_metrics_present"] = true
+	}
+	if strings.HasPrefix(name, "cardano_node_metrics_peerSelection_") {
+		out["peer_selection_metrics_present"] = true
 	}
 	switch name {
 	case "amaru_metrics_mempoolTxInsertionsNum_int":
@@ -910,6 +922,10 @@ var presenceTrackedPromMetrics = map[string]struct{}{
 	"dingo_mithril_snapshot_restore_state":          {},
 	"process_runtime":                               {},
 	"process_cpu_live":                              {},
+	"process_memory_live_resident":                  {},
+	"process_memory_footprint":                      {},
+	"host_memory_total":                             {},
+	"host_memory_used":                              {},
 	"amaru_consensus_header_total":                  {},
 	"amaru_metrics_mempoolTxInsertionsNum_int":      {},
 }

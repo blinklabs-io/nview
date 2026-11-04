@@ -3236,13 +3236,12 @@ func main() {
 				return
 			default:
 			}
-			uptime := getUptimes(ctx, processMetrics)
 			if m := promMetrics.Load(); m != nil &&
 				getEffectiveNodeBinary() == AMARU_BINARY &&
 				m.exports("process_runtime") {
-				uptime = m.AmaruProcessRuntime
-			}
-			if uptime != 0 {
+				// The scrape is authoritative, so a restart to 0 is shown.
+				uptimes = m.AmaruProcessRuntime
+			} else if uptime := getUptimes(ctx, processMetrics); uptime != 0 {
 				uptimes = uptime
 			}
 			select {
@@ -3421,8 +3420,16 @@ func main() {
 					failCount(),
 				)
 				connectFailure.Store(&err)
-				app.Stop()
-				return
+				// Stop is a no-op until Run has started the screen, so repeat it
+				// until Run returns.
+				for {
+					app.Stop()
+					select {
+					case <-uiStopped:
+						return
+					case <-time.After(100 * time.Millisecond):
+					}
+				}
 			}
 
 			// Refresh all the things
@@ -3436,8 +3443,10 @@ func main() {
 		}
 	}()
 
-	if err := app.SetRoot(pages, true).EnableMouse(false).Run(); err != nil {
-		panic(err)
+	runErr := app.SetRoot(pages, true).EnableMouse(false).Run()
+	close(uiStopped)
+	if runErr != nil {
+		panic(runErr)
 	}
 	if failure := connectFailure.Load(); failure != nil {
 		fmt.Fprintln(os.Stderr, "error:", *failure)
@@ -3445,6 +3454,9 @@ func main() {
 		os.Exit(1)
 	}
 }
+
+// uiStopped is closed once the UI has returned from Run.
+var uiStopped = make(chan struct{})
 
 // connectFailure holds the error that made the refresh loop give up.
 var connectFailure atomic.Pointer[error]
@@ -3460,7 +3472,7 @@ func recordProcessLookup(proc *process.Process, err error) bool {
 	if found {
 		return true
 	}
-	if getEffectiveNodeBinary() == AMARU_BINARY {
+	if !nodeBinaryDetected() || getEffectiveNodeBinary() == AMARU_BINARY {
 		recordSubsystemSuccess(healthSubsystemProcess)
 		return false
 	}
@@ -4571,28 +4583,34 @@ func getConnectionText(ctx context.Context) string {
 			return connectionText
 		}
 		fmt.Fprintf(&sb, " %s\n", uiPill("p2p", "enabled", uiSeverityOK))
-		if getEffectiveNodeBinary() == AMARU_BINARY && !promMetrics.NetworkExported {
-			// Amaru exports no connection or peer series, so zeros would claim
-			// a node with no peers.
-			fmt.Fprintf(&sb, " %s\n", uiKV("Connections", uiMuted("n/a")))
-			fmt.Fprintf(&sb, " %s\n", uiKV("Peers", uiMuted("n/a")))
-			return sb.String()
+		// Amaru exports no connection or peer series, and zeros would claim a
+		// node with no peers. Each group is judged on its own series.
+		connections, peerSelection := true, true
+		if getEffectiveNodeBinary() == AMARU_BINARY {
+			connections = promMetrics.ConnectionsExported
+			peerSelection = promMetrics.PeerSelectionExported
+		}
+		count := func(exported bool, value uint64) string {
+			if !exported {
+				return uiMuted("n/a")
+			}
+			return uiValue(strconv.FormatUint(value, 10))
 		}
 		fmt.Fprintf(&sb, " %s   %s\n",
-			uiKV("Incoming", uiValue(strconv.FormatUint(promMetrics.ConnIncoming, 10))),
-			uiKV("Outgoing", uiValue(strconv.FormatUint(promMetrics.ConnOutgoing, 10))),
+			uiKV("Incoming", count(connections, promMetrics.ConnIncoming)),
+			uiKV("Outgoing", count(connections, promMetrics.ConnOutgoing)),
 		)
 		fmt.Fprintf(&sb, " %s   %s   %s\n",
-			uiKV("Cold", uiValue(strconv.FormatUint(promMetrics.PeersCold, 10))),
-			uiKV("Warm", uiValue(strconv.FormatUint(promMetrics.PeersWarm, 10))),
-			uiKV("Hot", uiValue(strconv.FormatUint(promMetrics.PeersHot, 10))),
+			uiKV("Cold", count(peerSelection, promMetrics.PeersCold)),
+			uiKV("Warm", count(peerSelection, promMetrics.PeersWarm)),
+			uiKV("Hot", count(peerSelection, promMetrics.PeersHot)),
 		)
 		fmt.Fprintf(&sb, " %s   %s\n",
-			uiKV("Uni", uiValue(strconv.FormatUint(promMetrics.ConnUniDir, 10))),
-			uiKV("Bi", uiValue(strconv.FormatUint(promMetrics.ConnBiDir, 10))),
+			uiKV("Uni", count(connections, promMetrics.ConnUniDir)),
+			uiKV("Bi", count(connections, promMetrics.ConnBiDir)),
 		)
 		fmt.Fprintf(&sb, " %s\n",
-			uiKV("FullDuplex", uiValue(strconv.FormatUint(promMetrics.ConnFullDuplex, 10))),
+			uiKV("FullDuplex", count(connections, promMetrics.ConnFullDuplex)),
 		)
 	} else {
 		if processMetrics == nil {
@@ -5094,7 +5112,7 @@ func getPeerText(ctx context.Context) string {
 
 	if promMetrics != nil {
 		sb.WriteString(uiSection("Selection"))
-		if getEffectiveNodeBinary() == AMARU_BINARY && !promMetrics.NetworkExported {
+		if getEffectiveNodeBinary() == AMARU_BINARY && !promMetrics.PeerSelectionExported {
 			fmt.Fprintf(&sb, " %s\n", uiKV("Peers", uiMuted("n/a")))
 		} else {
 			fmt.Fprintf(&sb, " %s   %s   %s\n",
@@ -5244,38 +5262,46 @@ func getPeerText(ctx context.Context) string {
 }
 
 // amaruResourceText renders the resource use Amaru reports in its scrape. It
-// has no GC counters and its process is not necessarily on this host.
+// has no GC counters and its process is not necessarily on this host. A series
+// the scrape does not export reads n/a.
 func amaruResourceText(m *PromMetrics) string {
-	cpuPercent := m.AmaruProcessCPU
-	cpuSeverity := uiSeverityOK
-	if cpuPercent >= 90 {
-		cpuSeverity = uiSeverityCritical
-	} else if cpuPercent >= 70 {
-		cpuSeverity = uiSeverityWarn
+	bytes := func(name string, value uint64) string {
+		if !m.exports(name) {
+			return uiMuted("n/a")
+		}
+		return uiValue(formatMemoryBytes(value))
 	}
 	var sb strings.Builder
-	fmt.Fprintf(&sb, " %s %s   %s\n",
-		uiLabel("CPU"),
-		uiSeverityValue(fmt.Sprintf("%.2f%%", cpuPercent), cpuSeverity),
-		uiProgressBar(cpuPercent, 14, cpuSeverity),
-	)
+	if m.exports("process_cpu_live") {
+		cpuPercent := m.AmaruProcessCPU
+		cpuSeverity := uiSeverityOK
+		if cpuPercent >= 90 {
+			cpuSeverity = uiSeverityCritical
+		} else if cpuPercent >= 70 {
+			cpuSeverity = uiSeverityWarn
+		}
+		fmt.Fprintf(&sb, " %s %s   %s\n",
+			uiLabel("CPU"),
+			uiSeverityValue(fmt.Sprintf("%.2f%%", cpuPercent), cpuSeverity),
+			uiProgressBar(cpuPercent, 14, cpuSeverity),
+		)
+	} else {
+		fmt.Fprintf(&sb, " %s\n", uiKV("CPU", uiMuted("n/a")))
+	}
 	fmt.Fprintf(&sb, " %s   %s\n",
-		uiKV("RSS", uiValue(formatMemoryBytes(m.AmaruMemoryResident))),
-		uiKV("Footprint", uiValue(formatMemoryBytes(m.AmaruMemoryFootprint))),
+		uiKV("RSS", bytes("process_memory_live_resident", m.AmaruMemoryResident)),
+		uiKV("Footprint", bytes("process_memory_footprint", m.AmaruMemoryFootprint)),
 	)
 	fmt.Fprintf(&sb, " %s\n",
-		uiKV("Host Mem", uiValue(fmt.Sprintf("%s / %s",
-			formatMemoryBytes(m.AmaruHostMemoryUsed),
-			formatMemoryBytes(m.AmaruHostMemoryTotal),
-		))),
+		uiKV("Host Mem", bytes("host_memory_used", m.AmaruHostMemoryUsed)+
+			uiUnit(" / ")+bytes("host_memory_total", m.AmaruHostMemoryTotal)),
 	)
 	return sb.String()
 }
 
 func getResourceText(ctx context.Context) string {
 	promMetrics := promMetrics.Load()
-	if promMetrics != nil && getEffectiveNodeBinary() == AMARU_BINARY &&
-		promMetrics.exports("process_cpu_live") {
+	if promMetrics != nil && getEffectiveNodeBinary() == AMARU_BINARY {
 		return amaruResourceText(promMetrics)
 	}
 	if processMetrics == nil || promMetrics == nil {

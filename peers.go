@@ -54,7 +54,7 @@ type peerProbe struct {
 func filterPeers(ctx context.Context) error {
 	var peers []string
 	if processMetrics == nil {
-		if getEffectiveNodeBinary() == AMARU_BINARY {
+		if !nodeBinaryDetected() || getEffectiveNodeBinary() == AMARU_BINARY {
 			// Amaru is scraped through a Collector, so there may be no local
 			// process whose sockets could be listed.
 			resetPeers()
@@ -71,6 +71,12 @@ func filterPeers(ctx context.Context) error {
 		processMetrics.Pid,
 	)
 	if err != nil {
+		if getEffectiveNodeBinary() == AMARU_BINARY {
+			// The sockets of a process that may not be the node are not a
+			// reason to give up on a node that reports through a Collector.
+			resetPeers()
+			return nil
+		}
 		return err
 	}
 

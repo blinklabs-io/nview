@@ -172,6 +172,8 @@ func TestPromMetricsRecordedDingo088Preview(t *testing.T) {
 		absent := strings.HasPrefix(name, "dingo_mithril_sync_backfill_") ||
 			name == "process_runtime" ||
 			name == "process_cpu_live" ||
+			strings.HasPrefix(name, "process_memory_") ||
+			strings.HasPrefix(name, "host_memory_") ||
 			strings.HasPrefix(name, "amaru_")
 		if got := m.exports(name); got == absent {
 			t.Errorf("exports(%q) = %v for a recorded Dingo 0.88.1 scrape", name, got)
