@@ -72,7 +72,12 @@ func resetDataDirCache() {
 // line names a different --data-dir.
 func TestResolveDataDirPrefersConfig(t *testing.T) {
 	useNodeBinary(t, DINGO_BINARY)
-	proc := startDingoProcessHelper(t, isolatedHome(t), "--data-dir", "/from/cmdline")
+	proc := startDingoProcessHelper(
+		t,
+		isolatedHome(t),
+		"--data-dir",
+		"/from/cmdline",
+	)
 	cfg := &config.Config{Node: config.NodeConfig{DataDir: "/from/config"}}
 
 	got := resolveDataDir(context.Background(), cfg, proc)
@@ -165,8 +170,18 @@ func TestResolveDataDirEmptyWhenUnknown(t *testing.T) {
 // process's path and not the cached one.
 func TestResolveDataDirCacheFollowsPID(t *testing.T) {
 	useNodeBinary(t, DINGO_BINARY)
-	first := startDingoProcessHelper(t, isolatedHome(t), "--data-dir", "/data/one")
-	second := startDingoProcessHelper(t, isolatedHome(t), "--data-dir", "/data/two")
+	first := startDingoProcessHelper(
+		t,
+		isolatedHome(t),
+		"--data-dir",
+		"/data/one",
+	)
+	second := startDingoProcessHelper(
+		t,
+		isolatedHome(t),
+		"--data-dir",
+		"/data/two",
+	)
 	ctx := context.Background()
 
 	if got := resolveDataDir(ctx, &config.Config{}, first); got != "/data/one" {
@@ -310,7 +325,12 @@ func TestDataDirFromArgs(t *testing.T) {
 		cwd  func() (string, error)
 		want string
 	}{
-		{"absolute ignores cwd", []string{"--data-dir", "/abs"}, failCwd, "/abs"},
+		{
+			"absolute ignores cwd",
+			[]string{"--data-dir", "/abs"},
+			failCwd,
+			"/abs",
+		},
 		{"relative joins cwd", []string{"--data-dir=db"}, okCwd, "/work/db"},
 		{"relative cwd error", []string{"--data-dir", "db"}, failCwd, ""},
 		{"flag absent", []string{"--other", "x"}, okCwd, ""},
@@ -330,7 +350,12 @@ func TestDataDirFromArgs(t *testing.T) {
 // must not be served, and the path is re-read from the command line.
 func TestResolveDataDirCacheRejectsReusedPID(t *testing.T) {
 	useNodeBinary(t, DINGO_BINARY)
-	proc := startDingoProcessHelper(t, isolatedHome(t), "--data-dir", "/data/new")
+	proc := startDingoProcessHelper(
+		t,
+		isolatedHome(t),
+		"--data-dir",
+		"/data/new",
+	)
 	createTime, err := proc.CreateTimeWithContext(context.Background())
 	if err != nil {
 		t.Skipf("cannot read helper create time: %v", err)
@@ -349,7 +374,11 @@ func TestResolveDataDirCacheRejectsReusedPID(t *testing.T) {
 	cachedTime := dataDirCache.createTime
 	dataDirCache.Unlock()
 	if cachedTime != createTime {
-		t.Fatalf("cache not refreshed: create time %d, want %d", cachedTime, createTime)
+		t.Fatalf(
+			"cache not refreshed: create time %d, want %d",
+			cachedTime,
+			createTime,
+		)
 	}
 }
 
@@ -385,13 +414,19 @@ func TestRefreshDashboardTextShowsDiskForDingo(t *testing.T) {
 	refreshDashboardText(context.Background())
 	if !strings.Contains(dingoConsoleText, "Disk") ||
 		!strings.Contains(dingoConsoleText, "%") {
-		t.Fatalf("expected Disk row in Dingo console, got:\n%s", dingoConsoleText)
+		t.Fatalf(
+			"expected Disk row in Dingo console, got:\n%s",
+			dingoConsoleText,
+		)
 	}
 
 	useDingoDashboard(t, "")
 	refreshDashboardText(context.Background())
 	if strings.Contains(dingoConsoleText, "Disk") {
-		t.Fatalf("expected no Disk row without a data dir, got:\n%s", dingoConsoleText)
+		t.Fatalf(
+			"expected no Disk row without a data dir, got:\n%s",
+			dingoConsoleText,
+		)
 	}
 }
 
@@ -416,8 +451,15 @@ func TestDingoCompactPagesShowDisk(t *testing.T) {
 	latestDisk.Store(nil)
 	for _, page := range []int32{0, 3} {
 		compactDingoPage.Store(page)
-		if got := getDingoConsoleCompactText(&PromMetrics{}, 80); strings.Contains(got, "Disk") {
-			t.Errorf("compact page %d shows Disk without a snapshot:\n%s", page, got)
+		if got := getDingoConsoleCompactText(&PromMetrics{}, 80); strings.Contains(
+			got,
+			"Disk",
+		) {
+			t.Errorf(
+				"compact page %d shows Disk without a snapshot:\n%s",
+				page,
+				got,
+			)
 		}
 	}
 }
@@ -433,14 +475,21 @@ func TestRebaseToRoot(t *testing.T) {
 	}
 	ownCopy := t.TempDir()
 
-	if got := rebaseToRoot(root, "/data/db"); got != filepath.Join(root, "data", "db") {
+	if got := rebaseToRoot(root, "/data/db"); got != filepath.Join(
+		root,
+		"data",
+		"db",
+	) {
 		t.Fatalf("expected path under node root, got %q", got)
 	}
 	if got := rebaseToRoot(root, "/elsewhere"); got != "" {
 		t.Fatalf("expected no path when absent under root, got %q", got)
 	}
 	if got := rebaseToRoot(root, ownCopy); got != "" {
-		t.Fatalf("a path that exists only in nview's namespace must not be used, got %q", got)
+		t.Fatalf(
+			"a path that exists only in nview's namespace must not be used, got %q",
+			got,
+		)
 	}
 }
 
@@ -498,7 +547,10 @@ func TestDingoSystemsBandShowsDisk(t *testing.T) {
 	}
 
 	latestDisk.Store(nil)
-	if got := dingoConsoleSystemsBand(&PromMetrics{}, 120); strings.Contains(got, "Disk") {
+	if got := dingoConsoleSystemsBand(&PromMetrics{}, 120); strings.Contains(
+		got,
+		"Disk",
+	) {
 		t.Fatalf("expected no Disk row without a snapshot:\n%s", got)
 	}
 }

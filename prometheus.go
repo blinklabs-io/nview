@@ -465,14 +465,33 @@ func prometheusText2json(prom []byte) ([]byte, error) {
 			name := val.GetName()
 			switch val.GetType() {
 			case dto.MetricType_COUNTER:
-				setPromMetricValueWithLabels(out, name, m.GetCounter().GetValue(), m.GetLabel())
+				setPromMetricValueWithLabels(
+					out,
+					name,
+					m.GetCounter().GetValue(),
+					m.GetLabel(),
+				)
 			case dto.MetricType_GAUGE:
-				setPromMetricValueWithLabels(out, name, m.GetGauge().GetValue(), m.GetLabel())
+				setPromMetricValueWithLabels(
+					out,
+					name,
+					m.GetGauge().GetValue(),
+					m.GetLabel(),
+				)
 			case dto.MetricType_UNTYPED:
-				setPromMetricValueWithLabels(out, name, m.GetUntyped().GetValue(), m.GetLabel())
+				setPromMetricValueWithLabels(
+					out,
+					name,
+					m.GetUntyped().GetValue(),
+					m.GetLabel(),
+				)
 			case dto.MetricType_SUMMARY:
 				// Extract count from SUMMARY metrics (e.g. go_gc_duration_seconds_count)
-				setPromMetricValue(out, name+"_count", float64(m.GetSummary().GetSampleCount()))
+				setPromMetricValue(
+					out,
+					name+"_count",
+					float64(m.GetSummary().GetSampleCount()),
+				)
 			case dto.MetricType_HISTOGRAM,
 				dto.MetricType_GAUGE_HISTOGRAM:
 				setPromHistogramValueWithLabels(
@@ -654,9 +673,14 @@ func applyPromMetricAliases(out map[string]any) {
 
 func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
 	var symbols labels.SymbolTable
-	parser, err := textparse.New(prom, contentType, &symbols, textparse.ParserOptions{
-		KeepClassicOnClassicAndNativeHistograms: true,
-	})
+	parser, err := textparse.New(
+		prom,
+		contentType,
+		&symbols,
+		textparse.ParserOptions{
+			KeepClassicOnClassicAndNativeHistograms: true,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -685,7 +709,10 @@ func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
 				return
 			}
 			name, labelValue := label.Name, label.Value
-			metricLabels = append(metricLabels, &dto.LabelPair{Name: &name, Value: &labelValue})
+			metricLabels = append(
+				metricLabels,
+				&dto.LabelPair{Name: &name, Value: &labelValue},
+			)
 		})
 		setPromMetricValueWithLabels(out, name, value, metricLabels)
 	}
@@ -702,7 +729,12 @@ func setPromMetricValue(out map[string]any, name string, value float64) {
 	out[name] = value
 }
 
-func setPromMetricValueWithLabels(out map[string]any, name string, value float64, labels []*dto.LabelPair) {
+func setPromMetricValueWithLabels(
+	out map[string]any,
+	name string,
+	value float64,
+	labels []*dto.LabelPair,
+) {
 	if math.IsNaN(value) || math.IsInf(value, 0) {
 		return
 	}
@@ -888,7 +920,10 @@ func metricLabelSuffix(labels []*dto.LabelPair) string {
 		if labelValue == "" {
 			continue
 		}
-		parts = append(parts, labelName+"="+normalizedMetricLabelPart(labelValue))
+		parts = append(
+			parts,
+			labelName+"="+normalizedMetricLabelPart(labelValue),
+		)
 	}
 	if len(parts) == 0 {
 		return ""
@@ -954,9 +989,15 @@ func shouldAggregatePromMetric(name string) bool {
 		name == "dingo_protocol_message_duration_seconds_sum" ||
 		name == "dingo_metrics_peerSelection_churn_promotions_by_source" ||
 		name == "dingo_metrics_peerSelection_churn_demotions_by_source" ||
-		strings.HasPrefix(name, "dingo_metrics_peerSelection_peers_by_source_") ||
+		strings.HasPrefix(
+			name,
+			"dingo_metrics_peerSelection_peers_by_source_",
+		) ||
 		strings.HasPrefix(name, "dingo_protocol_messages_received_total_") ||
-		strings.HasPrefix(name, "dingo_blockfetch_shadow_gate_decisions_total_") ||
+		strings.HasPrefix(
+			name,
+			"dingo_blockfetch_shadow_gate_decisions_total_",
+		) ||
 		strings.HasPrefix(name, "dingo_protocol_message_duration_seconds_") ||
 		name == "dingo_equivocation_total_self"
 }
@@ -986,7 +1027,11 @@ func normalizedLabelValue(labels []*dto.LabelPair, name string) string {
 	return value
 }
 
-func setMithrilLedgerImportStageValue(out map[string]any, name, stage string, value float64) {
+func setMithrilLedgerImportStageValue(
+	out map[string]any,
+	name, stage string,
+	value float64,
+) {
 	const key = "dingo_mithril_sync_ledger_import_stages"
 	stages, ok := out[key].(map[string]any)
 	if !ok {

@@ -59,7 +59,9 @@ func getNodeVersion() (version string, revision string, err error) {
 	return version, revision, err
 }
 
-func getNodeVersionUncached(binary string) (version string, revision string, err error) {
+func getNodeVersionUncached(
+	binary string,
+) (version string, revision string, err error) {
 	cmd := exec.Command(binary, "version") // #nosec G204
 	stdout, err := cmd.Output()
 	if err != nil {

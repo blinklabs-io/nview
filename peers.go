@@ -118,7 +118,12 @@ func filterPeers(ctx context.Context) error {
 	return nil
 }
 
-func appendFilteredPeer(peers []string, peerIP string, peerPort uint32, direction string) []string {
+func appendFilteredPeer(
+	peers []string,
+	peerIP string,
+	peerPort uint32,
+	direction string,
+) []string {
 	cfg := config.GetConfig()
 	peerPortText := strconv.FormatUint(uint64(peerPort), 10)
 	if peerIP == "127.0.0.1" || peerIP == "::1" ||
@@ -139,12 +144,21 @@ func appendFilteredPeer(peers []string, peerIP string, peerPort uint32, directio
 			return peers
 		}
 		peers = slices.Delete(peers, idx, idx+1)
-		return append(peers, fmt.Sprintf("%s;%s;%s", peerIP, nextPort, nextDirection))
+		return append(
+			peers,
+			fmt.Sprintf("%s;%s;%s", peerIP, nextPort, nextDirection),
+		)
 	}
-	return append(peers, fmt.Sprintf("%s;%s;%s", peerIP, peerPortText, direction))
+	return append(
+		peers,
+		fmt.Sprintf("%s;%s;%s", peerIP, peerPortText, direction),
+	)
 }
 
-func preferredPeerProbePort(existing peerProbe, nextPort, nextDirection string) string {
+func preferredPeerProbePort(
+	existing peerProbe,
+	nextPort, nextDirection string,
+) string {
 	if directionHasOutgoing(nextDirection) {
 		return nextPort
 	}

@@ -40,7 +40,7 @@ type AppConfig struct {
 	Retries       uint32 `yaml:"retries"       envconfig:"RETRIES"`
 	LogBufferSize uint32 `yaml:"logBufferSize" envconfig:"LOG_BUFFER_SIZE"`
 	// VisualMode selects the TUI glyph set: auto, unicode, plain or nerd.
-	VisualMode string `yaml:"visualMode" envconfig:"NVIEW_VISUAL_MODE"`
+	VisualMode string `yaml:"visualMode"    envconfig:"NVIEW_VISUAL_MODE"`
 	// ImageProtocol selects terminal image protocol detection: auto, none,
 	// kitty, iterm2 or sixel.
 	ImageProtocol string `yaml:"imageProtocol" envconfig:"NVIEW_IMAGE_PROTOCOL"`

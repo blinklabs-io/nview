@@ -17,7 +17,10 @@ func decodeFixture(t *testing.T, name string) PromMetrics {
 	if err != nil {
 		t.Fatalf("ReadFile() error = %v", err)
 	}
-	out, err := prom2jsonWithContentType(b, "application/openmetrics-text; version=1.0.0; charset=utf-8")
+	out, err := prom2jsonWithContentType(
+		b,
+		"application/openmetrics-text; version=1.0.0; charset=utf-8",
+	)
 	if err != nil {
 		t.Fatalf("prom2jsonWithContentType() error = %v", err)
 	}
@@ -153,7 +156,11 @@ func TestPromMetricsRecordedDingo088Preview(t *testing.T) {
 		{"inflight bytes", m.DingoBlockfetchInflightBytes, 0},
 		{"stalled, summed over reasons", m.DingoChainselectionStalled, 11},
 		{"gdd disconnects", m.DingoChainselectionGDDDisconnects, 0},
-		{"plateau decisions, summed over outcomes", m.DingoChainsyncPlateauDecisions, 0},
+		{
+			"plateau decisions, summed over outcomes",
+			m.DingoChainsyncPlateauDecisions,
+			0,
+		},
 		{"keepalive timeouts", m.DingoKeepaliveTimeouts, 29},
 		{"hot set deficit", m.DingoHotSetDeficit, 0},
 		{"mithril restore state", m.MithrilRestoreState, 0},
@@ -176,19 +183,30 @@ func TestPromMetricsRecordedDingo088Preview(t *testing.T) {
 			strings.HasPrefix(name, "host_memory_") ||
 			strings.HasPrefix(name, "amaru_")
 		if got := m.exports(name); got == absent {
-			t.Errorf("exports(%q) = %v for a recorded Dingo 0.88.1 scrape", name, got)
+			t.Errorf(
+				"exports(%q) = %v for a recorded Dingo 0.88.1 scrape",
+				name,
+				got,
+			)
 		}
 	}
 
 	chain := dingoConsoleChainLane(&m, 120)
 	for _, expected := range []string{"Backlog", "0/10000", "Inflight"} {
 		if !strings.Contains(chain, expected) {
-			t.Errorf("chain view of the recorded scrape missing %q:\n%s", expected, chain)
+			t.Errorf(
+				"chain view of the recorded scrape missing %q:\n%s",
+				expected,
+				chain,
+			)
 		}
 	}
 	for _, cell := range dingoAnomalyCells(&m, nil) {
 		if strings.Contains(cell.Value, "n/a") {
-			t.Errorf("anomaly %s reads n/a for a scrape that exports it", cell.Label)
+			t.Errorf(
+				"anomaly %s reads n/a for a scrape that exports it",
+				cell.Label,
+			)
 		}
 	}
 	if label, _ := dingoHotSetDeficit(&m); label != "0" {

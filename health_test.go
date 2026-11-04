@@ -27,7 +27,9 @@ import (
 
 type failingMetricsTransport struct{}
 
-func (failingMetricsTransport) RoundTrip(*http.Request) (*http.Response, error) {
+func (failingMetricsTransport) RoundTrip(
+	*http.Request,
+) (*http.Response, error) {
 	return nil, errors.New("metrics endpoint unavailable")
 }
 
@@ -84,10 +86,16 @@ func TestSubsystemFailuresAreIndependent(t *testing.T) {
 	recordSubsystemFailure(healthSubsystemPeers)
 	recordSubsystemSuccess(healthSubsystemPrometheus)
 	if got := subsystemFailures[healthSubsystemPrometheus].Load(); got != 0 {
-		t.Fatalf("prometheus failure count = %d after its own success, expected 0", got)
+		t.Fatalf(
+			"prometheus failure count = %d after its own success, expected 0",
+			got,
+		)
 	}
 	if got := subsystemFailures[healthSubsystemPeers].Load(); got != 1 {
-		t.Fatalf("peers failure count = %d, expected 1 to remain untouched", got)
+		t.Fatalf(
+			"peers failure count = %d, expected 1 to remain untouched",
+			got,
+		)
 	}
 }
 
@@ -118,7 +126,10 @@ func TestFailCountReportsWorstSubsystem(t *testing.T) {
 	recordSubsystemFailure(healthSubsystemPrometheus)
 
 	if got := failCount(); got != 5 {
-		t.Fatalf("failCount() = %d, expected 5 once Prometheus becomes the worst subsystem", got)
+		t.Fatalf(
+			"failCount() = %d, expected 5 once Prometheus becomes the worst subsystem",
+			got,
+		)
 	}
 
 	recordSubsystemSuccess(healthSubsystemPrometheus)
@@ -156,7 +167,9 @@ func TestGetPromMetricsAppliesResultExactlyOnce(t *testing.T) {
 
 	ctx := context.Background()
 	if _, err := getPromMetrics(ctx); err == nil {
-		t.Fatal("expected getPromMetrics to fail against an unreachable endpoint")
+		t.Fatal(
+			"expected getPromMetrics to fail against an unreachable endpoint",
+		)
 	}
 	if got := subsystemFailures[healthSubsystemPrometheus].Load(); got != 1 {
 		t.Fatalf(
@@ -251,6 +264,8 @@ func TestConcurrentPromMetricsPublicationAndRendering(t *testing.T) {
 	wg.Wait()
 
 	if inconsistent.Load() {
-		t.Fatal("observed a promMetrics snapshot with inconsistent fields, expected whole-struct replacement")
+		t.Fatal(
+			"observed a promMetrics snapshot with inconsistent fields, expected whole-struct replacement",
+		)
 	}
 }

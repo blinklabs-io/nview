@@ -73,7 +73,9 @@ func startNamedDingoProcessHelper(
 		}
 		executable = linkPath
 	}
-	cmdArgs := append([]string{"-test.run=TestDingoProcessHelper", "--"}, args...)
+	cmdArgs := append(
+		[]string{"-test.run=TestDingoProcessHelper", "--"},
+		args...)
 	cmd := exec.Command(executable, cmdArgs...)
 	cmd.Env = append(os.Environ(), "GO_WANT_DINGO_PROCESS_HELPER=1")
 	cmd.Env = append(cmd.Env, env...)
@@ -143,7 +145,11 @@ func TestFindDingoProcessUsesExplicitPID(t *testing.T) {
 		t.Fatalf("findDingoProcess() returned error: %v", err)
 	}
 	if proc.Pid != cfg.Node.Pid {
-		t.Fatalf("findDingoProcess() returned pid %d, expected %d", proc.Pid, cfg.Node.Pid)
+		t.Fatalf(
+			"findDingoProcess() returned pid %d, expected %d",
+			proc.Pid,
+			cfg.Node.Pid,
+		)
 	}
 }
 
@@ -184,7 +190,10 @@ func TestFindDingoProcessUsesSocketOwnerBeforePID1Fallback(t *testing.T) {
 	dingoProcessSelectionLogged.Store(false)
 	dingoProcessAmbiguityLogged.Store(false)
 	logger = slog.New(&bufferHandler{
-		handler: slog.NewTextHandler(&strings.Builder{}, &slog.HandlerOptions{}),
+		handler: slog.NewTextHandler(
+			&strings.Builder{},
+			&slog.HandlerOptions{},
+		),
 	})
 	logMutex.Lock()
 	logBuffer = nil
@@ -198,10 +207,18 @@ func TestFindDingoProcessUsesSocketOwnerBeforePID1Fallback(t *testing.T) {
 			port uint32,
 		) (int32, error) {
 			if host != cfg.Prometheus.Host {
-				t.Fatalf("socketOwner host = %q, expected %q", host, cfg.Prometheus.Host)
+				t.Fatalf(
+					"socketOwner host = %q, expected %q",
+					host,
+					cfg.Prometheus.Host,
+				)
 			}
 			if port != cfg.Prometheus.Port {
-				t.Fatalf("socketOwner port = %d, expected %d", port, cfg.Prometheus.Port)
+				t.Fatalf(
+					"socketOwner port = %d, expected %d",
+					port,
+					cfg.Prometheus.Port,
+				)
 			}
 			return socketOwnerProc.Pid, nil
 		},
@@ -211,7 +228,11 @@ func TestFindDingoProcessUsesSocketOwnerBeforePID1Fallback(t *testing.T) {
 	}
 
 	if proc.Pid != socketOwnerProc.Pid {
-		t.Fatalf("findDingoProcess() returned pid %d, expected socket owner pid %d", proc.Pid, socketOwnerProc.Pid)
+		t.Fatalf(
+			"findDingoProcess() returned pid %d, expected socket owner pid %d",
+			proc.Pid,
+			socketOwnerProc.Pid,
+		)
 	}
 
 	logMutex.Lock()
@@ -224,7 +245,11 @@ func TestFindDingoProcessUsesSocketOwnerBeforePID1Fallback(t *testing.T) {
 		"method=socket-owner",
 	} {
 		if !strings.Contains(joinedLogs, expected) {
-			t.Fatalf("expected log buffer to contain %q, got %q", expected, joinedLogs)
+			t.Fatalf(
+				"expected log buffer to contain %q, got %q",
+				expected,
+				joinedLogs,
+			)
 		}
 	}
 }
@@ -269,13 +294,19 @@ func TestFindDingoProcessFallsBackFromSocketErrorToCmdlineMatch(t *testing.T) {
 		t.Fatalf("findDingoProcess() returned error: %v", err)
 	}
 	if proc.Pid != matchingProc.Pid {
-		t.Fatalf("findDingoProcess() returned pid %d, expected cmdline match pid %d", proc.Pid, matchingProc.Pid)
+		t.Fatalf(
+			"findDingoProcess() returned pid %d, expected cmdline match pid %d",
+			proc.Pid,
+			matchingProc.Pid,
+		)
 	}
 }
 
 // TestFindDingoProcessWarnsAndPicksLowestPIDForDuplicateCmdlineMatches
 // verifies duplicate --metrics-port matches are treated as ambiguous.
-func TestFindDingoProcessWarnsAndPicksLowestPIDForDuplicateCmdlineMatches(t *testing.T) {
+func TestFindDingoProcessWarnsAndPicksLowestPIDForDuplicateCmdlineMatches(
+	t *testing.T,
+) {
 	cfg := config.GetConfig()
 	originalNodePid := cfg.Node.Pid
 	originalPromPort := cfg.Prometheus.Port
@@ -301,7 +332,10 @@ func TestFindDingoProcessWarnsAndPicksLowestPIDForDuplicateCmdlineMatches(t *tes
 	dingoProcessSelectionLogged.Store(false)
 	dingoProcessAmbiguityLogged.Store(false)
 	logger = slog.New(&bufferHandler{
-		handler: slog.NewTextHandler(&strings.Builder{}, &slog.HandlerOptions{}),
+		handler: slog.NewTextHandler(
+			&strings.Builder{},
+			&slog.HandlerOptions{},
+		),
 	})
 	logMutex.Lock()
 	logBuffer = nil
@@ -336,7 +370,11 @@ func TestFindDingoProcessWarnsAndPicksLowestPIDForDuplicateCmdlineMatches(t *tes
 		t.Fatalf("findDingoProcess() returned error: %v", err)
 	}
 	if proc.Pid != expectedPID {
-		t.Fatalf("findDingoProcess() returned pid %d, expected lowest duplicate match pid %d", proc.Pid, expectedPID)
+		t.Fatalf(
+			"findDingoProcess() returned pid %d, expected lowest duplicate match pid %d",
+			proc.Pid,
+			expectedPID,
+		)
 	}
 
 	logMutex.Lock()
@@ -350,7 +388,11 @@ func TestFindDingoProcessWarnsAndPicksLowestPIDForDuplicateCmdlineMatches(t *tes
 		"metrics-port=12798",
 	} {
 		if !strings.Contains(joinedLogs, expected) {
-			t.Fatalf("expected log buffer to contain %q, got %q", expected, joinedLogs)
+			t.Fatalf(
+				"expected log buffer to contain %q, got %q",
+				expected,
+				joinedLogs,
+			)
 		}
 	}
 }
@@ -395,13 +437,19 @@ func TestFindDingoProcessUsesEnvMetricsPortMatch(t *testing.T) {
 		t.Fatalf("findDingoProcess() returned error: %v", err)
 	}
 	if proc.Pid != matchingProc.Pid {
-		t.Fatalf("findDingoProcess() returned pid %d, expected env match pid %d", proc.Pid, matchingProc.Pid)
+		t.Fatalf(
+			"findDingoProcess() returned pid %d, expected env match pid %d",
+			proc.Pid,
+			matchingProc.Pid,
+		)
 	}
 }
 
 // TestFindDingoProcessWarnsAndPicksLowestPIDForAmbiguousMultiMatch verifies
 // the deterministic fallback and visible warning for ambiguous multi-instance setups.
-func TestFindDingoProcessWarnsAndPicksLowestPIDForAmbiguousMultiMatch(t *testing.T) {
+func TestFindDingoProcessWarnsAndPicksLowestPIDForAmbiguousMultiMatch(
+	t *testing.T,
+) {
 	cfg := config.GetConfig()
 	originalNodePid := cfg.Node.Pid
 	originalPromPort := cfg.Prometheus.Port
@@ -427,7 +475,10 @@ func TestFindDingoProcessWarnsAndPicksLowestPIDForAmbiguousMultiMatch(t *testing
 	dingoProcessSelectionLogged.Store(false)
 	dingoProcessAmbiguityLogged.Store(false)
 	logger = slog.New(&bufferHandler{
-		handler: slog.NewTextHandler(&strings.Builder{}, &slog.HandlerOptions{}),
+		handler: slog.NewTextHandler(
+			&strings.Builder{},
+			&slog.HandlerOptions{},
+		),
 	})
 	logMutex.Lock()
 	logBuffer = nil
@@ -449,7 +500,11 @@ func TestFindDingoProcessWarnsAndPicksLowestPIDForAmbiguousMultiMatch(t *testing
 		t.Fatalf("findDingoProcess() returned error: %v", err)
 	}
 	if proc.Pid != lowest.Pid {
-		t.Fatalf("findDingoProcess() returned pid %d, expected lowest pid %d", proc.Pid, lowest.Pid)
+		t.Fatalf(
+			"findDingoProcess() returned pid %d, expected lowest pid %d",
+			proc.Pid,
+			lowest.Pid,
+		)
 	}
 
 	logMutex.Lock()
@@ -466,14 +521,20 @@ func TestFindDingoProcessWarnsAndPicksLowestPIDForAmbiguousMultiMatch(t *testing
 		"pid=23456 metrics-port=- data-dir=-",
 	} {
 		if !strings.Contains(joinedLogs, expected) {
-			t.Fatalf("expected log buffer to contain %q, got %q", expected, joinedLogs)
+			t.Fatalf(
+				"expected log buffer to contain %q, got %q",
+				expected,
+				joinedLogs,
+			)
 		}
 	}
 }
 
 // TestFindDingoProcessUsesSingleNameMatchWhenCmdlineUnreadable verifies that a
 // lone Dingo process is used even when cmdline and env metadata cannot be read.
-func TestFindDingoProcessUsesSingleNameMatchWhenCmdlineUnreadable(t *testing.T) {
+func TestFindDingoProcessUsesSingleNameMatchWhenCmdlineUnreadable(
+	t *testing.T,
+) {
 	preserveDingoDiscoveryAtomics(t)
 
 	cfg := config.GetConfig()
@@ -496,7 +557,11 @@ func TestFindDingoProcessUsesSingleNameMatchWhenCmdlineUnreadable(t *testing.T) 
 		t.Fatalf("findDingoProcess() returned error: %v", err)
 	}
 	if proc.Pid != namedProc.Pid {
-		t.Fatalf("findDingoProcess() returned pid %d, expected single name match pid %d", proc.Pid, namedProc.Pid)
+		t.Fatalf(
+			"findDingoProcess() returned pid %d, expected single name match pid %d",
+			proc.Pid,
+			namedProc.Pid,
+		)
 	}
 }
 
@@ -524,7 +589,10 @@ func TestFindDingoProcessFallsBackToPID1WhenNoNameMatches(t *testing.T) {
 		t.Fatalf("findDingoProcess() returned error: %v", err)
 	}
 	if proc.Pid != 1 {
-		t.Fatalf("findDingoProcess() returned pid %d, expected PID 1 fallback", proc.Pid)
+		t.Fatalf(
+			"findDingoProcess() returned pid %d, expected PID 1 fallback",
+			proc.Pid,
+		)
 	}
 }
 
@@ -823,14 +891,22 @@ func TestDingoHitRatioPercent(t *testing.T) {
 				tt.prevMiss,
 			)
 			if ok != tt.ok {
-				t.Fatalf("dingoHitRatioPercent() ok = %t, expected %t", ok, tt.ok)
+				t.Fatalf(
+					"dingoHitRatioPercent() ok = %t, expected %t",
+					ok,
+					tt.ok,
+				)
 			}
 			if !ok {
 				return
 			}
 			rounded := math.Round(result*10) / 10
 			if rounded != tt.expected {
-				t.Errorf("dingoHitRatioPercent() = %.1f, expected %.1f", rounded, tt.expected)
+				t.Errorf(
+					"dingoHitRatioPercent() = %.1f, expected %.1f",
+					rounded,
+					tt.expected,
+				)
 			}
 		})
 	}
@@ -983,19 +1059,35 @@ func TestDashboardPaneSeverities(t *testing.T) {
 	cfg.Node.ByronGenesis.EpochLength = 100
 
 	if got := blockPaneSeverity(); got != uiSeverityCritical {
-		t.Errorf("blockPaneSeverity() = %d, expected %d", got, uiSeverityCritical)
+		t.Errorf(
+			"blockPaneSeverity() = %d, expected %d",
+			got,
+			uiSeverityCritical,
+		)
 	}
 	if got := corePaneSeverity(); got != uiSeverityCritical {
-		t.Errorf("corePaneSeverity() = %d, expected %d", got, uiSeverityCritical)
+		t.Errorf(
+			"corePaneSeverity() = %d, expected %d",
+			got,
+			uiSeverityCritical,
+		)
 	}
 
 	subsystemFailures[healthSubsystemPrometheus].Store(1)
 	if _, got := dashboardHealth(); got != uiSeverityWarn {
-		t.Errorf("dashboardHealth severity = %d, expected %d", got, uiSeverityWarn)
+		t.Errorf(
+			"dashboardHealth severity = %d, expected %d",
+			got,
+			uiSeverityWarn,
+		)
 	}
 	subsystemFailures[healthSubsystemPrometheus].Store(5)
 	if _, got := dashboardHealth(); got != uiSeverityCritical {
-		t.Errorf("dashboardHealth severity = %d, expected %d", got, uiSeverityCritical)
+		t.Errorf(
+			"dashboardHealth severity = %d, expected %d",
+			got,
+			uiSeverityCritical,
+		)
 	}
 }
 
@@ -1016,7 +1108,11 @@ func TestFormatMithrilProgressLinePlainFallback(t *testing.T) {
 		"1.0G/2.0G",
 	} {
 		if !strings.Contains(result, expected) {
-			t.Errorf("formatMithrilProgressLine() missing %q in:\n%s", expected, result)
+			t.Errorf(
+				"formatMithrilProgressLine() missing %q in:\n%s",
+				expected,
+				result,
+			)
 		}
 	}
 }
@@ -1235,7 +1331,9 @@ func TestGetDingoConsoleTextRendersUnboxedLanes(t *testing.T) {
 		DingoStakeSnapshotLastEpoch:     1340,
 		DingoStakeSnapshotPoolCount:     658,
 		DingoStakeSnapshotActiveStake:   1496610126371652,
-		LeiosMetrics:                    map[string]float64{"dingo_leios_blocks_total": 2},
+		LeiosMetrics: map[string]float64{
+			"dingo_leios_blocks_total": 2,
+		},
 	})
 	peersFilteredMu.Lock()
 	peersFiltered = []string{"1.2.3.4:3001"}
@@ -1272,7 +1370,11 @@ func TestGetDingoConsoleTextRendersUnboxedLanes(t *testing.T) {
 		"[gray]Missed",
 	} {
 		if !strings.Contains(result, expected) {
-			t.Fatalf("getDingoConsoleText() missing %q in:\n%s", expected, result)
+			t.Fatalf(
+				"getDingoConsoleText() missing %q in:\n%s",
+				expected,
+				result,
+			)
 		}
 	}
 	for _, unexpected := range []string{
@@ -1282,7 +1384,11 @@ func TestGetDingoConsoleTextRendersUnboxedLanes(t *testing.T) {
 		"FORGE / LEDGER AUX",
 	} {
 		if strings.Contains(result, unexpected) {
-			t.Fatalf("getDingoConsoleText() unexpectedly contains %q in:\n%s", unexpected, result)
+			t.Fatalf(
+				"getDingoConsoleText() unexpectedly contains %q in:\n%s",
+				unexpected,
+				result,
+			)
 		}
 	}
 }
@@ -1304,7 +1410,14 @@ func TestDingoPanelRowsHaveStableWidths(t *testing.T) {
 			),
 			dingoMetricRow(
 				innerWidth,
-				dingoMetricSpan("Peer State", peerStateSegmentBar(&PromMetrics{PeersHot: 1, PeersCold: 18}, 24), 3),
+				dingoMetricSpan(
+					"Peer State",
+					peerStateSegmentBar(
+						&PromMetrics{PeersHot: 1, PeersCold: 18},
+						24,
+					),
+					3,
+				),
 				dingoMetric("Average", uiValue("42")+uiUnit(" ms")),
 			),
 		},
@@ -1317,10 +1430,20 @@ func TestDingoPanelRowsHaveStableWidths(t *testing.T) {
 	width := tview.TaggedStringWidth(lines[0])
 	for idx, line := range lines[1:] {
 		if got := tview.TaggedStringWidth(line); got != width {
-			t.Fatalf("panel line width mismatch: got %d, want %d\nline: %q\n%s", got, width, line, panel)
+			t.Fatalf(
+				"panel line width mismatch: got %d, want %d\nline: %q\n%s",
+				got,
+				width,
+				line,
+				panel,
+			)
 		}
 		if idx == 0 && strings.Count(line, "|") != 5 {
-			t.Fatalf("panel body row separators = %d, expected 5\n%s", strings.Count(line, "|"), panel)
+			t.Fatalf(
+				"panel body row separators = %d, expected 5\n%s",
+				strings.Count(line, "|"),
+				panel,
+			)
 		}
 	}
 }
@@ -1340,7 +1463,13 @@ func TestDingoConsoleCompactBreakpoints(t *testing.T) {
 	for _, tt := range tests {
 		got := dingoConsoleCompact(tt.cols, tt.rows)
 		if got != tt.want {
-			t.Fatalf("dingoConsoleCompact(%d, %d) = %v, expected %v", tt.cols, tt.rows, got, tt.want)
+			t.Fatalf(
+				"dingoConsoleCompact(%d, %d) = %v, expected %v",
+				tt.cols,
+				tt.rows,
+				got,
+				tt.want,
+			)
 		}
 	}
 }
@@ -1409,7 +1538,11 @@ func TestGetDingoConsoleTextKeepsDingoViewDuringMithrilSync(t *testing.T) {
 		"Remaining",
 	} {
 		if !strings.Contains(result, expected) {
-			t.Fatalf("getDingoConsoleText() missing normal Dingo token %q in:\n%s", expected, result)
+			t.Fatalf(
+				"getDingoConsoleText() missing normal Dingo token %q in:\n%s",
+				expected,
+				result,
+			)
 		}
 	}
 	for _, unexpected := range []string{
@@ -1417,7 +1550,11 @@ func TestGetDingoConsoleTextKeepsDingoViewDuringMithrilSync(t *testing.T) {
 		"Download",
 	} {
 		if strings.Contains(result, unexpected) {
-			t.Fatalf("getDingoConsoleText() unexpectedly contains overlay token %q in:\n%s", unexpected, result)
+			t.Fatalf(
+				"getDingoConsoleText() unexpectedly contains overlay token %q in:\n%s",
+				unexpected,
+				result,
+			)
 		}
 	}
 
@@ -1430,7 +1567,11 @@ func TestGetDingoConsoleTextKeepsDingoViewDuringMithrilSync(t *testing.T) {
 		"Remaining",
 	} {
 		if !strings.Contains(overlay, expected) {
-			t.Fatalf("getMithrilOverlayText() missing token %q in:\n%s", expected, overlay)
+			t.Fatalf(
+				"getMithrilOverlayText() missing token %q in:\n%s",
+				expected,
+				overlay,
+			)
 		}
 	}
 	for _, unexpected := range []string{
@@ -1439,7 +1580,11 @@ func TestGetDingoConsoleTextKeepsDingoViewDuringMithrilSync(t *testing.T) {
 		"DINGO SYSTEMS",
 	} {
 		if strings.Contains(overlay, unexpected) {
-			t.Fatalf("getMithrilOverlayText() unexpectedly contains normal Dingo token %q in:\n%s", unexpected, overlay)
+			t.Fatalf(
+				"getMithrilOverlayText() unexpectedly contains normal Dingo token %q in:\n%s",
+				unexpected,
+				overlay,
+			)
 		}
 	}
 }
@@ -1459,7 +1604,11 @@ func TestFormatDingoProtocolLatency(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := formatDingoProtocolLatency(tt.sum, tt.count); got != tt.want {
-				t.Fatalf("formatDingoProtocolLatency() = %q, expected %q", got, tt.want)
+				t.Fatalf(
+					"formatDingoProtocolLatency() = %q, expected %q",
+					got,
+					tt.want,
+				)
 			}
 		})
 	}
@@ -1492,7 +1641,10 @@ func TestCurrentNetworkNamePrefersDingoMetricLabel(t *testing.T) {
 
 	detectedNodeBinary.Store(CARDANO_BINARY)
 	if got := currentNetworkName(); got != "Mainnet" {
-		t.Fatalf("cardano-node currentNetworkName() = %q, expected Mainnet", got)
+		t.Fatalf(
+			"cardano-node currentNetworkName() = %q, expected Mainnet",
+			got,
+		)
 	}
 }
 
@@ -1531,7 +1683,11 @@ func TestFooterShowsPeerOverlayShortcutWithoutDingoToggle(t *testing.T) {
 	result := getFooterText()
 	for _, stale := range []string{"(d)", "(h)", "view "} {
 		if strings.Contains(result, stale) {
-			t.Fatalf("getFooterText() unexpectedly contains %q in %q", stale, result)
+			t.Fatalf(
+				"getFooterText() unexpectedly contains %q in %q",
+				stale,
+				result,
+			)
 		}
 	}
 	for _, expected := range []string{"(esc/q)", "(r)", "(p)"} {
@@ -1727,7 +1883,11 @@ func TestGetDingoStatsRendersDiagnostics(t *testing.T) {
 		"in warm",
 	} {
 		if strings.Contains(result, part) {
-			t.Errorf("getDingoStats() unexpectedly contains peer-selection content %q in:\n%s", part, result)
+			t.Errorf(
+				"getDingoStats() unexpectedly contains peer-selection content %q in:\n%s",
+				part,
+				result,
+			)
 		}
 	}
 }
@@ -1863,7 +2023,10 @@ func TestGetMithrilStatsNilMetrics(t *testing.T) {
 	promMetrics.Store(nil)
 	result := getMithrilStats()
 	if result != "" {
-		t.Errorf("getMithrilStats() with nil metrics = %q, expected empty string", result)
+		t.Errorf(
+			"getMithrilStats() with nil metrics = %q, expected empty string",
+			result,
+		)
 	}
 }
 
@@ -1881,74 +2044,116 @@ func TestIsMithrilSyncActive(t *testing.T) {
 			want:    false,
 		},
 		{
-			name:    "completed flag set",
-			metrics: &PromMetrics{MithrilSyncCompleted: 1, MithrilSyncDownloadBytes: 1000},
-			want:    false,
+			name: "completed flag set",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:     1,
+				MithrilSyncDownloadBytes: 1000,
+			},
+			want: false,
 		},
 		{
-			name:    "active via download bytes",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncDownloadBytes: 1000},
-			want:    true,
+			name: "active via download bytes",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:     0,
+				MithrilSyncDownloadBytes: 1000,
+			},
+			want: true,
 		},
 		{
-			name:    "active via started timestamp",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncStartedAt: 1700000000},
-			want:    true,
+			name: "active via started timestamp",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted: 0,
+				MithrilSyncStartedAt: 1700000000,
+			},
+			want: true,
 		},
 		{
-			name:    "active via errors total",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncErrorsTotal: 1},
-			want:    true,
+			name: "active via errors total",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:   0,
+				MithrilSyncErrorsTotal: 1,
+			},
+			want: true,
 		},
 		{
-			name:    "active via download total bytes",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncDownloadTotalBytes: 1000},
-			want:    true,
+			name: "active via download total bytes",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:          0,
+				MithrilSyncDownloadTotalBytes: 1000,
+			},
+			want: true,
 		},
 		{
-			name:    "active via download percent",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncDownloadPercent: 1.5},
-			want:    true,
+			name: "active via download percent",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:       0,
+				MithrilSyncDownloadPercent: 1.5,
+			},
+			want: true,
 		},
 		{
-			name:    "active via download rate",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncDownloadRate: 1.5},
-			want:    true,
+			name: "active via download rate",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:    0,
+				MithrilSyncDownloadRate: 1.5,
+			},
+			want: true,
 		},
 		{
-			name:    "active via snapshot size",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncSnapshotSize: 1000},
-			want:    true,
+			name: "active via snapshot size",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:    0,
+				MithrilSyncSnapshotSize: 1000,
+			},
+			want: true,
 		},
 		{
-			name:    "active via snapshot epoch",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncSnapshotEpoch: 500},
-			want:    true,
+			name: "active via snapshot epoch",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:     0,
+				MithrilSyncSnapshotEpoch: 500,
+			},
+			want: true,
 		},
 		{
-			name:    "active via snapshot ancillary size",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncSnapshotAncillarySize: 1000},
-			want:    true,
+			name: "active via snapshot ancillary size",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:             0,
+				MithrilSyncSnapshotAncillarySize: 1000,
+			},
+			want: true,
 		},
 		{
-			name:    "active via snapshot immutable file",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncSnapshotImmutableFile: 26153},
-			want:    true,
+			name: "active via snapshot immutable file",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:             0,
+				MithrilSyncSnapshotImmutableFile: 26153,
+			},
+			want: true,
 		},
 		{
-			name:    "active via ledger import current",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncLedgerImportCurrent: 1000},
-			want:    true,
+			name: "active via ledger import current",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:           0,
+				MithrilSyncLedgerImportCurrent: 1000,
+			},
+			want: true,
 		},
 		{
-			name:    "active via ledger import total",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncLedgerImportTotal: 1000},
-			want:    true,
+			name: "active via ledger import total",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:         0,
+				MithrilSyncLedgerImportTotal: 1000,
+			},
+			want: true,
 		},
 		{
-			name:    "active via ledger import percent",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncLedgerImportPercent: 1.5},
-			want:    true,
+			name: "active via ledger import percent",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:           0,
+				MithrilSyncLedgerImportPercent: 1.5,
+			},
+			want: true,
 		},
 		{
 			name: "active via ledger import stage",
@@ -1961,69 +2166,108 @@ func TestIsMithrilSyncActive(t *testing.T) {
 			want: true,
 		},
 		{
-			name:    "active via ledger state slot",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncLedgerStateSlot: 112986212},
-			want:    true,
+			name: "active via ledger state slot",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:       0,
+				MithrilSyncLedgerStateSlot: 112986212,
+			},
+			want: true,
 		},
 		{
-			name:    "active via immutable blocks",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncImmutableBlocksCopied: 1},
-			want:    true,
+			name: "active via immutable blocks",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:             0,
+				MithrilSyncImmutableBlocksCopied: 1,
+			},
+			want: true,
 		},
 		{
-			name:    "active via immutable rate",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncImmutableCopyPerSecond: 1.5},
-			want:    true,
+			name: "active via immutable rate",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:              0,
+				MithrilSyncImmutableCopyPerSecond: 1.5,
+			},
+			want: true,
 		},
 		{
-			name:    "active via immutable percent",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncImmutableCopyPercent: 1.5},
-			want:    true,
+			name: "active via immutable percent",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:            0,
+				MithrilSyncImmutableCopyPercent: 1.5,
+			},
+			want: true,
 		},
 		{
-			name:    "active via immutable current slot",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncImmutableCurrentSlot: 112985271},
-			want:    true,
+			name: "active via immutable current slot",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:            0,
+				MithrilSyncImmutableCurrentSlot: 112985271,
+			},
+			want: true,
 		},
 		{
-			name:    "active via immutable tip slot",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncImmutableTipSlot: 112985271},
-			want:    true,
+			name: "active via immutable tip slot",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:        0,
+				MithrilSyncImmutableTipSlot: 112985271,
+			},
+			want: true,
 		},
 		{
-			name:    "active via gap blocks",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilSyncGapBlocks: 500},
-			want:    true,
+			name: "active via gap blocks",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted: 0,
+				MithrilSyncGapBlocks: 500,
+			},
+			want: true,
 		},
 		{
-			name:    "active via bootstrap phase",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhaseBootstrap: 1},
-			want:    true,
+			name: "active via bootstrap phase",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:  0,
+				MithrilPhaseBootstrap: 1,
+			},
+			want: true,
 		},
 		{
-			name:    "active via ledger phase",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhaseLedger: 1},
-			want:    true,
+			name: "active via ledger phase",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted: 0,
+				MithrilPhaseLedger:   1,
+			},
+			want: true,
 		},
 		{
-			name:    "active via immutable phase",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhaseImmutable: 1},
-			want:    true,
+			name: "active via immutable phase",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:  0,
+				MithrilPhaseImmutable: 1,
+			},
+			want: true,
 		},
 		{
-			name:    "active via gap blocks phase",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhaseGapBlocks: 1},
-			want:    true,
+			name: "active via gap blocks phase",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:  0,
+				MithrilPhaseGapBlocks: 1,
+			},
+			want: true,
 		},
 		{
-			name:    "active via backfill phase",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhaseBackfill: 1},
-			want:    true,
+			name: "active via backfill phase",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted: 0,
+				MithrilPhaseBackfill: 1,
+			},
+			want: true,
 		},
 		{
-			name:    "active via post ledger phase",
-			metrics: &PromMetrics{MithrilSyncCompleted: 0, MithrilPhasePostLedger: 1},
-			want:    true,
+			name: "active via post ledger phase",
+			metrics: &PromMetrics{
+				MithrilSyncCompleted:   0,
+				MithrilPhasePostLedger: 1,
+			},
+			want: true,
 		},
 		{
 			name:    "all zeros not active",
@@ -2040,7 +2284,11 @@ func TestIsMithrilSyncActive(t *testing.T) {
 
 			got := isMithrilSyncActive()
 			if got != tt.want {
-				t.Errorf("isMithrilSyncActive() = %v, expected %v", got, tt.want)
+				t.Errorf(
+					"isMithrilSyncActive() = %v, expected %v",
+					got,
+					tt.want,
+				)
 			}
 		})
 	}
@@ -2072,25 +2320,39 @@ func TestUpdateMithrilViewOverlayState(t *testing.T) {
 	})
 	updateMithrilView()
 	if getActiveSecondaryView() != viewDingo {
-		t.Errorf("expected viewDingo to remain active during sync, got %d", getActiveSecondaryView())
+		t.Errorf(
+			"expected viewDingo to remain active during sync, got %d",
+			getActiveSecondaryView(),
+		)
 	}
 	if !mithrilViewAutoActive.Load() {
-		t.Error("expected mithrilViewAutoActive to be true while overlay is active")
+		t.Error(
+			"expected mithrilViewAutoActive to be true while overlay is active",
+		)
 	}
 	if !strings.Contains(mithrilOverlayText, "MITHRIL SYNC") {
-		t.Fatalf("expected overlay text to contain Mithril content, got:\n%s", mithrilOverlayText)
+		t.Fatalf(
+			"expected overlay text to contain Mithril content, got:\n%s",
+			mithrilOverlayText,
+		)
 	}
 
 	promMetrics.Store(&PromMetrics{MithrilSyncCompleted: 1})
 	updateMithrilView()
 	if getActiveSecondaryView() != viewDingo {
-		t.Errorf("expected viewDingo after sync completion, got %d", getActiveSecondaryView())
+		t.Errorf(
+			"expected viewDingo after sync completion, got %d",
+			getActiveSecondaryView(),
+		)
 	}
 	if mithrilViewAutoActive.Load() {
 		t.Error("expected mithrilViewAutoActive to be false after completion")
 	}
 	if mithrilOverlayText != "" {
-		t.Fatalf("expected overlay text to clear after completion, got:\n%s", mithrilOverlayText)
+		t.Fatalf(
+			"expected overlay text to clear after completion, got:\n%s",
+			mithrilOverlayText,
+		)
 	}
 }
 
@@ -2422,7 +2684,11 @@ func TestGetCoreTextMutesDisabledDingoForgeCounters(t *testing.T) {
 		"[gray] / ",
 	} {
 		if !strings.Contains(result, expected) {
-			t.Fatalf("getCoreText() missing muted forge token %q in:\n%s", expected, result)
+			t.Fatalf(
+				"getCoreText() missing muted forge token %q in:\n%s",
+				expected,
+				result,
+			)
 		}
 	}
 	for _, unexpected := range []string{
@@ -2432,7 +2698,11 @@ func TestGetCoreTextMutesDisabledDingoForgeCounters(t *testing.T) {
 		"[blue] / ",
 	} {
 		if strings.Contains(result, unexpected) {
-			t.Fatalf("getCoreText() unexpectedly contains active forge token %q in:\n%s", unexpected, result)
+			t.Fatalf(
+				"getCoreText() unexpectedly contains active forge token %q in:\n%s",
+				unexpected,
+				result,
+			)
 		}
 	}
 }
@@ -2463,7 +2733,12 @@ func TestFormatMemoryBytesUsesMegabytesBelowGigabyte(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := formatMemoryBytes(tt.bytes); got != tt.want {
-				t.Fatalf("formatMemoryBytes(%d) = %q, expected %q", tt.bytes, got, tt.want)
+				t.Fatalf(
+					"formatMemoryBytes(%d) = %q, expected %q",
+					tt.bytes,
+					got,
+					tt.want,
+				)
 			}
 		})
 	}
@@ -2496,14 +2771,18 @@ func TestRenderHelpersUseArgumentSnapshotNotGlobal(t *testing.T) {
 
 	// The global holds a wildly different snapshot than the one passed
 	// explicitly below, so any accidental reload of the global is caught.
-	promMetrics.Store(&PromMetrics{SlotNum: 999999, EpochNum: 999, SlotInEpoch: 99})
+	promMetrics.Store(
+		&PromMetrics{SlotNum: 999999, EpochNum: 999, SlotInEpoch: 99},
+	)
 
 	argMetrics := &PromMetrics{SlotNum: 0, EpochNum: 5, SlotInEpoch: 50}
 
-	if gap, severity := currentTipGap(argMetrics); gap != 0 || severity != uiSeverityMuted {
+	if gap, severity := currentTipGap(argMetrics); gap != 0 ||
+		severity != uiSeverityMuted {
 		t.Fatalf(
 			"currentTipGap(argMetrics) = (%d, %d), expected (0, uiSeverityMuted) from the argument's zero SlotNum, not the global's",
-			gap, severity,
+			gap,
+			severity,
 		)
 	}
 
@@ -2526,10 +2805,25 @@ func TestDingoPipelineState(t *testing.T) {
 		expectedSev   uiSeverity
 	}{
 		{"nil metrics", nil, "n/a", uiSeverityMuted},
-		{"running", &PromMetrics{DingoPipelinePresent: true}, "ok", uiSeverityOK},
+		{
+			"running",
+			&PromMetrics{DingoPipelinePresent: true},
+			"ok",
+			uiSeverityOK,
+		},
 		{"gauges absent", &PromMetrics{}, "n/a", uiSeverityMuted},
-		{"stuck", &PromMetrics{DingoPipelineStuck: 1}, "STUCK", uiSeverityCritical},
-		{"halted", &PromMetrics{DingoPipelineHalted: 1}, "HALTED", uiSeverityCritical},
+		{
+			"stuck",
+			&PromMetrics{DingoPipelineStuck: 1},
+			"STUCK",
+			uiSeverityCritical,
+		},
+		{
+			"halted",
+			&PromMetrics{DingoPipelineHalted: 1},
+			"HALTED",
+			uiSeverityCritical,
+		},
 		{
 			"halted and stuck",
 			&PromMetrics{DingoPipelineHalted: 1, DingoPipelineStuck: 1},
@@ -2568,7 +2862,13 @@ func TestDingoHeaderQueueSeverity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := dingoHeaderQueueSeverity(tt.length, tt.capacity); got != tt.expected {
-				t.Errorf("dingoHeaderQueueSeverity(%d, %d) = %d, expected %d", tt.length, tt.capacity, got, tt.expected)
+				t.Errorf(
+					"dingoHeaderQueueSeverity(%d, %d) = %d, expected %d",
+					tt.length,
+					tt.capacity,
+					got,
+					tt.expected,
+				)
 			}
 		})
 	}
@@ -2585,7 +2885,14 @@ func TestFormatDingoAnomaly(t *testing.T) {
 		{"never happened", 0, 0, true, "0", uiSeverityOK},
 		{"never happened, no previous sample", 0, 0, false, "0", uiSeverityOK},
 		{"old total, no increase", 10, 10, true, "10", uiSeverityNeutral},
-		{"old total, no previous sample", 10, 0, false, "10", uiSeverityNeutral},
+		{
+			"old total, no previous sample",
+			10,
+			0,
+			false,
+			"10",
+			uiSeverityNeutral,
+		},
 		{"increase warns", 13, 10, true, "13 +3", uiSeverityWarn},
 		{"counter reset counts from zero", 5, 10, true, "5 +5", uiSeverityWarn},
 	}
@@ -2595,7 +2902,13 @@ func TestFormatDingoAnomaly(t *testing.T) {
 			if text != tt.expectedText || severity != tt.expectedSev {
 				t.Errorf(
 					"formatDingoAnomaly(%d, %d, %v) = %q, %d, expected %q, %d",
-					tt.curr, tt.prev, tt.havePrev, text, severity, tt.expectedText, tt.expectedSev,
+					tt.curr,
+					tt.prev,
+					tt.havePrev,
+					text,
+					severity,
+					tt.expectedText,
+					tt.expectedSev,
 				)
 			}
 		})
@@ -2625,15 +2938,42 @@ func TestDingoLastBlockAge(t *testing.T) {
 	}{
 		{"clock skew", 1_700_000_005, 0, uiSeverityOK, "0s ago"},
 		{"fresh", 1_699_999_988, 12 * time.Second, uiSeverityOK, "12s ago"},
-		{"below warn", 1_699_999_881, 119 * time.Second, uiSeverityOK, "1m 59s ago"},
+		{
+			"below warn",
+			1_699_999_881,
+			119 * time.Second,
+			uiSeverityOK,
+			"1m 59s ago",
+		},
 		{"warn", 1_699_999_880, 2 * time.Minute, uiSeverityWarn, "2m 00s ago"},
-		{"below critical", 1_699_999_701, 299 * time.Second, uiSeverityWarn, "4m 59s ago"},
-		{"critical", 1_699_999_700, 5 * time.Minute, uiSeverityCritical, "5m 00s ago"},
-		{"hours", 1_699_992_000, 2*time.Hour + 13*time.Minute + 20*time.Second, uiSeverityCritical, "2h 13m ago"},
+		{
+			"below critical",
+			1_699_999_701,
+			299 * time.Second,
+			uiSeverityWarn,
+			"4m 59s ago",
+		},
+		{
+			"critical",
+			1_699_999_700,
+			5 * time.Minute,
+			uiSeverityCritical,
+			"5m 00s ago",
+		},
+		{
+			"hours",
+			1_699_992_000,
+			2*time.Hour + 13*time.Minute + 20*time.Second,
+			uiSeverityCritical,
+			"2h 13m ago",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			age, ok := dingoLastBlockAge(&PromMetrics{DingoLastBlockAdded: tt.added}, now)
+			age, ok := dingoLastBlockAge(
+				&PromMetrics{DingoLastBlockAdded: tt.added},
+				now,
+			)
 			if !ok {
 				t.Fatal("expected an age")
 			}
@@ -2673,14 +3013,32 @@ func TestDashboardHealthReportsDingoPipelineFailure(t *testing.T) {
 		expectedSev   uiSeverity
 	}{
 		{"running", &PromMetrics{}, 0, "online", uiSeverityOK},
-		{"stuck", &PromMetrics{DingoPipelineStuck: 1}, 0, "STUCK", uiSeverityCritical},
-		{"halted", &PromMetrics{DingoPipelineHalted: 1}, 0, "HALTED", uiSeverityCritical},
+		{
+			"stuck",
+			&PromMetrics{DingoPipelineStuck: 1},
+			0,
+			"STUCK",
+			uiSeverityCritical,
+		},
+		{
+			"halted",
+			&PromMetrics{DingoPipelineHalted: 1},
+			0,
+			"HALTED",
+			uiSeverityCritical,
+		},
 		{
 			"halted beats stuck",
 			&PromMetrics{DingoPipelineHalted: 1, DingoPipelineStuck: 1},
 			0, "HALTED", uiSeverityCritical,
 		},
-		{"scrape failing", &PromMetrics{DingoPipelineHalted: 1}, 5, "degraded", uiSeverityCritical},
+		{
+			"scrape failing",
+			&PromMetrics{DingoPipelineHalted: 1},
+			5,
+			"degraded",
+			uiSeverityCritical,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2719,18 +3077,42 @@ func TestDingoPaneSeverityFollowsPipelineAndLastBlock(t *testing.T) {
 		metrics     *PromMetrics
 		expectedSev uiSeverity
 	}{
-		{"fresh block", &PromMetrics{DingoLastBlockAdded: now - 5}, uiSeverityOK},
+		{
+			"fresh block",
+			&PromMetrics{DingoLastBlockAdded: now - 5},
+			uiSeverityOK,
+		},
 		{"no block yet", &PromMetrics{}, uiSeverityOK},
-		{"halted", &PromMetrics{DingoPipelineHalted: 1, DingoLastBlockAdded: now - 5}, uiSeverityCritical},
-		{"stuck", &PromMetrics{DingoPipelineStuck: 1, DingoLastBlockAdded: now - 5}, uiSeverityCritical},
-		{"slow block", &PromMetrics{DingoLastBlockAdded: now - 150}, uiSeverityWarn},
-		{"stalled block", &PromMetrics{DingoLastBlockAdded: now - 400}, uiSeverityCritical},
+		{
+			"halted",
+			&PromMetrics{DingoPipelineHalted: 1, DingoLastBlockAdded: now - 5},
+			uiSeverityCritical,
+		},
+		{
+			"stuck",
+			&PromMetrics{DingoPipelineStuck: 1, DingoLastBlockAdded: now - 5},
+			uiSeverityCritical,
+		},
+		{
+			"slow block",
+			&PromMetrics{DingoLastBlockAdded: now - 150},
+			uiSeverityWarn,
+		},
+		{
+			"stalled block",
+			&PromMetrics{DingoLastBlockAdded: now - 400},
+			uiSeverityCritical,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			promMetrics.Store(tt.metrics)
 			if got := dingoPaneSeverity(); got != tt.expectedSev {
-				t.Errorf("dingoPaneSeverity() = %d, expected %d", got, tt.expectedSev)
+				t.Errorf(
+					"dingoPaneSeverity() = %d, expected %d",
+					got,
+					tt.expectedSev,
+				)
 			}
 		})
 	}
@@ -2779,7 +3161,12 @@ func TestDingoViewsShowPipelineAndLastBlock(t *testing.T) {
 	for _, view := range []string{"systems", "compact", "stats"} {
 		for _, expected := range []string{"Pipeline", "Last Block", "1m 3"} {
 			if !strings.Contains(halted[view], expected) {
-				t.Errorf("%s view missing %q:\n%s", view, expected, halted[view])
+				t.Errorf(
+					"%s view missing %q:\n%s",
+					view,
+					expected,
+					halted[view],
+				)
 			}
 		}
 	}
@@ -2789,24 +3176,40 @@ func TestDingoViewsShowPipelineAndLastBlock(t *testing.T) {
 		}
 	}
 
-	stuck := render(&PromMetrics{DingoPipelineStuck: 1, DingoLastBlockAdded: lastBlock})
+	stuck := render(
+		&PromMetrics{DingoPipelineStuck: 1, DingoLastBlockAdded: lastBlock},
+	)
 	for view, text := range stuck {
 		if !strings.Contains(text, "STUCK") {
 			t.Errorf("%s view missing STUCK:\n%s", view, text)
 		}
 	}
 
-	healthy := render(&PromMetrics{DingoPipelinePresent: true, DingoLastBlockAdded: float64(time.Now().Unix() - 5)})
+	healthy := render(
+		&PromMetrics{
+			DingoPipelinePresent: true,
+			DingoLastBlockAdded:  float64(time.Now().Unix() - 5),
+		},
+	)
 	for view, text := range healthy {
 		for _, unexpected := range []string{"HALTED", "STUCK"} {
 			if strings.Contains(text, unexpected) {
-				t.Errorf("%s view unexpectedly shows %s:\n%s", view, unexpected, text)
+				t.Errorf(
+					"%s view unexpectedly shows %s:\n%s",
+					view,
+					unexpected,
+					text,
+				)
 			}
 		}
 	}
 	for _, view := range []string{"systems", "compact", "stats"} {
 		if !strings.Contains(healthy[view], "s ago") {
-			t.Errorf("%s view missing the last block age:\n%s", view, healthy[view])
+			t.Errorf(
+				"%s view missing the last block age:\n%s",
+				view,
+				healthy[view],
+			)
 		}
 	}
 	if !strings.Contains(healthy["header"], "online") {
@@ -2863,8 +3266,13 @@ func TestDingoSyncBacklogViews(t *testing.T) {
 		"full":    dingoConsoleChainLane(without, 120),
 		"compact": dingoConsoleChainCompact(without, 60),
 	} {
-		if strings.Contains(text, "Backlog") || strings.Contains(text, "Inflight") {
-			t.Errorf("%s chain view shows a backlog without the header queue:\n%s", name, text)
+		if strings.Contains(text, "Backlog") ||
+			strings.Contains(text, "Inflight") {
+			t.Errorf(
+				"%s chain view shows a backlog without the header queue:\n%s",
+				name,
+				text,
+			)
 		}
 	}
 }
@@ -2879,11 +3287,21 @@ func TestDingoHotSetDeficitInPeerViews(t *testing.T) {
 			t.Errorf("%s peer view missing Hot Deficit:\n%s", name, text)
 		}
 	}
-	if label, severity := dingoHotSetDeficit(deficit); label != "3" || severity != uiSeverityWarn {
-		t.Errorf("dingoHotSetDeficit(3) = %q, %d, expected \"3\", warn", label, severity)
+	if label, severity := dingoHotSetDeficit(deficit); label != "3" ||
+		severity != uiSeverityWarn {
+		t.Errorf(
+			"dingoHotSetDeficit(3) = %q, %d, expected \"3\", warn",
+			label,
+			severity,
+		)
 	}
-	if label, severity := dingoHotSetDeficit(dingoSyncExported(&PromMetrics{})); label != "0" || severity != uiSeverityOK {
-		t.Errorf("dingoHotSetDeficit(0) = %q, %d, expected \"0\", ok", label, severity)
+	if label, severity := dingoHotSetDeficit(dingoSyncExported(&PromMetrics{})); label != "0" ||
+		severity != uiSeverityOK {
+		t.Errorf(
+			"dingoHotSetDeficit(0) = %q, %d, expected \"0\", ok",
+			label,
+			severity,
+		)
 	}
 }
 
@@ -2944,7 +3362,10 @@ func TestGetDingoStatsShowsAnomaliesAndBacklog(t *testing.T) {
 	}
 	// Only the stalled counter increased, so only it carries a delta.
 	if strings.Count(result, " +") != 1 {
-		t.Errorf("getDingoStats() should show exactly one anomaly delta:\n%s", result)
+		t.Errorf(
+			"getDingoStats() should show exactly one anomaly delta:\n%s",
+			result,
+		)
 	}
 }
 
@@ -3037,7 +3458,11 @@ func TestDingoConsoleViewsShowAnomalies(t *testing.T) {
 			}
 		}
 		if strings.Count(text, " +") != 1 {
-			t.Errorf("%s view should show exactly one anomaly delta:\n%s", name, text)
+			t.Errorf(
+				"%s view should show exactly one anomaly delta:\n%s",
+				name,
+				text,
+			)
 		}
 	}
 
@@ -3045,7 +3470,11 @@ func TestDingoConsoleViewsShowAnomalies(t *testing.T) {
 	reset(nil)
 	for name, text := range render(dingoSyncExported(&PromMetrics{DingoChainselectionStalled: 10})) {
 		if !strings.Contains(text, "Stalled") || strings.Contains(text, " +") {
-			t.Errorf("%s view with no previous scrape should show totals only:\n%s", name, text)
+			t.Errorf(
+				"%s view with no previous scrape should show totals only:\n%s",
+				name,
+				text,
+			)
 		}
 	}
 }
@@ -3066,11 +3495,21 @@ func dingoSyncExported(metrics *PromMetrics) *PromMetrics {
 func TestDingoSyncMetricsReportMissingAsUnavailable(t *testing.T) {
 	missing := &PromMetrics{}
 
-	if label, severity := dingoHotSetDeficit(missing); label != "n/a" || severity != uiSeverityMuted {
-		t.Errorf("dingoHotSetDeficit(missing) = %q, %d, expected n/a, muted", label, severity)
+	if label, severity := dingoHotSetDeficit(missing); label != "n/a" ||
+		severity != uiSeverityMuted {
+		t.Errorf(
+			"dingoHotSetDeficit(missing) = %q, %d, expected n/a, muted",
+			label,
+			severity,
+		)
 	}
-	if label, severity := mithrilRestoreState(missing); label != "n/a" || severity != uiSeverityMuted {
-		t.Errorf("mithrilRestoreState(missing) = %q, %d, expected n/a, muted", label, severity)
+	if label, severity := mithrilRestoreState(missing); label != "n/a" ||
+		severity != uiSeverityMuted {
+		t.Errorf(
+			"mithrilRestoreState(missing) = %q, %d, expected n/a, muted",
+			label,
+			severity,
+		)
 	}
 	for _, cell := range dingoAnomalyCells(missing, nil) {
 		if !strings.Contains(cell.Value, "n/a") {
@@ -3080,12 +3519,19 @@ func TestDingoSyncMetricsReportMissingAsUnavailable(t *testing.T) {
 
 	// One counter missing must not hide the others.
 	partial := dingoSyncExported(&PromMetrics{})
-	delete(partial.DingoPresentMetrics, "dingo_chainsync_plateau_decisions_total")
+	delete(
+		partial.DingoPresentMetrics,
+		"dingo_chainsync_plateau_decisions_total",
+	)
 	cells := dingoAnomalyCells(partial, nil)
 	for _, cell := range cells {
 		hasNA := strings.Contains(cell.Value, "n/a")
 		if (cell.Label == "Plateau") != hasNA {
-			t.Errorf("anomaly %s = %q, n/a only expected for Plateau", cell.Label, cell.Value)
+			t.Errorf(
+				"anomaly %s = %q, n/a only expected for Plateau",
+				cell.Label,
+				cell.Value,
+			)
 		}
 	}
 
@@ -3094,7 +3540,10 @@ func TestDingoSyncMetricsReportMissingAsUnavailable(t *testing.T) {
 		t.Errorf("dingoHotSetDeficit(exported zero) = %q, expected 0", label)
 	}
 	if label, _ := mithrilRestoreState(exported); label != "idle" {
-		t.Errorf("mithrilRestoreState(exported zero) = %q, expected idle", label)
+		t.Errorf(
+			"mithrilRestoreState(exported zero) = %q, expected idle",
+			label,
+		)
 	}
 }
 
@@ -3119,7 +3568,12 @@ func TestGetDingoStatsReportsMissingAnomalyCountersAsUnavailable(t *testing.T) {
 	promMetrics.Store(&PromMetrics{})
 
 	result := getDingoStats()
-	labels := []string{"Stalled", "GDD Disconnects", "Plateau", "Keepalive Timeouts"}
+	labels := []string{
+		"Stalled",
+		"GDD Disconnects",
+		"Plateau",
+		"Keepalive Timeouts",
+	}
 	for _, label := range labels {
 		found := false
 		for _, line := range strings.Split(result, "\n") {
@@ -3192,7 +3646,10 @@ func TestDingoStaleRenderKeepsItsOwnBaseline(t *testing.T) {
 	}
 	for _, cell := range dingoAnomalyCells(a, nil) {
 		if cell.Label == "Stalled" && strings.Contains(cell.Value, "+") {
-			t.Errorf("stale frame Stalled = %q, expected no increase", cell.Value)
+			t.Errorf(
+				"stale frame Stalled = %q, expected no increase",
+				cell.Value,
+			)
 		}
 	}
 
@@ -3200,10 +3657,17 @@ func TestDingoStaleRenderKeepsItsOwnBaseline(t *testing.T) {
 	// found newer scrape B already recorded, must not rotate B out.
 	z := dingoSyncExported(&PromMetrics{DingoChainselectionStalled: 9})
 	if prev, _ := dingoPreviousSample(z); prev != nil {
-		t.Fatalf("unrecorded stale scrape got baseline %+v, expected none", prev)
+		t.Fatalf(
+			"unrecorded stale scrape got baseline %+v, expected none",
+			prev,
+		)
 	}
-	if prev, _ := dingoPreviousSample(b); prev == nil || prev.DingoChainselectionStalled != 10 {
-		t.Fatalf("latest baseline after stale read = %+v, expected A (10)", prev)
+	if prev, _ := dingoPreviousSample(b); prev == nil ||
+		prev.DingoChainselectionStalled != 10 {
+		t.Fatalf(
+			"latest baseline after stale read = %+v, expected A (10)",
+			prev,
+		)
 	}
 
 	c := dingoSyncExported(&PromMetrics{DingoChainselectionStalled: 12})
@@ -3234,7 +3698,10 @@ func TestDingoSampleAdvancesOncePerScrape(t *testing.T) {
 
 	prev, _ := dingoPreviousSample(third)
 	if prev == nil || prev.DingoKeepaliveTimeouts != 12 {
-		t.Fatalf("baseline = %+v, expected the scrape before the latest (12)", prev)
+		t.Fatalf(
+			"baseline = %+v, expected the scrape before the latest (12)",
+			prev,
+		)
 	}
 	again, _ := dingoPreviousSample(third)
 	if again != prev {
@@ -3260,7 +3727,11 @@ func TestDingoAnomalyNeedsPreviousExport(t *testing.T) {
 				continue
 			}
 			if strings.Contains(cell.Value, "+") {
-				t.Errorf("%s: Stalled = %q, expected a total with no increase", name, cell.Value)
+				t.Errorf(
+					"%s: Stalled = %q, expected a total with no increase",
+					name,
+					cell.Value,
+				)
 			}
 		}
 	}
@@ -3270,7 +3741,10 @@ func TestDingoAnomalyNeedsPreviousExport(t *testing.T) {
 	lastDingoSampleAt = time.Now().Add(-10 * time.Second)
 	promMetrics.Store(current)
 	if stats := getDingoStats(); strings.Contains(stats, "+13") {
-		t.Errorf("getDingoStats() shows the whole total as an increase:\n%s", stats)
+		t.Errorf(
+			"getDingoStats() shows the whole total as an increase:\n%s",
+			stats,
+		)
 	}
 }
 
@@ -3290,12 +3764,21 @@ func TestDingoPartialExportsReportMissingAsUnavailable(t *testing.T) {
 			t.Errorf("%s chain view invents a queue length:\n%s", name, text)
 		}
 		for _, line := range strings.Split(text, "\n") {
-			if strings.Contains(line, "Backlog") && strings.Contains(line, "%") {
-				t.Errorf("%s chain view invents a backlog percentage:\n%s", name, line)
+			if strings.Contains(line, "Backlog") &&
+				strings.Contains(line, "%") {
+				t.Errorf(
+					"%s chain view invents a backlog percentage:\n%s",
+					name,
+					line,
+				)
 			}
 		}
 		if !strings.Contains(text, "n/a") {
-			t.Errorf("%s chain view should read n/a for the unexported series:\n%s", name, text)
+			t.Errorf(
+				"%s chain view should read n/a for the unexported series:\n%s",
+				name,
+				text,
+			)
 		}
 		if strings.Contains(text, "0 blk") {
 			t.Errorf("%s chain view invents blocks in flight:\n%s", name, text)
@@ -3303,27 +3786,43 @@ func TestDingoPartialExportsReportMissingAsUnavailable(t *testing.T) {
 	}
 
 	if got := dingoInflightValue(capacityOnly); strings.Count(got, "n/a") != 2 {
-		t.Errorf("dingoInflightValue() = %q, expected n/a for both blocks and bytes", got)
+		t.Errorf(
+			"dingoInflightValue() = %q, expected n/a for both blocks and bytes",
+			got,
+		)
 	}
 	bytesOnly := &PromMetrics{
 		DingoBlockfetchInflightBytes: 2048,
-		DingoPresentMetrics:          map[string]bool{"dingo_blockfetch_inflight_bytes": true},
+		DingoPresentMetrics: map[string]bool{
+			"dingo_blockfetch_inflight_bytes": true,
+		},
 	}
 	if got := dingoInflightValue(bytesOnly); strings.Count(got, "n/a") != 1 {
-		t.Errorf("dingoInflightValue() = %q, expected n/a for the blocks only", got)
+		t.Errorf(
+			"dingoInflightValue() = %q, expected n/a for the blocks only",
+			got,
+		)
 	}
 
 	mithrilMissing := &PromMetrics{
 		MithrilPhaseBackfill: 1,
-		DingoPresentMetrics:  map[string]bool{"dingo_mithril_snapshot_restore_state": true},
+		DingoPresentMetrics: map[string]bool{
+			"dingo_mithril_snapshot_restore_state": true,
+		},
 	}
 	row := mithrilRestoreRow(mithrilMissing, 80)
 	if strings.Count(row, "n/a") != 2 {
-		t.Errorf("restore row should read n/a for the source and fallback totals:\n%s", row)
+		t.Errorf(
+			"restore row should read n/a for the source and fallback totals:\n%s",
+			row,
+		)
 	}
 	backfill := mithrilBackfillRow(mithrilMissing, 80, 20)
 	if strings.Count(backfill, "n/a") < 4 {
-		t.Errorf("backfill row should read n/a for percent, slots and rate:\n%s", backfill)
+		t.Errorf(
+			"backfill row should read n/a for percent, slots and rate:\n%s",
+			backfill,
+		)
 	}
 	if strings.Contains(backfill, "0.0%") || strings.Contains(backfill, "0/0") {
 		t.Errorf("backfill row invents zero progress:\n%s", backfill)
@@ -3334,7 +3833,11 @@ func TestDingoPartialExportsReportMissingAsUnavailable(t *testing.T) {
 		DingoHeaderQueueCapacity: 10000,
 		DingoPresentMetrics:      map[string]bool{},
 	})
-	if stats := getDingoStats(); strings.Contains(stats, "0/10000") || strings.Contains(stats, "0 blk") {
-		t.Errorf("getDingoStats() invents a queue length or blocks in flight:\n%s", stats)
+	if stats := getDingoStats(); strings.Contains(stats, "0/10000") ||
+		strings.Contains(stats, "0 blk") {
+		t.Errorf(
+			"getDingoStats() invents a queue length or blocks in flight:\n%s",
+			stats,
+		)
 	}
 }
