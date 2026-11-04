@@ -946,6 +946,78 @@ func amaruIntakeText(m *PromMetrics) string {
 	return sb.String()
 }
 
+// amaruLatencyRow is one consensus duration histogram, reported by Amaru as a
+// running sum in microseconds and a sample count.
+type amaruLatencyRow struct {
+	label            string
+	sum, prevSum     float64
+	count, prevCount uint64
+}
+
+// amaruLatencyRows pairs each duration histogram with the same one from the
+// previous scrape; prev is nil when there is none.
+func amaruLatencyRows(m, prev *PromMetrics) []amaruLatencyRow {
+	if prev == nil {
+		prev = &PromMetrics{}
+	}
+	return []amaruLatencyRow{
+		{"Fetch", m.AmaruBlockFetchSum, prev.AmaruBlockFetchSum, m.AmaruBlockFetchCount, prev.AmaruBlockFetchCount},
+		{"Fetch Wait", m.AmaruBlockFetchWaitSum, prev.AmaruBlockFetchWaitSum, m.AmaruBlockFetchWaitCount, prev.AmaruBlockFetchWaitCount},
+		{"Hdr Fwd", m.AmaruHeaderForwardSum, prev.AmaruHeaderForwardSum, m.AmaruHeaderForwardCount, prev.AmaruHeaderForwardCount},
+		{"Slot>Hdr", m.AmaruSlotToHeaderSum, prev.AmaruSlotToHeaderSum, m.AmaruSlotToHeaderCount, prev.AmaruSlotToHeaderCount},
+		{"Fork Sw", m.AmaruForkSwitchSum, prev.AmaruForkSwitchSum, m.AmaruForkSwitchCount, prev.AmaruForkSwitchCount},
+	}
+}
+
+// formatMicroseconds renders a duration given in microseconds.
+func formatMicroseconds(us float64) string {
+	switch {
+	case us >= 1_000_000:
+		return fmt.Sprintf("%.2fs", us/1_000_000)
+	case us >= 1_000:
+		return fmt.Sprintf("%.0fms", us/1_000)
+	default:
+		return fmt.Sprintf("%.0fus", us)
+	}
+}
+
+// average is the mean over the node's lifetime. recent is the mean over the
+// samples since the previous scrape, and is absent when there were none or the
+// counters went backwards, as after a restart.
+func (r amaruLatencyRow) average() (float64, bool) {
+	if r.count == 0 {
+		return 0, false
+	}
+	return r.sum / float64(r.count), true
+}
+
+func (r amaruLatencyRow) recent() (float64, bool) {
+	if r.count <= r.prevCount || r.sum < r.prevSum {
+		return 0, false
+	}
+	return (r.sum - r.prevSum) / float64(r.count-r.prevCount), true
+}
+
+// amaruLatencyText shows the consensus durations as lifetime average and
+// average since the previous scrape. A histogram with no samples reads n/a.
+func amaruLatencyText(m, prev *PromMetrics) string {
+	var sb strings.Builder
+	sb.WriteString(uiSection("Latency  avg / recent"))
+	for _, row := range amaruLatencyRows(m, prev) {
+		avg := uiMuted("n/a")
+		if v, ok := row.average(); ok {
+			avg = uiValue(formatMicroseconds(v))
+		}
+		recent := uiMuted("-")
+		if v, ok := row.recent(); ok {
+			recent = uiValue(formatMicroseconds(v))
+		}
+		fmt.Fprintf(&sb, " %s %s%s%s\n",
+			uiLabel(fmt.Sprintf("%-10s", row.label)), avg, uiUnit(" / "), recent)
+	}
+	return sb.String()
+}
+
 func getOperatorFocusText(ctx context.Context) string {
 	select {
 	case <-ctx.Done():
@@ -979,6 +1051,8 @@ func getOperatorFocusText(ctx context.Context) string {
 	)
 	if getEffectiveNodeBinary() == AMARU_BINARY {
 		sb.WriteString(amaruIntakeText(promMetrics))
+		prev, _ := dingoPreviousSample(promMetrics)
+		sb.WriteString(amaruLatencyText(promMetrics, prev))
 	}
 	return sb.String()
 }

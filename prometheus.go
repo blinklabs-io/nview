@@ -156,19 +156,29 @@ type PromMetrics struct {
 
 	// Amaru exports resource use and build info through its OpenTelemetry
 	// Collector instead of a local process, so these replace the PID lookup.
-	AmaruProcessRuntime   uint64  `json:"process_runtime"`
-	AmaruProcessCPU       float64 `json:"process_cpu_live"`
-	AmaruMemoryResident   uint64  `json:"process_memory_live_resident"`
-	AmaruMemoryFootprint  uint64  `json:"process_memory_footprint"`
-	AmaruHostMemoryTotal  uint64  `json:"host_memory_total"`
-	AmaruHostMemoryUsed   uint64  `json:"host_memory_used"`
-	AmaruHeadersTotal     uint64  `json:"amaru_consensus_header_total"`
-	AmaruHeadersValid     uint64  `json:"amaru_consensus_header_total_valid"`
-	AmaruMempoolAccepted  uint64  `json:"amaru_metrics_mempoolTxInsertionsNum_int_accepted"`
-	AmaruMempoolDuplicate uint64  `json:"amaru_metrics_mempoolTxInsertionsNum_int_rejected_duplicate"`
-	AmaruMempoolInvalid   uint64  `json:"amaru_metrics_mempoolTxInsertionsNum_int_rejected_invalid"`
-	AmaruBuildVersion     string  `json:"cardano_node_metrics_cardano_build_info_version"`
-	AmaruBuildRevision    string  `json:"cardano_node_metrics_cardano_build_info_revision"`
+	AmaruProcessRuntime      uint64  `json:"process_runtime"`
+	AmaruProcessCPU          float64 `json:"process_cpu_live"`
+	AmaruMemoryResident      uint64  `json:"process_memory_live_resident"`
+	AmaruMemoryFootprint     uint64  `json:"process_memory_footprint"`
+	AmaruHostMemoryTotal     uint64  `json:"host_memory_total"`
+	AmaruHostMemoryUsed      uint64  `json:"host_memory_used"`
+	AmaruHeadersTotal        uint64  `json:"amaru_consensus_header_total"`
+	AmaruHeadersValid        uint64  `json:"amaru_consensus_header_total_valid"`
+	AmaruMempoolAccepted     uint64  `json:"amaru_metrics_mempoolTxInsertionsNum_int_accepted"`
+	AmaruMempoolDuplicate    uint64  `json:"amaru_metrics_mempoolTxInsertionsNum_int_rejected_duplicate"`
+	AmaruMempoolInvalid      uint64  `json:"amaru_metrics_mempoolTxInsertionsNum_int_rejected_invalid"`
+	AmaruBlockFetchSum       float64 `json:"amaru_consensus_block_fetch_duration_microseconds_sum"`
+	AmaruBlockFetchCount     uint64  `json:"amaru_consensus_block_fetch_duration_microseconds_count"`
+	AmaruBlockFetchWaitSum   float64 `json:"amaru_consensus_block_fetch_wait_duration_microseconds_sum"`
+	AmaruBlockFetchWaitCount uint64  `json:"amaru_consensus_block_fetch_wait_duration_microseconds_count"`
+	AmaruHeaderForwardSum    float64 `json:"amaru_consensus_header_forward_duration_microseconds_sum"`
+	AmaruHeaderForwardCount  uint64  `json:"amaru_consensus_header_forward_duration_microseconds_count"`
+	AmaruSlotToHeaderSum     float64 `json:"amaru_consensus_slot_start_to_header_duration_microseconds_sum"`
+	AmaruSlotToHeaderCount   uint64  `json:"amaru_consensus_slot_start_to_header_duration_microseconds_count"`
+	AmaruForkSwitchSum       float64 `json:"amaru_consensus_fork_switch_duration_microseconds_sum"`
+	AmaruForkSwitchCount     uint64  `json:"amaru_consensus_fork_switch_duration_microseconds_count"`
+	AmaruBuildVersion        string  `json:"cardano_node_metrics_cardano_build_info_version"`
+	AmaruBuildRevision       string  `json:"cardano_node_metrics_cardano_build_info_revision"`
 
 	// Dingo-native metrics
 	DingoDbSizeBytes          uint64 `json:"dingo_database_size_bytes"`
@@ -913,6 +923,9 @@ func shouldAggregatePromMetric(name string) bool {
 	return strings.HasPrefix(name, "event_") ||
 		strings.HasPrefix(name, "amaru_metrics_mempoolTxInsertionsNum_int_") ||
 		name == "amaru_consensus_header_total" ||
+		(strings.HasPrefix(name, "amaru_consensus_") &&
+			(strings.HasSuffix(name, "_microseconds_sum") ||
+				strings.HasSuffix(name, "_microseconds_count"))) ||
 		strings.HasPrefix(name, "amaru_consensus_header_total_") ||
 		name == "dingo_database_size_bytes" ||
 		name == "dingo_protocol_messages_received_total" ||

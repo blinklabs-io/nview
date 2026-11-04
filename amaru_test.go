@@ -52,6 +52,11 @@ func TestPromMetricsRecordedAmaruRelay(t *testing.T) {
 		{"AmaruMempoolAccepted", m.AmaruMempoolAccepted, 3257},
 		{"AmaruMempoolDuplicate", m.AmaruMempoolDuplicate, 17158},
 		{"AmaruMempoolInvalid", m.AmaruMempoolInvalid, 6841},
+		{"AmaruBlockFetchCount", m.AmaruBlockFetchCount, 649},
+		{"AmaruBlockFetchWaitCount", m.AmaruBlockFetchWaitCount, 649},
+		{"AmaruHeaderForwardCount", m.AmaruHeaderForwardCount, 649},
+		{"AmaruSlotToHeaderCount", m.AmaruSlotToHeaderCount, 646},
+		{"AmaruForkSwitchCount", m.AmaruForkSwitchCount, 14},
 	}
 	for _, tt := range counts {
 		if tt.got != tt.want {
@@ -243,5 +248,101 @@ func TestDisplayEpochUsesTheScrapeBeingDrawn(t *testing.T) {
 	}
 	if got := displayEpoch(nil); got != 12 {
 		t.Errorf("displayEpoch(nil) = %d, expected the cached 12", got)
+	}
+}
+
+func TestAmaruLatencyShowsAverageAndRecent(t *testing.T) {
+	m := decodeAmaruFixture(t)
+	if m.AmaruBlockFetchSum != 128088283 || m.AmaruSlotToHeaderSum != 128388335 {
+		t.Fatalf("sums = %v, %v", m.AmaruBlockFetchSum, m.AmaruSlotToHeaderSum)
+	}
+
+	text := amaruLatencyText(m, nil)
+	for _, expected := range []string{"Latency", "Fetch", "197ms", "Fork Sw", "251ms", "Slot>Hdr", "199ms"} {
+		if !strings.Contains(text, expected) {
+			t.Errorf("latency text missing %q:\n%s", expected, text)
+		}
+	}
+	if strings.Contains(text, "n/a") {
+		t.Errorf("a scrape with samples must not read n/a:\n%s", text)
+	}
+
+	// 49 more fetches adding 49 s of total time: the recent average is 1 s.
+	prev := *m
+	prev.AmaruBlockFetchCount -= 49
+	prev.AmaruBlockFetchSum -= 49_000_000
+	row := amaruLatencyRows(m, &prev)[0]
+	if got, ok := row.recent(); !ok || got != 1_000_000 {
+		t.Errorf("recent fetch = %v, %v, expected 1000000 us", got, ok)
+	}
+	if text := amaruLatencyText(m, &prev); !strings.Contains(text, "1.00s") {
+		t.Errorf("latency text missing the recent 1.00s:\n%s", text)
+	}
+
+	if avg, ok := amaruLatencyRows(m, nil)[0].average(); !ok || avg != 128088283.0/649.0 {
+		t.Errorf("average fetch = %v, %v, expected the sum over the count", avg, ok)
+	}
+
+	// No new samples, or counters that went backwards after a restart.
+	if _, ok := amaruLatencyRows(m, m)[0].recent(); ok {
+		t.Error("recent reported with no new samples")
+	}
+	restarted := *m
+	restarted.AmaruBlockFetchCount = 1000
+	restarted.AmaruBlockFetchSum = 1e12
+	if _, ok := amaruLatencyRows(m, &restarted)[0].recent(); ok {
+		t.Error("recent reported after the counters went backwards")
+	}
+	sumBackwards := *m
+	sumBackwards.AmaruBlockFetchCount--
+	sumBackwards.AmaruBlockFetchSum++
+	if _, ok := amaruLatencyRows(m, &sumBackwards)[0].recent(); ok {
+		t.Error("recent reported after the sum went backwards")
+	}
+}
+
+func TestAmaruLatencyWithoutSamplesReadsNotAvailable(t *testing.T) {
+	text := amaruLatencyText(&PromMetrics{}, nil)
+	if strings.Count(text, "n/a") != 5 {
+		t.Errorf("each histogram without samples should read n/a:\n%s", text)
+	}
+}
+
+func TestPromMetricsAmaruLatencySumsOutcomes(t *testing.T) {
+	m := decodePromMetrics(t, []byte(`# TYPE amaru_consensus_block_fetch_duration_microseconds histogram
+amaru_consensus_block_fetch_duration_microseconds_sum{outcome="valid"} 100
+amaru_consensus_block_fetch_duration_microseconds_count{outcome="valid"} 4
+amaru_consensus_block_fetch_duration_microseconds_sum{outcome="invalid"} 50
+amaru_consensus_block_fetch_duration_microseconds_count{outcome="invalid"} 1
+`))
+	if m.AmaruBlockFetchSum != 150 || m.AmaruBlockFetchCount != 5 {
+		t.Errorf("fetch = %v over %d, expected 150 over 5", m.AmaruBlockFetchSum, m.AmaruBlockFetchCount)
+	}
+}
+
+// TestAmaruFocusPaneShowsLatency checks the latency rows reach the pane Amaru
+// draws, with the previous scrape as the baseline for the recent figure.
+func TestAmaruFocusPaneShowsLatency(t *testing.T) {
+	withAmaruState(t)
+	withDingoSampleState(t)
+	cfg := config.GetConfig()
+	originalSlotLength := cfg.Node.ShelleyGenesis.SlotLength
+	cfg.Node.ShelleyGenesis.SlotLength = 1000
+	t.Cleanup(func() { cfg.Node.ShelleyGenesis.SlotLength = originalSlotLength })
+
+	first := decodeAmaruFixture(t)
+	second := *first
+	second.AmaruBlockFetchCount += 10
+	second.AmaruBlockFetchSum += 10 * 2_000_000
+	detectNodeType(first)
+	recordDingoSample(first)
+	promMetrics.Store(&second)
+	recordDingoSample(&second)
+
+	text := getOperatorFocusText(context.Background())
+	for _, expected := range []string{"Latency", "Fetch", "225ms", "2.00s"} {
+		if !strings.Contains(text, expected) {
+			t.Errorf("focus pane missing %q:\n%s", expected, text)
+		}
 	}
 }

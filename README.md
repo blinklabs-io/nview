@@ -57,8 +57,10 @@ Set `OTEL_METRIC_EXPORT_INTERVAL` below 60 seconds and the Collector's
 
 nview recognises Amaru from its `process_*` and `amaru_consensus_*` metrics. It
 reads the version, uptime, CPU and memory from the scrape, because the Collector
-may run on another host from the node. Amaru does not export peer counters, so
-those stay at zero.
+may run on another host from the node. The Amaru Focus pane also shows header
+and mempool outcomes and the consensus durations (block fetch, header forward,
+slot start to header, fork switch) as a lifetime average and the average since
+the previous scrape. Amaru does not export peer counters, so those read `n/a`.
 
 ## Usage
 
