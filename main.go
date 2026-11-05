@@ -356,7 +356,11 @@ func dashboardShowsDingoSystems() bool {
 	return getEffectiveNodeBinary() == DINGO_BINARY
 }
 
-func styleDashboardPane(view *tview.TextView, title string, severity uiSeverity) {
+func styleDashboardPane(
+	view *tview.TextView,
+	title string,
+	severity uiSeverity,
+) {
 	view.SetDynamicColors(true)
 	view.SetBorder(true)
 	view.SetTitle(uiPanelTitle(title, severity))
@@ -478,7 +482,11 @@ func getFooterText() string {
 			parts = append(
 				parts,
 				uiKey(
-					fmt.Sprintf("%d/%d", compactDingoPageIndex()+1, compactDingoPageCount),
+					fmt.Sprintf(
+						"%d/%d",
+						compactDingoPageIndex()+1,
+						compactDingoPageCount,
+					),
 					"Panel",
 				),
 			)
@@ -495,7 +503,12 @@ func dashboardChromeText(text string) string {
 		return text
 	}
 	width := dashboardContentWidth()
-	return dingoPanelMargin(width) + dingoPadTaggedRight(text, dingoPanelRenderedWidth(width))
+	return dingoPanelMargin(
+		width,
+	) + dingoPadTaggedRight(
+		text,
+		dingoPanelRenderedWidth(width),
+	)
 }
 
 func getMinimalFooterText() string {
@@ -513,11 +526,19 @@ func refreshChrome() {
 	styleDashboardPane(connectionTextView, "Network", connectionPaneSeverity())
 	styleDashboardPane(coreTextView, "Forge", corePaneSeverity())
 	styleDashboardPane(chainTextView, "Ledger", chainPaneSeverity())
-	styleDashboardPane(blockTextView, activityPanelTitle(), activityPaneSeverity())
+	styleDashboardPane(
+		blockTextView,
+		activityPanelTitle(),
+		activityPaneSeverity(),
+	)
 	styleDashboardPane(dingoTextView, dingoPanelTitle(), dingoPaneSeverity())
 	styleDashboardPane(peerTextView, "Peer Radar", peerPaneSeverity())
 	styleDashboardPane(peerOverlayTextView, "Peer Radar", peerPaneSeverity())
-	styleDashboardPane(mithrilOverlayTextView, "Mithril Sync", activityPaneSeverity())
+	styleDashboardPane(
+		mithrilOverlayTextView,
+		"Mithril Sync",
+		activityPaneSeverity(),
+	)
 	peerOverlayTextView.SetTextColor(tcell.ColorWhite)
 	mithrilOverlayTextView.SetTextColor(tcell.ColorWhite)
 }
@@ -539,7 +560,11 @@ func refreshDashboardText(ctx context.Context) {
 	if getEffectiveNodeBinary() == DINGO_BINARY {
 		dashboardPages.SwitchToPage("dingo")
 		refreshDiskSnapshot(ctx, config.GetConfig(), processMetrics)
-		setTextIfChanged(dingoConsoleTextView, &dingoConsoleText, getDingoConsoleText(ctx))
+		setTextIfChanged(
+			dingoConsoleTextView,
+			&dingoConsoleText,
+			getDingoConsoleText(ctx),
+		)
 		updateMithrilView()
 		updatePeerOverlay(ctx)
 		if scrollPeers {
@@ -553,7 +578,11 @@ func refreshDashboardText(ctx context.Context) {
 	setTextIfChanged(overviewTextView, &overviewText, getOverviewText(ctx))
 	setTextIfChanged(nodeTextView, &nodeText, getNodeText(ctx))
 	setTextIfChanged(resourceTextView, &resourceText, getResourceText(ctx))
-	setTextIfChanged(connectionTextView, &connectionText, getConnectionText(ctx))
+	setTextIfChanged(
+		connectionTextView,
+		&connectionText,
+		getConnectionText(ctx),
+	)
 	setTextIfChanged(coreTextView, &coreText, getCoreText(ctx))
 	setTextIfChanged(chainTextView, &chainText, getLedgerText(ctx))
 	setTextIfChanged(blockTextView, &blockText, getActivityText(ctx))
@@ -695,7 +724,8 @@ func corePaneSeverity() uiSeverity {
 	if promMetrics == nil || !hasForgeMetrics(promMetrics) {
 		return uiSeverityMuted
 	}
-	if getEffectiveNodeBinary() == DINGO_BINARY && promMetrics.ForgingEnabled == 0 {
+	if getEffectiveNodeBinary() == DINGO_BINARY &&
+		promMetrics.ForgingEnabled == 0 {
 		if promMetrics.DidntAdopt > 0 {
 			return uiSeverityCritical
 		}
@@ -707,7 +737,8 @@ func corePaneSeverity() uiSeverity {
 	if promMetrics.DidntAdopt > 0 {
 		return uiSeverityCritical
 	}
-	if promMetrics.IsLeader != promMetrics.Adopted || promMetrics.MissedSlots > 0 {
+	if promMetrics.IsLeader != promMetrics.Adopted ||
+		promMetrics.MissedSlots > 0 {
 		return uiSeverityWarn
 	}
 	return uiSeverityOK
@@ -720,7 +751,11 @@ func runtimePaneSeverity() uiSeverity {
 	}
 	fdUsage := 0.0
 	if promMetrics.ProcessMaxFDs > 0 {
-		fdUsage = float64(promMetrics.ProcessOpenFDs) / float64(promMetrics.ProcessMaxFDs) * 100
+		fdUsage = float64(
+			promMetrics.ProcessOpenFDs,
+		) / float64(
+			promMetrics.ProcessMaxFDs,
+		) * 100
 	}
 	if fdUsage >= 90 {
 		return uiSeverityCritical
@@ -893,8 +928,15 @@ func getOverviewText(ctx context.Context) string {
 				uiUnit(" slots"),
 		),
 	)
-	fmt.Fprintf(&sb, " %s   %s   %s\n",
-		uiPercentBar("Epoch", epochProgress, mithrilProgressSeverity(epochProgress), 20),
+	fmt.Fprintf(
+		&sb,
+		" %s   %s   %s\n",
+		uiPercentBar(
+			"Epoch",
+			epochProgress,
+			mithrilProgressSeverity(epochProgress),
+			20,
+		),
 		uiKVAligned(9, "Remaining", uiValue(formatEpochRemaining(promMetrics))),
 		uiKVAligned(9, "Peers", peerStateSegmentBar(promMetrics, 12)),
 	)
@@ -905,9 +947,14 @@ func getOverviewText(ctx context.Context) string {
 			forgeLabel = "enabled"
 			forgeSeverity = uiSeverityOK
 		}
-		fmt.Fprintf(&sb, " %s   %s   %s   %s\n",
+		fmt.Fprintf(
+			&sb,
+			" %s   %s   %s   %s\n",
 			uiPill("forge", forgeLabel, forgeSeverity),
-			uiKV("Forged", uiValue(strconv.FormatUint(promMetrics.BlocksForged, 10))),
+			uiKV(
+				"Forged",
+				uiValue(strconv.FormatUint(promMetrics.BlocksForged, 10)),
+			),
 			uiKV("DB", uiValue(formatDingoBytes(dingoDbSize(promMetrics)))),
 			uiKV("FD", uiValue(formatFDUsage(promMetrics))),
 		)
@@ -932,16 +979,42 @@ func amaruIntakeText(m *PromMetrics) string {
 	}
 	var sb strings.Builder
 	sb.WriteString(uiSection("Intake"))
-	fmt.Fprintf(&sb, " %s   %s\n",
+	fmt.Fprintf(
+		&sb,
+		" %s   %s\n",
 		uiKV("Headers", count(headers, m.AmaruHeadersTotal, uiSeverityNeutral)),
-		uiKV("Rejected", count(headers, rejectedHeaders, dingoCounterSeverity(rejectedHeaders, uiSeverityWarn))),
+		uiKV(
+			"Rejected",
+			count(
+				headers,
+				rejectedHeaders,
+				dingoCounterSeverity(rejectedHeaders, uiSeverityWarn),
+			),
+		),
 	)
-	fmt.Fprintf(&sb, " %s   %s\n",
-		uiKV("Tx OK", count(mempool, m.AmaruMempoolAccepted, uiSeverityNeutral)),
-		uiKV("Tx Dup", count(mempool, m.AmaruMempoolDuplicate, uiSeverityNeutral)),
+	fmt.Fprintf(
+		&sb,
+		" %s   %s\n",
+		uiKV(
+			"Tx OK",
+			count(mempool, m.AmaruMempoolAccepted, uiSeverityNeutral),
+		),
+		uiKV(
+			"Tx Dup",
+			count(mempool, m.AmaruMempoolDuplicate, uiSeverityNeutral),
+		),
 	)
-	fmt.Fprintf(&sb, " %s\n",
-		uiKV("Tx Invalid", count(mempool, m.AmaruMempoolInvalid, dingoCounterSeverity(m.AmaruMempoolInvalid, uiSeverityWarn))),
+	fmt.Fprintf(
+		&sb,
+		" %s\n",
+		uiKV(
+			"Tx Invalid",
+			count(
+				mempool,
+				m.AmaruMempoolInvalid,
+				dingoCounterSeverity(m.AmaruMempoolInvalid, uiSeverityWarn),
+			),
+		),
 	)
 	return sb.String()
 }
@@ -961,11 +1034,41 @@ func amaruLatencyRows(m, prev *PromMetrics) []amaruLatencyRow {
 		prev = &PromMetrics{}
 	}
 	return []amaruLatencyRow{
-		{"Fetch", m.AmaruBlockFetchSum, prev.AmaruBlockFetchSum, m.AmaruBlockFetchCount, prev.AmaruBlockFetchCount},
-		{"Fetch Wait", m.AmaruBlockFetchWaitSum, prev.AmaruBlockFetchWaitSum, m.AmaruBlockFetchWaitCount, prev.AmaruBlockFetchWaitCount},
-		{"Hdr Fwd", m.AmaruHeaderForwardSum, prev.AmaruHeaderForwardSum, m.AmaruHeaderForwardCount, prev.AmaruHeaderForwardCount},
-		{"Slot>Hdr", m.AmaruSlotToHeaderSum, prev.AmaruSlotToHeaderSum, m.AmaruSlotToHeaderCount, prev.AmaruSlotToHeaderCount},
-		{"Fork Sw", m.AmaruForkSwitchSum, prev.AmaruForkSwitchSum, m.AmaruForkSwitchCount, prev.AmaruForkSwitchCount},
+		{
+			"Fetch",
+			m.AmaruBlockFetchSum,
+			prev.AmaruBlockFetchSum,
+			m.AmaruBlockFetchCount,
+			prev.AmaruBlockFetchCount,
+		},
+		{
+			"Fetch Wait",
+			m.AmaruBlockFetchWaitSum,
+			prev.AmaruBlockFetchWaitSum,
+			m.AmaruBlockFetchWaitCount,
+			prev.AmaruBlockFetchWaitCount,
+		},
+		{
+			"Hdr Fwd",
+			m.AmaruHeaderForwardSum,
+			prev.AmaruHeaderForwardSum,
+			m.AmaruHeaderForwardCount,
+			prev.AmaruHeaderForwardCount,
+		},
+		{
+			"Slot>Hdr",
+			m.AmaruSlotToHeaderSum,
+			prev.AmaruSlotToHeaderSum,
+			m.AmaruSlotToHeaderCount,
+			prev.AmaruSlotToHeaderCount,
+		},
+		{
+			"Fork Sw",
+			m.AmaruForkSwitchSum,
+			prev.AmaruForkSwitchSum,
+			m.AmaruForkSwitchCount,
+			prev.AmaruForkSwitchCount,
+		},
 	}
 }
 
@@ -1012,8 +1115,16 @@ func amaruLatencyText(m, prev *PromMetrics) string {
 		if v, ok := row.recent(); ok {
 			recent = uiValue(formatMicroseconds(v))
 		}
-		fmt.Fprintf(&sb, " %s %s%s%s\n",
-			uiLabel(fmt.Sprintf("%-10s", row.label)), avg, uiUnit(" / "), recent)
+		fmt.Fprintf(
+			&sb,
+			" %s %s%s%s\n",
+			uiLabel(
+				fmt.Sprintf("%-10s", row.label),
+			),
+			avg,
+			uiUnit(" / "),
+			recent,
+		)
 	}
 	return sb.String()
 }
@@ -1032,11 +1143,21 @@ func getOperatorFocusText(ctx context.Context) string {
 	var sb strings.Builder
 	sb.WriteString(uiSection("Node Signals"))
 	tipGap, tipSeverity := currentTipGap(promMetrics)
-	fmt.Fprintf(&sb, " %s   %s\n",
-		uiKV("Health", uiSeverityValue(dashboardHealthLabel(), dashboardHealthSeverity())),
+	fmt.Fprintf(
+		&sb,
+		" %s   %s\n",
+		uiKV(
+			"Health",
+			uiSeverityValue(dashboardHealthLabel(), dashboardHealthSeverity()),
+		),
 		uiKV(
 			"Tip Gap",
-			uiSeverityValue(strconv.FormatUint(tipGap, 10), tipSeverity)+uiUnit(" slots"),
+			uiSeverityValue(
+				strconv.FormatUint(tipGap, 10),
+				tipSeverity,
+			)+uiUnit(
+				" slots",
+			),
 		),
 	)
 	fmt.Fprintf(&sb, " %s   %s\n",
@@ -1045,8 +1166,13 @@ func getOperatorFocusText(ctx context.Context) string {
 	)
 	sb.WriteString(uiSection("Block Service"))
 	lateSeverity := dingoCounterSeverity(promMetrics.BlocksLate, uiSeverityWarn)
-	fmt.Fprintf(&sb, " %s   %s\n",
-		uiKV("Served", uiValue(strconv.FormatUint(promMetrics.BlocksServed, 10))),
+	fmt.Fprintf(
+		&sb,
+		" %s   %s\n",
+		uiKV(
+			"Served",
+			uiValue(strconv.FormatUint(promMetrics.BlocksServed, 10)),
+		),
 		uiKV("Late", formatSeverityCount(promMetrics.BlocksLate, lateSeverity)),
 	)
 	if getEffectiveNodeBinary() == AMARU_BINARY {
@@ -1108,9 +1234,21 @@ func peerStateSegmentBar(metrics *PromMetrics, width int) string {
 		return uiSegmentBar(nil, width)
 	}
 	return uiSegmentBar([]uiSegment{
-		{Label: "hot", Value: float64(metrics.PeersHot), Severity: uiSeverityOK},
-		{Label: "warm", Value: float64(metrics.PeersWarm), Severity: uiSeverityWarn},
-		{Label: "cold", Value: float64(metrics.PeersCold), Severity: uiSeverityMuted},
+		{
+			Label:    "hot",
+			Value:    float64(metrics.PeersHot),
+			Severity: uiSeverityOK,
+		},
+		{
+			Label:    "warm",
+			Value:    float64(metrics.PeersWarm),
+			Severity: uiSeverityWarn,
+		},
+		{
+			Label:    "cold",
+			Value:    float64(metrics.PeersCold),
+			Severity: uiSeverityMuted,
+		},
 	}, width)
 }
 
@@ -1134,7 +1272,8 @@ func terminalSizeWithFallback(defaultWidth int) (int, int) {
 	if fd > math.MaxInt {
 		return defaultWidth, DashboardHeightDefault
 	}
-	cols, rows, err := terminal.GetSize(int(fd)) //nolint:gosec // fd validated above
+	fdInt := int(fd) //nolint:gosec // fd validated above
+	cols, rows, err := terminal.GetSize(fdInt)
 	if err != nil || cols <= 0 || rows <= 0 {
 		return defaultWidth, DashboardHeightDefault
 	}
@@ -1148,13 +1287,23 @@ type dingoMetricCell struct {
 	Span          int
 }
 
-func dingoPanel(title string, severity uiSeverity, width int, lines []string) string {
+func dingoPanel(
+	title string,
+	severity uiSeverity,
+	width int,
+	lines []string,
+) string {
 	panelWidth := dingoPanelWidth(width)
 	innerWidth := dingoPanelInnerWidth(width)
 	margin := dingoPanelMargin(width)
 
 	top := dingoPanelTop(title, severity, panelWidth)
-	bottom := uiMuted(" " + dingoBorderLeftBottom() + strings.Repeat(dingoBorderHorizontal(), panelWidth-2) + dingoBorderRightBottom())
+	bottom := uiMuted(
+		" " + dingoBorderLeftBottom() + strings.Repeat(
+			dingoBorderHorizontal(),
+			panelWidth-2,
+		) + dingoBorderRightBottom(),
+	)
 	var sb strings.Builder
 	sb.WriteString("\n")
 	sb.WriteString(margin)
@@ -1224,7 +1373,12 @@ func dingoPanelTop(title string, severity uiSeverity, width int) string {
 	}
 	return uiMuted(prefix) +
 		titleText +
-		uiMuted(suffixPrefix+strings.Repeat(dingoBorderHorizontal(), fill)+dingoBorderRightTop())
+		uiMuted(
+			suffixPrefix+strings.Repeat(
+				dingoBorderHorizontal(),
+				fill,
+			)+dingoBorderRightTop(),
+		)
 }
 
 func dingoBorderLeftTop() string {
@@ -1281,7 +1435,10 @@ func dingoMetricRow(innerWidth int, cells ...dingoMetricCell) string {
 	return dingoMetricRowColumns(innerWidth, 4, cells...)
 }
 
-func dingoMetricRowColumns(innerWidth, columns int, cells ...dingoMetricCell) string {
+func dingoMetricRowColumns(
+	innerWidth, columns int,
+	cells ...dingoMetricCell,
+) string {
 	if len(cells) == 0 {
 		return ""
 	}
@@ -1330,7 +1487,10 @@ func dingoMetricRowColumns(innerWidth, columns int, cells ...dingoMetricCell) st
 		usedColumns += span
 	}
 	for usedColumns < columns {
-		parts = append(parts, dingoMetricCellText(dingoMetricCell{}, columnWidths[usedColumns]))
+		parts = append(
+			parts,
+			dingoMetricCellText(dingoMetricCell{}, columnWidths[usedColumns]),
+		)
 		usedColumns++
 	}
 	return strings.Join(parts, uiMuted(separator))
@@ -1365,7 +1525,10 @@ func dingoMetricCellText(cell dingoMetricCell, width int) string {
 	if labelSeverity == 0 {
 		labelSeverity = uiSeverityNeutral
 	}
-	text := uiLabelSeverity(fmt.Sprintf("%-*s", labelWidth, label), labelSeverity) +
+	text := uiLabelSeverity(
+		fmt.Sprintf("%-*s", labelWidth, label),
+		labelSeverity,
+	) +
 		" " +
 		cell.Value
 	return dingoPadTaggedRight(text, width)
@@ -1379,7 +1542,10 @@ func dingoMetric(label, value string) dingoMetricCell {
 	}
 }
 
-func dingoMetricStyled(label, value string, severity uiSeverity) dingoMetricCell {
+func dingoMetricStyled(
+	label, value string,
+	severity uiSeverity,
+) dingoMetricCell {
 	return dingoMetricCell{
 		Label:         label,
 		Value:         value,
@@ -1393,7 +1559,10 @@ func dingoMetricSpan(label, value string, span int) dingoMetricCell {
 	return cell
 }
 
-func dingoMetricStyledWide(label, value string, severity uiSeverity) dingoMetricCell {
+func dingoMetricStyledWide(
+	label, value string,
+	severity uiSeverity,
+) dingoMetricCell {
 	cell := dingoMetricStyled(label, value, severity)
 	cell.Span = 2
 	return cell
@@ -1426,7 +1595,10 @@ func dingoPipelineState(metrics *PromMetrics) (string, uiSeverity) {
 // dingoLastBlockAge returns how long ago Dingo last added a block to the
 // chain. The gauge is zero until a block arrives after start, which reports as
 // no age. A timestamp ahead of the local clock reads as zero.
-func dingoLastBlockAge(metrics *PromMetrics, now time.Time) (time.Duration, bool) {
+func dingoLastBlockAge(
+	metrics *PromMetrics,
+	now time.Time,
+) (time.Duration, bool) {
 	if metrics == nil || metrics.DingoLastBlockAdded <= 0 {
 		return 0, false
 	}
@@ -1460,7 +1632,9 @@ func formatDingoLastBlock(age time.Duration, ok bool) string {
 
 // dingoPipelineCells returns the pipeline state, its restart count and the
 // last block age as metric cells, each styled by its own severity.
-func dingoPipelineCells(metrics *PromMetrics) (dingoMetricCell, dingoMetricCell, dingoMetricCell) {
+func dingoPipelineCells(
+	metrics *PromMetrics,
+) (dingoMetricCell, dingoMetricCell, dingoMetricCell) {
 	label, severity := dingoPipelineState(metrics)
 	restartSeverity := uiSeverityOK
 	if metrics.DingoPipelineRestarts > 0 {
@@ -1471,7 +1645,11 @@ func dingoPipelineCells(metrics *PromMetrics) (dingoMetricCell, dingoMetricCell,
 	if ok {
 		blockSeverity = dingoLastBlockSeverity(age)
 	}
-	return dingoMetricStyled("Pipeline", uiSeverityValue(label, severity), severity),
+	return dingoMetricStyled(
+			"Pipeline",
+			uiSeverityValue(label, severity),
+			severity,
+		),
 		dingoMetricStyled(
 			"Restarts",
 			formatSeverityCount(metrics.DingoPipelineRestarts, restartSeverity),
@@ -1539,7 +1717,9 @@ func dingoInflightValue(metrics *PromMetrics) string {
 // dingoHeaderQueueFill returns the queue severity and its length over capacity.
 // It reads n/a and muted when the node exports the capacity but not the
 // length. The caller has already checked the capacity is non-zero.
-func dingoHeaderQueueFill(metrics *PromMetrics) (uiSeverity, string, float64, bool) {
+func dingoHeaderQueueFill(
+	metrics *PromMetrics,
+) (uiSeverity, string, float64, bool) {
 	if !metrics.exports("dingo_chain_header_queue_length") {
 		return uiSeverityMuted, dingoNotAvailable(), 0, false
 	}
@@ -1562,16 +1742,27 @@ func dingoHeaderQueueFill(metrics *PromMetrics) (uiSeverity, string, float64, bo
 
 // dingoSyncBacklogRows renders the header queue fill and the blocks in flight.
 // It returns nothing when the node does not export the header queue capacity.
-func dingoSyncBacklogRows(metrics *PromMetrics, innerWidth int, compact bool) []string {
+func dingoSyncBacklogRows(
+	metrics *PromMetrics,
+	innerWidth int,
+	compact bool,
+) []string {
 	if metrics.DingoHeaderQueueCapacity == 0 {
 		return nil
 	}
 	severity, queueText, percent, known := dingoHeaderQueueFill(metrics)
 	backlogText := dingoNotAvailable()
 	if known {
-		backlogText = uiSeverityValue(fmt.Sprintf("%5.1f%%", percent), severity) +
+		backlogText = uiSeverityValue(
+			fmt.Sprintf("%5.1f%%", percent),
+			severity,
+		) +
 			" " +
-			uiProgressBar(percent, 20, severity)
+			uiProgressBar(
+				percent,
+				20,
+				severity,
+			)
 	}
 	backlog := dingoMetricStyled("Backlog", backlogText, severity)
 	backlog.Span = 2
@@ -1609,7 +1800,10 @@ func dingoHotSetDeficit(metrics *PromMetrics) (string, uiSeverity) {
 		return "n/a", uiSeverityMuted
 	}
 	if metrics.DingoHotSetDeficit > 0 {
-		return strconv.FormatUint(metrics.DingoHotSetDeficit, 10), uiSeverityWarn
+		return strconv.FormatUint(
+			metrics.DingoHotSetDeficit,
+			10,
+		), uiSeverityWarn
 	}
 	return "0", uiSeverityOK
 }
@@ -1659,21 +1853,55 @@ func mithrilRestoreRow(metrics *PromMetrics, innerWidth int) string {
 	label, severity := mithrilRestoreState(metrics)
 	return dingoMetricRow(
 		innerWidth,
-		dingoMetricStyled("Restore", uiSeverityValue(label, severity), severity),
-		dingoMetric("Source", dingoCountValue(metrics, "dingo_mithril_source_decisions_total", metrics.MithrilSourceDecisions)),
-		dingoMetric("Fallback", dingoCountValue(metrics, "dingo_mithril_fallbacks_total", metrics.MithrilFallbacks)),
+		dingoMetricStyled(
+			"Restore",
+			uiSeverityValue(label, severity),
+			severity,
+		),
+		dingoMetric(
+			"Source",
+			dingoCountValue(
+				metrics,
+				"dingo_mithril_source_decisions_total",
+				metrics.MithrilSourceDecisions,
+			),
+		),
+		dingoMetric(
+			"Fallback",
+			dingoCountValue(
+				metrics,
+				"dingo_mithril_fallbacks_total",
+				metrics.MithrilFallbacks,
+			),
+		),
 	)
 }
 
 // mithrilBackfillSlotValue shows the backfill position and rate, each n/a when
 // the node does not export it.
 func mithrilBackfillSlotValue(metrics *PromMetrics) string {
-	return dingoCountValue(metrics, "dingo_mithril_sync_backfill_current_slot", metrics.MithrilBackfillCurrentSlot) +
-		uiUnit("/") +
-		dingoCountValue(metrics, "dingo_mithril_sync_backfill_tip_slot", metrics.MithrilBackfillTipSlot) +
+	return dingoCountValue(
+		metrics,
+		"dingo_mithril_sync_backfill_current_slot",
+		metrics.MithrilBackfillCurrentSlot,
+	) +
+		uiUnit(
+			"/",
+		) +
+		dingoCountValue(
+			metrics,
+			"dingo_mithril_sync_backfill_tip_slot",
+			metrics.MithrilBackfillTipSlot,
+		) +
 		"  " +
-		dingoRateValue(metrics, "dingo_mithril_sync_backfill_blocks_per_second", metrics.MithrilBackfillBlocksPerSecond) +
-		uiUnit(" blk/s")
+		dingoRateValue(
+			metrics,
+			"dingo_mithril_sync_backfill_blocks_per_second",
+			metrics.MithrilBackfillBlocksPerSecond,
+		) +
+		uiUnit(
+			" blk/s",
+		)
 }
 
 func mithrilBackfillRow(metrics *PromMetrics, innerWidth, barWidth int) string {
@@ -1683,9 +1911,16 @@ func mithrilBackfillRow(metrics *PromMetrics, innerWidth, barWidth int) string {
 	progress := dingoNotAvailable()
 	if metrics.exports("dingo_mithril_sync_backfill_percent") {
 		severity := mithrilProgressSeverity(metrics.MithrilBackfillPercent)
-		progress = uiSeverityValue(fmt.Sprintf("%5.1f%%", metrics.MithrilBackfillPercent), severity) +
+		progress = uiSeverityValue(
+			fmt.Sprintf("%5.1f%%", metrics.MithrilBackfillPercent),
+			severity,
+		) +
 			" " +
-			uiProgressBar(metrics.MithrilBackfillPercent, barWidth, severity)
+			uiProgressBar(
+				metrics.MithrilBackfillPercent,
+				barWidth,
+				severity,
+			)
 	}
 	return dingoMetricRow(
 		innerWidth,
@@ -1701,7 +1936,9 @@ func dingoConsoleTipGap(metrics *PromMetrics) (uint64, uiSeverity) {
 	if metrics.DingoTipGapSlots > 0 ||
 		metrics.DingoShelleyStartTime > 0 ||
 		metrics.DingoEpochLengthSlots > 0 {
-		return metrics.DingoTipGapSlots, dingoTipGapSeverity(metrics.DingoTipGapSlots)
+		return metrics.DingoTipGapSlots, dingoTipGapSeverity(
+			metrics.DingoTipGapSlots,
+		)
 	}
 	return currentTipGap(metrics)
 }
@@ -1818,7 +2055,11 @@ func dingoConsoleHero(metrics *PromMetrics, width int) string {
 				dingoMetric("Node", uiValue("Dingo")),
 				dingoMetric("Network", uiValue(currentNetworkName())),
 				dingoMetric("Role", uiValue(role)),
-				dingoMetricStyled("Health", uiSeverityValue(healthLabel, healthSeverity), healthSeverity),
+				dingoMetricStyled(
+					"Health",
+					uiSeverityValue(healthLabel, healthSeverity),
+					healthSeverity,
+				),
 			),
 			dingoMetricRow(
 				innerWidth,
@@ -1828,9 +2069,14 @@ func dingoConsoleHero(metrics *PromMetrics, width int) string {
 					"Peers",
 					uiValue(strconv.FormatUint(metrics.PeersActive, 10))+
 						uiUnit("/")+
-						uiValue(strconv.FormatUint(metrics.PeersEstablished, 10)),
+						uiValue(
+							strconv.FormatUint(metrics.PeersEstablished, 10),
+						),
 				),
-				dingoMetric("Remaining", uiValue(formatEpochRemaining(metrics))),
+				dingoMetric(
+					"Remaining",
+					uiValue(formatEpochRemaining(metrics)),
+				),
 			),
 		},
 	)
@@ -1875,7 +2121,11 @@ func dingoConsoleDashboardCompact(metrics *PromMetrics, width int) string {
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
-				dingoMetricStyled("Health", uiSeverityValue(healthLabel, healthSeverity), healthSeverity),
+				dingoMetricStyled(
+					"Health",
+					uiSeverityValue(healthLabel, healthSeverity),
+					healthSeverity,
+				),
 				dingoMetric("Role", uiValue(role)),
 			),
 			dingoMetricRowColumns(innerWidth, 2, pipeline, restarts),
@@ -1883,18 +2133,32 @@ func dingoConsoleDashboardCompact(metrics *PromMetrics, width int) string {
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
-				dingoMetric("Block", uiValue(strconv.FormatUint(metrics.BlockNum, 10))),
-				dingoMetric("Slot", uiValue(strconv.FormatUint(metrics.SlotNum, 10))),
+				dingoMetric(
+					"Block",
+					uiValue(strconv.FormatUint(metrics.BlockNum, 10)),
+				),
+				dingoMetric(
+					"Slot",
+					uiValue(strconv.FormatUint(metrics.SlotNum, 10)),
+				),
 			),
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
 				dingoMetricStyled(
 					"Tip Gap",
-					uiSeverityValue(strconv.FormatUint(tipGap, 10), tipSeverity)+uiUnit(" slots"),
+					uiSeverityValue(
+						strconv.FormatUint(tipGap, 10),
+						tipSeverity,
+					)+uiUnit(
+						" slots",
+					),
 					tipSeverity,
 				),
-				dingoMetric("Remaining", uiValue(formatEpochRemaining(metrics))),
+				dingoMetric(
+					"Remaining",
+					uiValue(formatEpochRemaining(metrics)),
+				),
 			),
 			dingoMetricRowColumns(
 				innerWidth,
@@ -1905,14 +2169,24 @@ func dingoConsoleDashboardCompact(metrics *PromMetrics, width int) string {
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
-				dingoMetricStyled("Forge", uiSeverityValue(forgeLabel, forgeSeverity), forgeSeverity),
+				dingoMetricStyled(
+					"Forge",
+					uiSeverityValue(forgeLabel, forgeSeverity),
+					forgeSeverity,
+				),
 				dingoMetric("Mempool", mempoolValue),
 			),
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
-				dingoMetric("Heap", uiValue(formatMemoryBytes(metrics.GoHeapInuse))),
-				dingoMetric("DB", uiValue(formatDingoBytes(dingoDbSize(metrics)))),
+				dingoMetric(
+					"Heap",
+					uiValue(formatMemoryBytes(metrics.GoHeapInuse)),
+				),
+				dingoMetric(
+					"DB",
+					uiValue(formatDingoBytes(dingoDbSize(metrics))),
+				),
 			),
 		}, dingoDiskRows(innerWidth)...),
 	)
@@ -1928,11 +2202,19 @@ func dingoConsoleSystemsBand(metrics *PromMetrics, width int) string {
 	} else if metrics.BlocksForged > 0 || metrics.DingoBlockForgingLatencyN > 0 {
 		forgeSeverity = uiSeverityNeutral
 	}
-	adoptedSeverity, invalidSeverity, missedSeverity := dingoForgeCounterSeverities(metrics)
+	adoptedSeverity, invalidSeverity, missedSeverity := dingoForgeCounterSeverities(
+		metrics,
+	)
 
 	innerWidth := dingoPanelInnerWidth(width)
-	utxoCache, utxoSeverity := dingoConsoleCacheValue(metrics.DingoCacheUtxoHotHits, metrics.DingoCacheUtxoHotMiss)
-	blockCache, blockSeverity := dingoConsoleCacheValue(metrics.DingoCacheBlockLruHits, metrics.DingoCacheBlockLruMiss)
+	utxoCache, utxoSeverity := dingoConsoleCacheValue(
+		metrics.DingoCacheUtxoHotHits,
+		metrics.DingoCacheUtxoHotMiss,
+	)
+	blockCache, blockSeverity := dingoConsoleCacheValue(
+		metrics.DingoCacheBlockLruHits,
+		metrics.DingoCacheBlockLruMiss,
+	)
 	pipeline, restarts, lastBlock := dingoPipelineCells(metrics)
 	lines := make([]string, 0, 10)
 	lines = append(
@@ -1941,9 +2223,15 @@ func dingoConsoleSystemsBand(metrics *PromMetrics, width int) string {
 		dingoMetricRow(
 			innerWidth,
 			dingoMetric("DB", uiValue(formatDingoBytes(dingoDbSize(metrics)))),
-			dingoMetric("Heap", uiValue(formatMemoryBytes(metrics.GoHeapInuse))),
+			dingoMetric(
+				"Heap",
+				uiValue(formatMemoryBytes(metrics.GoHeapInuse)),
+			),
 			dingoMetric("FD", uiValue(formatFDUsage(metrics))),
-			dingoMetric("Goroutines", uiValue(strconv.FormatUint(metrics.GoRoutines, 10))),
+			dingoMetric(
+				"Goroutines",
+				uiValue(strconv.FormatUint(metrics.GoRoutines, 10)),
+			),
 		),
 		dingoMetricRow(
 			innerWidth,
@@ -1952,37 +2240,97 @@ func dingoConsoleSystemsBand(metrics *PromMetrics, width int) string {
 		),
 		dingoMetricRow(
 			innerWidth,
-			dingoMetric("Cold CBOR", uiValue(strconv.FormatUint(metrics.DingoCacheColdExtract, 10))),
-			dingoMetric("Chain Cache", uiValue(strconv.FormatUint(metrics.DingoChainCachedBlocks, 10))),
+			dingoMetric(
+				"Cold CBOR",
+				uiValue(strconv.FormatUint(metrics.DingoCacheColdExtract, 10)),
+			),
+			dingoMetric(
+				"Chain Cache",
+				uiValue(strconv.FormatUint(metrics.DingoChainCachedBlocks, 10)),
+			),
 		),
 		dingoMetricRow(
 			innerWidth,
-			dingoMetricStyled("Forge", uiSeverityValue(forgeLabel, forgeSeverity), forgeSeverity),
-			dingoMetricStyled("Forged", uiSeverityValue(strconv.FormatUint(metrics.BlocksForged, 10), forgeSeverity), forgeSeverity),
-			dingoMetricStyled("Latency", uiSeverityValue(formatDingoProtocolLatency(metrics.DingoBlockForgingLatencyS, metrics.DingoBlockForgingLatencyN), forgeSeverity), forgeSeverity),
-			dingoMetricStyled("Missed", uiSeverityValue(strconv.FormatUint(metrics.MissedSlots, 10), missedSeverity), missedSeverity),
+			dingoMetricStyled(
+				"Forge",
+				uiSeverityValue(forgeLabel, forgeSeverity),
+				forgeSeverity,
+			),
+			dingoMetricStyled(
+				"Forged",
+				uiSeverityValue(
+					strconv.FormatUint(metrics.BlocksForged, 10),
+					forgeSeverity,
+				),
+				forgeSeverity,
+			),
+			dingoMetricStyled(
+				"Latency",
+				uiSeverityValue(
+					formatDingoProtocolLatency(
+						metrics.DingoBlockForgingLatencyS,
+						metrics.DingoBlockForgingLatencyN,
+					),
+					forgeSeverity,
+				),
+				forgeSeverity,
+			),
+			dingoMetricStyled(
+				"Missed",
+				uiSeverityValue(
+					strconv.FormatUint(metrics.MissedSlots, 10),
+					missedSeverity,
+				),
+				missedSeverity,
+			),
 		),
 		dingoMetricRow(
 			innerWidth,
-			dingoMetricStyled("Adopted", formatSeverityCount(metrics.Adopted, adoptedSeverity), adoptedSeverity),
-			dingoMetricStyled("Invalid", formatSeverityCount(metrics.DidntAdopt, invalidSeverity), invalidSeverity),
-			dingoMetricStyled("Leader", uiSeverityValue(strconv.FormatUint(metrics.IsLeader, 10), forgeSeverity), forgeSeverity),
+			dingoMetricStyled(
+				"Adopted",
+				formatSeverityCount(metrics.Adopted, adoptedSeverity),
+				adoptedSeverity,
+			),
+			dingoMetricStyled(
+				"Invalid",
+				formatSeverityCount(metrics.DidntAdopt, invalidSeverity),
+				invalidSeverity,
+			),
+			dingoMetricStyled(
+				"Leader",
+				uiSeverityValue(
+					strconv.FormatUint(metrics.IsLeader, 10),
+					forgeSeverity,
+				),
+				forgeSeverity,
+			),
 		),
 	)
 	lines = slices.Insert(lines, 2, dingoDiskRows(innerWidth)...)
-	lines = append(lines, dingoConsoleSignalRows(metrics, forgeDisabled, innerWidth)...)
+	lines = append(
+		lines,
+		dingoConsoleSignalRows(metrics, forgeDisabled, innerWidth)...)
 	prev, _ := dingoPreviousSample(metrics)
-	lines = append(lines, dingoMetricRow(innerWidth, dingoAnomalyCells(metrics, prev)...))
+	lines = append(
+		lines,
+		dingoMetricRow(innerWidth, dingoAnomalyCells(metrics, prev)...),
+	)
 	lines = append(lines, dingoConsoleLeiosRows(metrics, innerWidth)...)
 	return dingoPanel(
 		"dingo systems",
-		worstSeverity(corePaneSeverity(), dingoPaneSeverity(), runtimePaneSeverity()),
+		worstSeverity(
+			corePaneSeverity(),
+			dingoPaneSeverity(),
+			runtimePaneSeverity(),
+		),
 		width,
 		lines,
 	)
 }
 
-func dingoForgeCounterSeverities(metrics *PromMetrics) (uiSeverity, uiSeverity, uiSeverity) {
+func dingoForgeCounterSeverities(
+	metrics *PromMetrics,
+) (uiSeverity, uiSeverity, uiSeverity) {
 	forgeDisabled := metrics.ForgingEnabled == 0
 	adoptedSeverity := uiSeverityOK
 	if forgeDisabled && metrics.Adopted == 0 {
@@ -2028,13 +2376,24 @@ func dingoConsoleSignalRows(
 		if value == 0 {
 			return
 		}
-		cells = append(cells, dingoMetricStyled(label, formatSeverityCount(value, severity), severity))
+		cells = append(
+			cells,
+			dingoMetricStyled(
+				label,
+				formatSeverityCount(value, severity),
+				severity,
+			),
+		)
 	}
 	addSignal("Clock", metrics.DingoSlotClockFallback, uiSeverityWarn)
 	addSignal("Forge Err", metrics.DingoForgeSlotClockErr, uiSeverityWarn)
 	addSignal("Sync Skip", metrics.DingoForgeSyncSkip, uiSeverityWarn)
 	addSignal("Gov", metrics.DingoGovernanceDecodeFailures, uiSeverityCritical)
-	addSignal("Stake Fail", metrics.DingoStakeSnapshotFailure, uiSeverityCritical)
+	addSignal(
+		"Stake Fail",
+		metrics.DingoStakeSnapshotFailure,
+		uiSeverityCritical,
+	)
 	if len(cells) == 0 {
 		status := uiMuted("quiet")
 		statusSeverity := uiSeverityMuted
@@ -2044,7 +2403,8 @@ func dingoConsoleSignalRows(
 		}
 		stake := uiMuted("inactive")
 		stakeSeverity := uiSeverityMuted
-		if metrics.DingoStakeSnapshotPoolCount > 0 || metrics.DingoStakeSnapshotActiveStake > 0 {
+		if metrics.DingoStakeSnapshotPoolCount > 0 ||
+			metrics.DingoStakeSnapshotActiveStake > 0 {
 			stakeSeverity = uiSeverityOK
 			stake = uiSeverityValue(
 				strconv.FormatUint(metrics.DingoStakeSnapshotPoolCount, 10),
@@ -2077,7 +2437,11 @@ func dingoConsoleLeiosRows(metrics *PromMetrics, innerWidth int) []string {
 		return []string{
 			dingoMetricRow(
 				innerWidth,
-				dingoMetricStyled("Leios", uiMuted("not exposed by this metrics endpoint"), uiSeverityMuted),
+				dingoMetricStyled(
+					"Leios",
+					uiMuted("not exposed by this metrics endpoint"),
+					uiSeverityMuted,
+				),
 			),
 		}
 	}
@@ -2092,8 +2456,13 @@ func dingoConsoleLeiosRows(metrics *PromMetrics, innerWidth int) []string {
 	}
 
 	cells := make([]dingoMetricCell, 0, 1+len(keys))
-	cells = append(cells,
-		dingoMetricStyled("Leios", uiSeverityValue("exposed", uiSeverityOK), uiSeverityOK),
+	cells = append(
+		cells,
+		dingoMetricStyled(
+			"Leios",
+			uiSeverityValue("exposed", uiSeverityOK),
+			uiSeverityOK,
+		),
 	)
 	for _, key := range keys {
 		cells = append(
@@ -2133,7 +2502,10 @@ func dingoConsoleMithrilProgressLines(
 		metrics.MithrilSyncLedgerImportTotal,
 		metrics.MithrilSyncLedgerImportPercent,
 	)
-	errSeverity := dingoCounterSeverity(metrics.MithrilSyncErrorsTotal, uiSeverityCritical)
+	errSeverity := dingoCounterSeverity(
+		metrics.MithrilSyncErrorsTotal,
+		uiSeverityCritical,
+	)
 	dlSeverity := mithrilProgressSeverity(dlPct)
 	ledgerSeverity := mithrilProgressSeverity(ledgerPct)
 
@@ -2141,9 +2513,21 @@ func dingoConsoleMithrilProgressLines(
 	lines = append(lines,
 		dingoMetricRow(
 			innerWidth,
-			dingoMetric("Phase", uiSeverityValue(mithrilPhaseName(metrics), uiSeverityNeutral)),
-			dingoMetric("Snapshot", uiValue(formatDingoBytes(metrics.MithrilSyncSnapshotSize))),
-			dingoMetric("Errors", formatSeverityCount(metrics.MithrilSyncErrorsTotal, errSeverity)),
+			dingoMetric(
+				"Phase",
+				uiSeverityValue(mithrilPhaseName(metrics), uiSeverityNeutral),
+			),
+			dingoMetric(
+				"Snapshot",
+				uiValue(formatDingoBytes(metrics.MithrilSyncSnapshotSize)),
+			),
+			dingoMetric(
+				"Errors",
+				formatSeverityCount(
+					metrics.MithrilSyncErrorsTotal,
+					errSeverity,
+				),
+			),
 		),
 	)
 
@@ -2163,7 +2547,9 @@ func dingoConsoleMithrilProgressLines(
 				"Bytes",
 				uiValue(formatDingoBytes(metrics.MithrilSyncDownloadBytes))+
 					uiUnit("/")+
-					uiValue(formatDingoBytes(metrics.MithrilSyncDownloadTotalBytes)),
+					uiValue(
+						formatDingoBytes(metrics.MithrilSyncDownloadTotalBytes),
+					),
 			),
 		)
 	}
@@ -2183,9 +2569,21 @@ func dingoConsoleMithrilProgressLines(
 			ledgerCells,
 			dingoMetric(
 				"Items",
-				uiValue(strconv.FormatUint(metrics.MithrilSyncLedgerImportCurrent, 10))+
-					uiUnit("/")+
-					uiValue(strconv.FormatUint(metrics.MithrilSyncLedgerImportTotal, 10)),
+				uiValue(
+					strconv.FormatUint(
+						metrics.MithrilSyncLedgerImportCurrent,
+						10,
+					),
+				)+
+					uiUnit(
+						"/",
+					)+
+					uiValue(
+						strconv.FormatUint(
+							metrics.MithrilSyncLedgerImportTotal,
+							10,
+						),
+					),
 			),
 		)
 	}
@@ -2213,30 +2611,61 @@ func dingoConsoleChainLane(metrics *PromMetrics, width int) string {
 				innerWidth,
 				dingoMetric(
 					"Epoch",
-					uiSeverityValue(fmt.Sprintf("%5.1f%%", epochProgress), progressSeverity)+
+					uiSeverityValue(
+						fmt.Sprintf("%5.1f%%", epochProgress),
+						progressSeverity,
+					)+
 						" "+
-						uiProgressBar(epochProgress, 52, progressSeverity),
+						uiProgressBar(
+							epochProgress,
+							52,
+							progressSeverity,
+						),
 				),
 			),
 			dingoMetricRow(
 				innerWidth,
-				dingoMetric("Block", uiValue(strconv.FormatUint(metrics.BlockNum, 10))),
-				dingoMetric("Slot", uiValue(strconv.FormatUint(metrics.SlotNum, 10))),
+				dingoMetric(
+					"Block",
+					uiValue(strconv.FormatUint(metrics.BlockNum, 10)),
+				),
+				dingoMetric(
+					"Slot",
+					uiValue(strconv.FormatUint(metrics.SlotNum, 10)),
+				),
 				dingoMetricStyled(
 					"Tip Gap",
-					uiSeverityValue(strconv.FormatUint(tipGap, 10), tipSeverity)+uiUnit(" slots"),
+					uiSeverityValue(
+						strconv.FormatUint(tipGap, 10),
+						tipSeverity,
+					)+uiUnit(
+						" slots",
+					),
 					tipSeverity,
 				),
 			),
 			dingoMetricRow(
 				innerWidth,
-				dingoMetric("Epoch No.", uiValue(strconv.FormatUint(epoch, 10))),
-				dingoMetric("Remaining", uiValue(formatEpochRemaining(metrics))),
-				dingoMetricSpan("Switch", uiValue(formatEpochSwitchTime(metrics)), 2),
+				dingoMetric(
+					"Epoch No.",
+					uiValue(strconv.FormatUint(epoch, 10)),
+				),
+				dingoMetric(
+					"Remaining",
+					uiValue(formatEpochRemaining(metrics)),
+				),
+				dingoMetricSpan(
+					"Switch",
+					uiValue(formatEpochSwitchTime(metrics)),
+					2,
+				),
 			),
 			dingoMetricRow(
 				innerWidth,
-				dingoMetric("Slot/Epoch", uiValue(strconv.FormatUint(metrics.SlotInEpoch, 10))),
+				dingoMetric(
+					"Slot/Epoch",
+					uiValue(strconv.FormatUint(metrics.SlotInEpoch, 10)),
+				),
 				dingoMetric(
 					"Mempool",
 					uiValue(strconv.FormatUint(metrics.MempoolTx, 10))+
@@ -2244,8 +2673,14 @@ func dingoConsoleChainLane(metrics *PromMetrics, width int) string {
 						uiValue(strconv.FormatUint(mempoolKBytes, 10))+
 						uiUnit("K"),
 				),
-				dingoMetric("Forks", uiValue(strconv.FormatUint(metrics.Forks, 10))),
-				dingoMetric("Density", uiValue(fmt.Sprintf("%3.5f%%", metrics.Density*100))),
+				dingoMetric(
+					"Forks",
+					uiValue(strconv.FormatUint(metrics.Forks, 10)),
+				),
+				dingoMetric(
+					"Density",
+					uiValue(fmt.Sprintf("%3.5f%%", metrics.Density*100)),
+				),
 			),
 		}, dingoSyncBacklogRows(metrics, innerWidth, false)...),
 	)
@@ -2267,15 +2702,26 @@ func dingoConsoleChainCompact(metrics *PromMetrics, width int) string {
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
-				dingoMetric("Block", uiValue(strconv.FormatUint(metrics.BlockNum, 10))),
-				dingoMetric("Slot", uiValue(strconv.FormatUint(metrics.SlotNum, 10))),
+				dingoMetric(
+					"Block",
+					uiValue(strconv.FormatUint(metrics.BlockNum, 10)),
+				),
+				dingoMetric(
+					"Slot",
+					uiValue(strconv.FormatUint(metrics.SlotNum, 10)),
+				),
 			),
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
 				dingoMetricStyled(
 					"Tip Gap",
-					uiSeverityValue(strconv.FormatUint(tipGap, 10), tipSeverity)+uiUnit(" slots"),
+					uiSeverityValue(
+						strconv.FormatUint(tipGap, 10),
+						tipSeverity,
+					)+uiUnit(
+						" slots",
+					),
 					tipSeverity,
 				),
 				dingoMetric("Epoch", uiValue(strconv.FormatUint(epoch, 10))),
@@ -2295,8 +2741,14 @@ func dingoConsoleChainCompact(metrics *PromMetrics, width int) string {
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
-				dingoMetric("Forks", uiValue(strconv.FormatUint(metrics.Forks, 10))),
-				dingoMetric("Density", uiValue(fmt.Sprintf("%3.3f%%", metrics.Density*100))),
+				dingoMetric(
+					"Forks",
+					uiValue(strconv.FormatUint(metrics.Forks, 10)),
+				),
+				dingoMetric(
+					"Density",
+					uiValue(fmt.Sprintf("%3.3f%%", metrics.Density*100)),
+				),
 			),
 		}, dingoSyncBacklogRows(metrics, innerWidth, true)...),
 	)
@@ -2346,8 +2798,14 @@ func dingoConsolePeerCompact(metrics *PromMetrics, width int) string {
 		dingoMetricRowColumns(
 			innerWidth,
 			2,
-			dingoMetric("Known", uiValue(strconv.FormatUint(metrics.PeersKnown, 10))),
-			dingoMetric("Active", uiValue(strconv.FormatUint(metrics.PeersActive, 10))),
+			dingoMetric(
+				"Known",
+				uiValue(strconv.FormatUint(metrics.PeersKnown, 10)),
+			),
+			dingoMetric(
+				"Active",
+				uiValue(strconv.FormatUint(metrics.PeersActive, 10)),
+			),
 		),
 		dingoMetricRowColumns(
 			innerWidth,
@@ -2358,20 +2816,45 @@ func dingoConsolePeerCompact(metrics *PromMetrics, width int) string {
 					uiUnit("/")+
 					uiValue(strconv.FormatUint(metrics.PeersWarm, 10)),
 			),
-			dingoMetric("Cold", uiValue(strconv.FormatUint(metrics.PeersCold, 10))),
+			dingoMetric(
+				"Cold",
+				uiValue(strconv.FormatUint(metrics.PeersCold, 10)),
+			),
 		),
 		dingoMetricRowColumns(innerWidth, 2, dingoHotSetDeficitCell(metrics)),
 		dingoMetricRowColumns(
 			innerWidth,
 			2,
-			dingoMetricStyled("RTT", uiSeverityValue(fmt.Sprintf("%d/%d", rttCount, peerCount), scanSeverity), scanSeverity),
+			dingoMetricStyled(
+				"RTT",
+				uiSeverityValue(
+					fmt.Sprintf("%d/%d", rttCount, peerCount),
+					scanSeverity,
+				),
+				scanSeverity,
+			),
 			dingoMetric("Probing", uiValue(strconv.Itoa(inFlight))),
 		),
 		dingoMetricRowColumns(
 			innerWidth,
 			2,
-			dingoMetricStyled("Avg", uiSeverityValue(strconv.Itoa(rttAvg), avgSeverity)+uiUnit(" ms"), avgSeverity),
-			dingoMetric("Unknown", formatSeverityIntCount(cnt0, dingoIntCounterSeverity(cnt0, uiSeverityWarn))),
+			dingoMetricStyled(
+				"Avg",
+				uiSeverityValue(
+					strconv.Itoa(rttAvg),
+					avgSeverity,
+				)+uiUnit(
+					" ms",
+				),
+				avgSeverity,
+			),
+			dingoMetric(
+				"Unknown",
+				formatSeverityIntCount(
+					cnt0,
+					dingoIntCounterSeverity(cnt0, uiSeverityWarn),
+				),
+			),
 		),
 		dingoMetricRowColumns(
 			innerWidth,
@@ -2379,19 +2862,61 @@ func dingoConsolePeerCompact(metrics *PromMetrics, width int) string {
 			dingoMetricSpan(
 				"Latency",
 				uiSegmentBar([]uiSegment{
-					{Label: "0-50", Value: float64(cnt1), Severity: uiSeverityOK},
-					{Label: "50-100", Value: float64(cnt2), Severity: uiSeverityWarn},
-					{Label: "100-200", Value: float64(cnt3), Severity: uiSeverityCritical},
-					{Label: ">200", Value: float64(cnt4), Severity: uiSeverityCritical},
-					{Label: "unknown", Value: float64(cnt0), Severity: uiSeverityMuted},
+					{
+						Label:    "0-50",
+						Value:    float64(cnt1),
+						Severity: uiSeverityOK,
+					},
+					{
+						Label:    "50-100",
+						Value:    float64(cnt2),
+						Severity: uiSeverityWarn,
+					},
+					{
+						Label:    "100-200",
+						Value:    float64(cnt3),
+						Severity: uiSeverityCritical,
+					},
+					{
+						Label:    ">200",
+						Value:    float64(cnt4),
+						Severity: uiSeverityCritical,
+					},
+					{
+						Label:    "unknown",
+						Value:    float64(cnt0),
+						Severity: uiSeverityMuted,
+					},
 				}, 28),
 				2,
 			),
 		),
-		dingoMetricRowColumns(innerWidth, 2, dingoMetric("0-50ms", peerLatencyBar(cnt1, pct1, uiSeverityOK))),
-		dingoMetricRowColumns(innerWidth, 2, dingoMetric("50-100", peerLatencyBar(cnt2, pct2, uiSeverityWarn))),
-		dingoMetricRowColumns(innerWidth, 2, dingoMetric("100-200", peerLatencyBar(cnt3, pct3, uiSeverityCritical))),
-		dingoMetricRowColumns(innerWidth, 2, dingoMetric(">200ms", peerLatencyBar(cnt4, pct4, uiSeverityCritical))),
+		dingoMetricRowColumns(
+			innerWidth,
+			2,
+			dingoMetric("0-50ms", peerLatencyBar(cnt1, pct1, uiSeverityOK)),
+		),
+		dingoMetricRowColumns(
+			innerWidth,
+			2,
+			dingoMetric("50-100", peerLatencyBar(cnt2, pct2, uiSeverityWarn)),
+		),
+		dingoMetricRowColumns(
+			innerWidth,
+			2,
+			dingoMetric(
+				"100-200",
+				peerLatencyBar(cnt3, pct3, uiSeverityCritical),
+			),
+		),
+		dingoMetricRowColumns(
+			innerWidth,
+			2,
+			dingoMetric(
+				">200ms",
+				peerLatencyBar(cnt4, pct4, uiSeverityCritical),
+			),
+		),
 		dingoMetricRowColumns(
 			innerWidth,
 			2,
@@ -2399,7 +2924,9 @@ func dingoConsolePeerCompact(metrics *PromMetrics, width int) string {
 			dingoMetric("Samples", uiValue(strconv.Itoa(rttCount))),
 		),
 	)
-	lines = append(lines, dingoConsoleTopPeerLines(peers, len(peers), innerWidth)...)
+	lines = append(
+		lines,
+		dingoConsoleTopPeerLines(peers, len(peers), innerWidth)...)
 	return dingoPanel("peers", peerPaneSeverity(), width, lines)
 }
 
@@ -2416,10 +2943,18 @@ func dingoConsoleOperationsCompact(metrics *PromMetrics, width int) string {
 
 	protocolValue := uiMuted("not exposed")
 	if hasDingoPropagationMetrics(metrics) {
-		protocolValue = uiValue(strconv.FormatUint(metrics.DingoProtocolBlockfetchMessages, 10)) +
-			uiUnit(" bf / ") +
-			uiValue(strconv.FormatUint(metrics.DingoProtocolChainsyncMessages, 10)) +
-			uiUnit(" cs")
+		protocolValue = uiValue(
+			strconv.FormatUint(metrics.DingoProtocolBlockfetchMessages, 10),
+		) +
+			uiUnit(
+				" bf / ",
+			) +
+			uiValue(
+				strconv.FormatUint(metrics.DingoProtocolChainsyncMessages, 10),
+			) +
+			uiUnit(
+				" cs",
+			)
 	}
 
 	innerWidth := dingoPanelInnerWidth(width)
@@ -2427,20 +2962,46 @@ func dingoConsoleOperationsCompact(metrics *PromMetrics, width int) string {
 	anomalies := dingoAnomalyCells(metrics, prev)
 	return dingoPanel(
 		"operations",
-		worstSeverity(corePaneSeverity(), activityPaneSeverity(), runtimePaneSeverity()),
+		worstSeverity(
+			corePaneSeverity(),
+			activityPaneSeverity(),
+			runtimePaneSeverity(),
+		),
 		width,
 		append([]string{
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
-				dingoMetricStyled("Forge", uiSeverityValue(forgeLabel, forgeSeverity), forgeSeverity),
-				dingoMetricStyled("Forged", uiSeverityValue(strconv.FormatUint(metrics.BlocksForged, 10), forgeSeverity), forgeSeverity),
+				dingoMetricStyled(
+					"Forge",
+					uiSeverityValue(forgeLabel, forgeSeverity),
+					forgeSeverity,
+				),
+				dingoMetricStyled(
+					"Forged",
+					uiSeverityValue(
+						strconv.FormatUint(metrics.BlocksForged, 10),
+						forgeSeverity,
+					),
+					forgeSeverity,
+				),
 			),
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
-				dingoMetricStyled("Invalid", formatSeverityCount(metrics.DidntAdopt, invalidSeverity), invalidSeverity),
-				dingoMetricStyled("Missed", uiSeverityValue(strconv.FormatUint(metrics.MissedSlots, 10), missedSeverity), missedSeverity),
+				dingoMetricStyled(
+					"Invalid",
+					formatSeverityCount(metrics.DidntAdopt, invalidSeverity),
+					invalidSeverity,
+				),
+				dingoMetricStyled(
+					"Missed",
+					uiSeverityValue(
+						strconv.FormatUint(metrics.MissedSlots, 10),
+						missedSeverity,
+					),
+					missedSeverity,
+				),
 			),
 			dingoMetricRowColumns(
 				innerWidth,
@@ -2452,14 +3013,23 @@ func dingoConsoleOperationsCompact(metrics *PromMetrics, width int) string {
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
-				dingoMetric("DB", uiValue(formatDingoBytes(dingoDbSize(metrics)))),
-				dingoMetric("Heap", uiValue(formatMemoryBytes(metrics.GoHeapInuse))),
+				dingoMetric(
+					"DB",
+					uiValue(formatDingoBytes(dingoDbSize(metrics))),
+				),
+				dingoMetric(
+					"Heap",
+					uiValue(formatMemoryBytes(metrics.GoHeapInuse)),
+				),
 			),
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
 				dingoMetric("FD", uiValue(formatFDUsage(metrics))),
-				dingoMetric("Goroutines", uiValue(strconv.FormatUint(metrics.GoRoutines, 10))),
+				dingoMetric(
+					"Goroutines",
+					uiValue(strconv.FormatUint(metrics.GoRoutines, 10)),
+				),
 			),
 		}, dingoDiskRows(innerWidth)...),
 	)
@@ -2486,9 +3056,18 @@ func dingoConsolePeerLane(metrics *PromMetrics, width int) string {
 	lines = append(lines,
 		dingoMetricRow(
 			innerWidth,
-			dingoMetric("Known", uiValue(strconv.FormatUint(metrics.PeersKnown, 10))),
-			dingoMetric("Established", uiValue(strconv.FormatUint(metrics.PeersEstablished, 10))),
-			dingoMetric("Active", uiValue(strconv.FormatUint(metrics.PeersActive, 10))),
+			dingoMetric(
+				"Known",
+				uiValue(strconv.FormatUint(metrics.PeersKnown, 10)),
+			),
+			dingoMetric(
+				"Established",
+				uiValue(strconv.FormatUint(metrics.PeersEstablished, 10)),
+			),
+			dingoMetric(
+				"Active",
+				uiValue(strconv.FormatUint(metrics.PeersActive, 10)),
+			),
 			dingoMetric(
 				"Hot/Warm/Cold",
 				uiValue(strconv.FormatUint(metrics.PeersHot, 10))+
@@ -2511,9 +3090,33 @@ func dingoConsolePeerLane(metrics *PromMetrics, width int) string {
 			lines,
 			dingoMetricRow(
 				innerWidth,
-				dingoMetric("Ledger", uiValue(strconv.FormatUint(metrics.DingoPeersBySourceLedger, 10))),
-				dingoMetric("Inbound", uiValue(strconv.FormatUint(metrics.DingoPeersBySourceInbound, 10))),
-				dingoMetric("Gossip", uiValue(strconv.FormatUint(metrics.DingoPeersBySourceGossip, 10))),
+				dingoMetric(
+					"Ledger",
+					uiValue(
+						strconv.FormatUint(
+							metrics.DingoPeersBySourceLedger,
+							10,
+						),
+					),
+				),
+				dingoMetric(
+					"Inbound",
+					uiValue(
+						strconv.FormatUint(
+							metrics.DingoPeersBySourceInbound,
+							10,
+						),
+					),
+				),
+				dingoMetric(
+					"Gossip",
+					uiValue(
+						strconv.FormatUint(
+							metrics.DingoPeersBySourceGossip,
+							10,
+						),
+					),
+				),
 			),
 			stateMixRow,
 			dingoMetricRow(
@@ -2521,9 +3124,23 @@ func dingoConsolePeerLane(metrics *PromMetrics, width int) string {
 				dingoMetric(
 					"Source Mix",
 					uiSegmentBar([]uiSegment{
-						{Label: "ledger", Value: float64(metrics.DingoPeersBySourceLedger), Severity: uiSeverityOK},
-						{Label: "inbound", Value: float64(metrics.DingoPeersBySourceInbound), Severity: uiSeverityNeutral},
-						{Label: "gossip", Value: float64(metrics.DingoPeersBySourceGossip), Severity: uiSeverityWarn},
+						{
+							Label:    "ledger",
+							Value:    float64(metrics.DingoPeersBySourceLedger),
+							Severity: uiSeverityOK,
+						},
+						{
+							Label: "inbound",
+							Value: float64(
+								metrics.DingoPeersBySourceInbound,
+							),
+							Severity: uiSeverityNeutral,
+						},
+						{
+							Label:    "gossip",
+							Value:    float64(metrics.DingoPeersBySourceGossip),
+							Severity: uiSeverityWarn,
+						},
 					}, 58),
 				),
 			),
@@ -2542,17 +3159,39 @@ func dingoConsolePeerLane(metrics *PromMetrics, width int) string {
 				innerWidth,
 				dingoMetric(
 					"In Hot",
-					uiSeverityValue(fmt.Sprintf("%5.1f%%", hotUsage), hotSeverity)+
+					uiSeverityValue(
+						fmt.Sprintf("%5.1f%%", hotUsage),
+						hotSeverity,
+					)+
 						" "+
-						uiProgressBar(hotUsage, 14, hotSeverity),
+						uiProgressBar(
+							hotUsage,
+							14,
+							hotSeverity,
+						),
 				),
 				dingoMetric(
 					"In Warm",
-					uiSeverityValue(fmt.Sprintf("%5.1f%%", warmUsage), warmSeverity)+
+					uiSeverityValue(
+						fmt.Sprintf("%5.1f%%", warmUsage),
+						warmSeverity,
+					)+
 						" "+
-						uiProgressBar(warmUsage, 14, warmSeverity),
+						uiProgressBar(
+							warmUsage,
+							14,
+							warmSeverity,
+						),
 				),
-				dingoMetric("Arrivals", uiValue(strconv.FormatUint(metrics.DingoInboundArrivalsTotal, 10))),
+				dingoMetric(
+					"Arrivals",
+					uiValue(
+						strconv.FormatUint(
+							metrics.DingoInboundArrivalsTotal,
+							10,
+						),
+					),
+				),
 			),
 		)
 	} else {
@@ -2586,13 +3225,21 @@ func dingoConsolePeerLane(metrics *PromMetrics, width int) string {
 			innerWidth,
 			dingoMetricStyled(
 				"RTT Scan",
-				uiSeverityValue(fmt.Sprintf("%d/%d", rttCount, peerCount), scanSeverity),
+				uiSeverityValue(
+					fmt.Sprintf("%d/%d", rttCount, peerCount),
+					scanSeverity,
+				),
 				scanSeverity,
 			),
 			dingoMetric("Probing", uiValue(strconv.Itoa(inFlight))),
 			dingoMetricStyled(
 				"Average",
-				uiSeverityValue(strconv.Itoa(rttAvg), avgSeverity)+uiUnit(" ms"),
+				uiSeverityValue(
+					strconv.Itoa(rttAvg),
+					avgSeverity,
+				)+uiUnit(
+					" ms",
+				),
 				avgSeverity,
 			),
 		),
@@ -2601,15 +3248,41 @@ func dingoConsolePeerLane(metrics *PromMetrics, width int) string {
 			dingoMetricSpan(
 				"Latency",
 				uiSegmentBar([]uiSegment{
-					{Label: "0-50", Value: float64(cnt1), Severity: uiSeverityOK},
-					{Label: "50-100", Value: float64(cnt2), Severity: uiSeverityWarn},
-					{Label: "100-200", Value: float64(cnt3), Severity: uiSeverityCritical},
-					{Label: ">200", Value: float64(cnt4), Severity: uiSeverityCritical},
-					{Label: "unknown", Value: float64(cnt0), Severity: uiSeverityMuted},
+					{
+						Label:    "0-50",
+						Value:    float64(cnt1),
+						Severity: uiSeverityOK,
+					},
+					{
+						Label:    "50-100",
+						Value:    float64(cnt2),
+						Severity: uiSeverityWarn,
+					},
+					{
+						Label:    "100-200",
+						Value:    float64(cnt3),
+						Severity: uiSeverityCritical,
+					},
+					{
+						Label:    ">200",
+						Value:    float64(cnt4),
+						Severity: uiSeverityCritical,
+					},
+					{
+						Label:    "unknown",
+						Value:    float64(cnt0),
+						Severity: uiSeverityMuted,
+					},
 				}, 58),
 				3,
 			),
-			dingoMetric("Unknown", formatSeverityIntCount(cnt0, dingoIntCounterSeverity(cnt0, uiSeverityWarn))),
+			dingoMetric(
+				"Unknown",
+				formatSeverityIntCount(
+					cnt0,
+					dingoIntCounterSeverity(cnt0, uiSeverityWarn),
+				),
+			),
 		),
 	)
 	return dingoPanel("peer fabric", peerPaneSeverity(), width, lines)
@@ -2632,8 +3305,24 @@ func dingoConsoleFlowCompact(metrics *PromMetrics, width int) string {
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
-				dingoMetric("Blockfetch", uiValue(strconv.FormatUint(metrics.DingoProtocolBlockfetchMessages, 10))),
-				dingoMetric("Chainsync", uiValue(strconv.FormatUint(metrics.DingoProtocolChainsyncMessages, 10))),
+				dingoMetric(
+					"Blockfetch",
+					uiValue(
+						strconv.FormatUint(
+							metrics.DingoProtocolBlockfetchMessages,
+							10,
+						),
+					),
+				),
+				dingoMetric(
+					"Chainsync",
+					uiValue(
+						strconv.FormatUint(
+							metrics.DingoProtocolChainsyncMessages,
+							10,
+						),
+					),
+				),
 			),
 			dingoMetricRowColumns(
 				innerWidth,
@@ -2650,13 +3339,37 @@ func dingoConsoleFlowCompact(metrics *PromMetrics, width int) string {
 				dingoMetricRowColumns(
 					innerWidth,
 					2,
-					dingoMetric("Dispatch", uiValue(strconv.FormatUint(metrics.DingoBlockfetchGateDispatched, 10))),
-					dingoMetric("Skip Fast", uiValue(strconv.FormatUint(metrics.DingoBlockfetchGateSkippedFast, 10))),
+					dingoMetric(
+						"Dispatch",
+						uiValue(
+							strconv.FormatUint(
+								metrics.DingoBlockfetchGateDispatched,
+								10,
+							),
+						),
+					),
+					dingoMetric(
+						"Skip Fast",
+						uiValue(
+							strconv.FormatUint(
+								metrics.DingoBlockfetchGateSkippedFast,
+								10,
+							),
+						),
+					),
 				),
 				dingoMetricRowColumns(
 					innerWidth,
 					2,
-					dingoMetric("No Peer", uiValue(strconv.FormatUint(metrics.DingoBlockfetchGateSkippedPeer, 10))),
+					dingoMetric(
+						"No Peer",
+						uiValue(
+							strconv.FormatUint(
+								metrics.DingoBlockfetchGateSkippedPeer,
+								10,
+							),
+						),
+					),
 				),
 			)
 		}
@@ -2689,8 +3402,18 @@ func dingoConsoleFlowCompact(metrics *PromMetrics, width int) string {
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
-				dingoMetricStyled("Last Fetch", uiSeverityValue(fmt.Sprintf("%.2fs", metrics.BlockDelay), delaySeverity), delaySeverity),
-				dingoMetric("Late >5s", formatSeverityCount(metrics.BlocksLate, lateSeverity)),
+				dingoMetricStyled(
+					"Last Fetch",
+					uiSeverityValue(
+						fmt.Sprintf("%.2fs", metrics.BlockDelay),
+						delaySeverity,
+					),
+					delaySeverity,
+				),
+				dingoMetric(
+					"Late >5s",
+					formatSeverityCount(metrics.BlocksLate, lateSeverity),
+				),
 			),
 		)
 	}
@@ -2716,19 +3439,75 @@ func dingoConsoleFlowLane(metrics *PromMetrics, width int) string {
 				dingoMetric(
 					"Traffic",
 					uiSegmentBar([]uiSegment{
-						{Label: "blockfetch", Value: float64(metrics.DingoProtocolBlockfetchMessages), Severity: uiSeverityOK},
-						{Label: "chainsync", Value: float64(metrics.DingoProtocolChainsyncMessages), Severity: uiSeverityNeutral},
-						{Label: "keepalive", Value: float64(metrics.DingoProtocolKeepaliveMessages), Severity: uiSeverityWarn},
-						{Label: "txsubmit", Value: float64(metrics.DingoProtocolTxSubmitMessages), Severity: uiSeverityMuted},
+						{
+							Label: "blockfetch",
+							Value: float64(
+								metrics.DingoProtocolBlockfetchMessages,
+							),
+							Severity: uiSeverityOK,
+						},
+						{
+							Label: "chainsync",
+							Value: float64(
+								metrics.DingoProtocolChainsyncMessages,
+							),
+							Severity: uiSeverityNeutral,
+						},
+						{
+							Label: "keepalive",
+							Value: float64(
+								metrics.DingoProtocolKeepaliveMessages,
+							),
+							Severity: uiSeverityWarn,
+						},
+						{
+							Label: "txsubmit",
+							Value: float64(
+								metrics.DingoProtocolTxSubmitMessages,
+							),
+							Severity: uiSeverityMuted,
+						},
 					}, 58),
 				),
 			),
 			dingoMetricRow(
 				innerWidth,
-				dingoMetric("Blockfetch", uiValue(strconv.FormatUint(metrics.DingoProtocolBlockfetchMessages, 10))),
-				dingoMetric("Chainsync", uiValue(strconv.FormatUint(metrics.DingoProtocolChainsyncMessages, 10))),
-				dingoMetric("Keepalive", uiValue(strconv.FormatUint(metrics.DingoProtocolKeepaliveMessages, 10))),
-				dingoMetric("TxSubmit", uiValue(strconv.FormatUint(metrics.DingoProtocolTxSubmitMessages, 10))),
+				dingoMetric(
+					"Blockfetch",
+					uiValue(
+						strconv.FormatUint(
+							metrics.DingoProtocolBlockfetchMessages,
+							10,
+						),
+					),
+				),
+				dingoMetric(
+					"Chainsync",
+					uiValue(
+						strconv.FormatUint(
+							metrics.DingoProtocolChainsyncMessages,
+							10,
+						),
+					),
+				),
+				dingoMetric(
+					"Keepalive",
+					uiValue(
+						strconv.FormatUint(
+							metrics.DingoProtocolKeepaliveMessages,
+							10,
+						),
+					),
+				),
+				dingoMetric(
+					"TxSubmit",
+					uiValue(
+						strconv.FormatUint(
+							metrics.DingoProtocolTxSubmitMessages,
+							10,
+						),
+					),
+				),
 			),
 			dingoMetricRow(
 				innerWidth,
@@ -2746,17 +3525,59 @@ func dingoConsoleFlowLane(metrics *PromMetrics, width int) string {
 					dingoMetric(
 						"Gate",
 						uiSegmentBar([]uiSegment{
-							{Label: "dispatch", Value: float64(metrics.DingoBlockfetchGateDispatched), Severity: uiSeverityOK},
-							{Label: "fast", Value: float64(metrics.DingoBlockfetchGateSkippedFast), Severity: uiSeverityMuted},
-							{Label: "no_peer", Value: float64(metrics.DingoBlockfetchGateSkippedPeer), Severity: uiSeverityWarn},
+							{
+								Label: "dispatch",
+								Value: float64(
+									metrics.DingoBlockfetchGateDispatched,
+								),
+								Severity: uiSeverityOK,
+							},
+							{
+								Label: "fast",
+								Value: float64(
+									metrics.DingoBlockfetchGateSkippedFast,
+								),
+								Severity: uiSeverityMuted,
+							},
+							{
+								Label: "no_peer",
+								Value: float64(
+									metrics.DingoBlockfetchGateSkippedPeer,
+								),
+								Severity: uiSeverityWarn,
+							},
 						}, 58),
 					),
 				),
 				dingoMetricRow(
 					innerWidth,
-					dingoMetric("Dispatched", uiValue(strconv.FormatUint(metrics.DingoBlockfetchGateDispatched, 10))),
-					dingoMetric("Skip Fast", uiValue(strconv.FormatUint(metrics.DingoBlockfetchGateSkippedFast, 10))),
-					dingoMetric("No Peer", uiValue(strconv.FormatUint(metrics.DingoBlockfetchGateSkippedPeer, 10))),
+					dingoMetric(
+						"Dispatched",
+						uiValue(
+							strconv.FormatUint(
+								metrics.DingoBlockfetchGateDispatched,
+								10,
+							),
+						),
+					),
+					dingoMetric(
+						"Skip Fast",
+						uiValue(
+							strconv.FormatUint(
+								metrics.DingoBlockfetchGateSkippedFast,
+								10,
+							),
+						),
+					),
+					dingoMetric(
+						"No Peer",
+						uiValue(
+							strconv.FormatUint(
+								metrics.DingoBlockfetchGateSkippedPeer,
+								10,
+							),
+						),
+					),
 				),
 			)
 		}
@@ -2795,15 +3616,30 @@ func dingoConsoleFlowLane(metrics *PromMetrics, width int) string {
 				innerWidth,
 				dingoMetricStyled(
 					"Last Fetch",
-					uiSeverityValue(fmt.Sprintf("%.2fs", metrics.BlockDelay), delaySeverity),
+					uiSeverityValue(
+						fmt.Sprintf("%.2fs", metrics.BlockDelay),
+						delaySeverity,
+					),
 					delaySeverity,
 				),
-				dingoMetric("Served", uiValue(strconv.FormatUint(metrics.BlocksServed, 10))),
-				dingoMetric("Late >5s", formatSeverityCount(metrics.BlocksLate, lateSeverity)),
+				dingoMetric(
+					"Served",
+					uiValue(strconv.FormatUint(metrics.BlocksServed, 10)),
+				),
+				dingoMetric(
+					"Late >5s",
+					formatSeverityCount(metrics.BlocksLate, lateSeverity),
+				),
 				dingoMetric(
 					"CDF",
-					uiSparkline([]float64{blk1Pct, blk3Pct, blk5Pct}, 100, dingoPropagationSeverity(blk5Pct))+
-						uiUnit(" 1s 3s 5s"),
+					uiSparkline(
+						[]float64{blk1Pct, blk3Pct, blk5Pct},
+						100,
+						dingoPropagationSeverity(blk5Pct),
+					)+
+						uiUnit(
+							" 1s 3s 5s",
+						),
 				),
 			),
 		)
@@ -2922,7 +3758,11 @@ func dingoConsoleTopPeerLines(peers []*Peer, limit, innerWidth int) []string {
 		return []string{
 			dingoMetricRow(
 				innerWidth,
-				dingoMetricStyled("Peers", uiMuted("RTT collection pending"), uiSeverityMuted),
+				dingoMetricStyled(
+					"Peers",
+					uiMuted("RTT collection pending"),
+					uiSeverityMuted,
+				),
 			),
 		}
 	}
@@ -2955,7 +3795,16 @@ func dingoConsoleTopPeerLines(peers []*Peer, limit, innerWidth int) []string {
 	lines := make([]string, 0, limit+1)
 	lines = append(
 		lines,
-		uiMuted(formatPeerTableHeader(headerFormat, sampleWidth, remoteWidth, dirWidth, rttWidth, locationWidth)),
+		uiMuted(
+			formatPeerTableHeader(
+				headerFormat,
+				sampleWidth,
+				remoteWidth,
+				dirWidth,
+				rttWidth,
+				locationWidth,
+			),
+		),
 	)
 	for idx, peer := range peers[:limit] {
 		severity := uiSeverityMuted
@@ -2970,15 +3819,35 @@ func dingoConsoleTopPeerLines(peers []*Peer, limit, innerWidth int) []string {
 			}
 		}
 		values := []any{
-			uiMuted(fmt.Sprintf("%-*s", sampleWidth, fmt.Sprintf("#%02d", idx+1))),
-			uiValue(fmt.Sprintf("%-*s", remoteWidth, shortenString(formatPeerEndpoint(peer), remoteWidth))),
-			uiMuted(fmt.Sprintf("%-*s", dirWidth, shortenString(peer.Direction, dirWidth))),
+			uiMuted(
+				fmt.Sprintf("%-*s", sampleWidth, fmt.Sprintf("#%02d", idx+1)),
+			),
+			uiValue(
+				fmt.Sprintf(
+					"%-*s",
+					remoteWidth,
+					shortenString(formatPeerEndpoint(peer), remoteWidth),
+				),
+			),
+			uiMuted(
+				fmt.Sprintf(
+					"%-*s",
+					dirWidth,
+					shortenString(peer.Direction, dirWidth),
+				),
+			),
 			uiSeverityValue(fmt.Sprintf("%*s", rttWidth, rtt), severity),
 		}
 		if locationWidth > 0 {
 			values = append(
 				values,
-				uiMuted(fmt.Sprintf("%-*s", locationWidth, shortenString(peer.Location, locationWidth))),
+				uiMuted(
+					fmt.Sprintf(
+						"%-*s",
+						locationWidth,
+						shortenString(peer.Location, locationWidth),
+					),
+				),
 			)
 		}
 		lines = append(lines, fmt.Sprintf(peerFormat, values...))
@@ -3332,7 +4201,10 @@ func main() {
 	)
 	dashboardPages.AddPage(
 		peerOverlayPageName,
-		newPeerOverlayPrimitive(dashboardContentWidth(), DashboardHeightDefault),
+		newPeerOverlayPrimitive(
+			dashboardContentWidth(),
+			DashboardHeightDefault,
+		),
 		true,
 		false,
 	)
@@ -3366,7 +4238,8 @@ func main() {
 			refreshDashboardText(ctx)
 			return nil
 		}
-		if !peerOverlayActive.Load() && getEffectiveNodeBinary() == DINGO_BINARY {
+		if !peerOverlayActive.Load() &&
+			getEffectiveNodeBinary() == DINGO_BINARY {
 			cols, rows := dashboardTerminalSize()
 			if dingoConsoleCompact(cols, rows) {
 				if event.Key() == tcell.KeyLeft {
@@ -3659,7 +4532,11 @@ func peerLatencyBar(count int, percent float32, severity uiSeverity) string {
 		uiProgressBar(float64(percent), 14, severity)
 }
 
-func formatSeverityPercentRatio(value uint64, percent float32, severity uiSeverity) string {
+func formatSeverityPercentRatio(
+	value uint64,
+	percent float32,
+	severity uiSeverity,
+) string {
 	separator := uiUnit(" / ")
 	if severity == uiSeverityMuted {
 		separator = uiMuted(" / ")
@@ -3740,10 +4617,30 @@ func dingoAnomalyCells(metrics, prev *PromMetrics) []dingoMetricCell {
 		name       string
 		curr, prev uint64
 	}{
-		{"Stalled", "dingo_chainselection_stalled_total", metrics.DingoChainselectionStalled, prev.DingoChainselectionStalled},
-		{"GDD Drop", "dingo_chainselection_gdd_disconnects_total", metrics.DingoChainselectionGDDDisconnects, prev.DingoChainselectionGDDDisconnects},
-		{"Plateau", "dingo_chainsync_plateau_decisions_total", metrics.DingoChainsyncPlateauDecisions, prev.DingoChainsyncPlateauDecisions},
-		{"Keepalive", "dingo_keepalive_timeout_total", metrics.DingoKeepaliveTimeouts, prev.DingoKeepaliveTimeouts},
+		{
+			"Stalled",
+			"dingo_chainselection_stalled_total",
+			metrics.DingoChainselectionStalled,
+			prev.DingoChainselectionStalled,
+		},
+		{
+			"GDD Drop",
+			"dingo_chainselection_gdd_disconnects_total",
+			metrics.DingoChainselectionGDDDisconnects,
+			prev.DingoChainselectionGDDDisconnects,
+		},
+		{
+			"Plateau",
+			"dingo_chainsync_plateau_decisions_total",
+			metrics.DingoChainsyncPlateauDecisions,
+			prev.DingoChainsyncPlateauDecisions,
+		},
+		{
+			"Keepalive",
+			"dingo_keepalive_timeout_total",
+			metrics.DingoKeepaliveTimeouts,
+			prev.DingoKeepaliveTimeouts,
+		},
 	}
 	cells := make([]dingoMetricCell, 0, len(counters))
 	for _, c := range counters {
@@ -3755,7 +4652,11 @@ func dingoAnomalyCells(metrics, prev *PromMetrics) []dingoMetricCell {
 			))
 			continue
 		}
-		text, severity := formatDingoAnomaly(c.curr, c.prev, prev.exports(c.name))
+		text, severity := formatDingoAnomaly(
+			c.curr,
+			c.prev,
+			prev.exports(c.name),
+		)
 		cells = append(cells, dingoMetricStyled(
 			c.label,
 			uiStatusGlyph(severity)+" "+uiSeverityValue(text, severity),
@@ -3835,21 +4736,34 @@ func getDingoStats() string {
 		),
 	)
 	if curr.DingoDbBlobSizeBytes > 0 || curr.DingoDbMetadataSizeBytes > 0 {
-		fmt.Fprintf(&sb, " %s   %s\n",
+		fmt.Fprintf(
+			&sb,
+			" %s   %s\n",
 			uiKV("Blob", uiValue(formatDingoBytes(curr.DingoDbBlobSizeBytes))),
-			uiKV("Metadata", uiValue(formatDingoBytes(curr.DingoDbMetadataSizeBytes))),
+			uiKV(
+				"Metadata",
+				uiValue(formatDingoBytes(curr.DingoDbMetadataSizeBytes)),
+			),
 		)
 	}
 	tipSeverity := dingoTipGapSeverity(curr.DingoTipGapSlots)
 	forgeSeverity := dingoTipGapSeverity(curr.DingoForgeTipGapSlots)
-	fmt.Fprintf(&sb, " %s %s %s%s   %s %s %s%s\n",
+	fmt.Fprintf(
+		&sb,
+		" %s %s %s%s   %s %s %s%s\n",
 		uiLabel("Tip Gap"),
 		uiStatusGlyph(tipSeverity),
-		uiSeverityValue(strconv.FormatUint(curr.DingoTipGapSlots, 10), tipSeverity),
+		uiSeverityValue(
+			strconv.FormatUint(curr.DingoTipGapSlots, 10),
+			tipSeverity,
+		),
 		uiUnit(" slots"),
 		uiLabel("Forge Gap"),
 		uiStatusGlyph(forgeSeverity),
-		uiSeverityValue(strconv.FormatUint(curr.DingoForgeTipGapSlots, 10), forgeSeverity),
+		uiSeverityValue(
+			strconv.FormatUint(curr.DingoForgeTipGapSlots, 10),
+			forgeSeverity,
+		),
 		uiUnit(" slots"),
 	)
 	pipelineLabel, pipelineSeverity := dingoPipelineState(&curr)
@@ -3862,7 +4776,9 @@ func getDingoStats() string {
 	if curr.DingoPipelineRestarts > 0 {
 		restartSeverity = uiSeverityWarn
 	}
-	fmt.Fprintf(&sb, " %s %s %s   %s %s   %s %s %s\n",
+	fmt.Fprintf(
+		&sb,
+		" %s %s %s   %s %s   %s %s %s\n",
 		uiLabel("Pipeline"),
 		uiStatusGlyph(pipelineSeverity),
 		uiSeverityValue(pipelineLabel, pipelineSeverity),
@@ -3870,12 +4786,26 @@ func getDingoStats() string {
 		formatSeverityCount(curr.DingoPipelineRestarts, restartSeverity),
 		uiLabel("Last Block"),
 		uiStatusGlyph(lastBlockSeverity),
-		uiSeverityValue(formatDingoLastBlock(lastBlockAge, lastBlockOK), lastBlockSeverity),
+		uiSeverityValue(
+			formatDingoLastBlock(lastBlockAge, lastBlockOK),
+			lastBlockSeverity,
+		),
 	)
-	fmt.Fprintf(&sb, " %s   %s   %s\n",
-		uiKV("Seen Headers", uiValue(strconv.FormatUint(curr.DingoChainsyncSeenHeaders, 10))),
-		uiKV("Tx Evicted", uiValue(strconv.FormatUint(curr.DingoTxsEvicted, 10))),
-		uiKV("Tx Expired", uiValue(strconv.FormatUint(curr.DingoTxsExpired, 10))),
+	fmt.Fprintf(
+		&sb,
+		" %s   %s   %s\n",
+		uiKV(
+			"Seen Headers",
+			uiValue(strconv.FormatUint(curr.DingoChainsyncSeenHeaders, 10)),
+		),
+		uiKV(
+			"Tx Evicted",
+			uiValue(strconv.FormatUint(curr.DingoTxsEvicted, 10)),
+		),
+		uiKV(
+			"Tx Expired",
+			uiValue(strconv.FormatUint(curr.DingoTxsExpired, 10)),
+		),
 	)
 
 	sb.WriteString(uiSection("Sync Backlog / Anomalies"))
@@ -3892,18 +4822,56 @@ func getDingoStats() string {
 	havePrev := prev != nil
 	anomalyKV := func(label, name string, currValue, prevValue uint64) string {
 		if !curr.exports(name) {
-			return fmt.Sprintf("%s %s %s", uiLabel(label), uiStatusGlyph(uiSeverityMuted), uiSeverityValue("n/a", uiSeverityMuted))
+			return fmt.Sprintf(
+				"%s %s %s",
+				uiLabel(label),
+				uiStatusGlyph(uiSeverityMuted),
+				uiSeverityValue("n/a", uiSeverityMuted),
+			)
 		}
-		text, severity := formatDingoAnomaly(currValue, prevValue, havePrev && prevMetrics.exports(name))
-		return fmt.Sprintf("%s %s %s", uiLabel(label), uiStatusGlyph(severity), uiSeverityValue(text, severity))
+		text, severity := formatDingoAnomaly(
+			currValue,
+			prevValue,
+			havePrev && prevMetrics.exports(name),
+		)
+		return fmt.Sprintf(
+			"%s %s %s",
+			uiLabel(label),
+			uiStatusGlyph(severity),
+			uiSeverityValue(text, severity),
+		)
 	}
-	fmt.Fprintf(&sb, " %s   %s\n",
-		anomalyKV("Stalled", "dingo_chainselection_stalled_total", curr.DingoChainselectionStalled, prevMetrics.DingoChainselectionStalled),
-		anomalyKV("GDD Disconnects", "dingo_chainselection_gdd_disconnects_total", curr.DingoChainselectionGDDDisconnects, prevMetrics.DingoChainselectionGDDDisconnects),
+	fmt.Fprintf(
+		&sb,
+		" %s   %s\n",
+		anomalyKV(
+			"Stalled",
+			"dingo_chainselection_stalled_total",
+			curr.DingoChainselectionStalled,
+			prevMetrics.DingoChainselectionStalled,
+		),
+		anomalyKV(
+			"GDD Disconnects",
+			"dingo_chainselection_gdd_disconnects_total",
+			curr.DingoChainselectionGDDDisconnects,
+			prevMetrics.DingoChainselectionGDDDisconnects,
+		),
 	)
-	fmt.Fprintf(&sb, " %s   %s\n",
-		anomalyKV("Plateau", "dingo_chainsync_plateau_decisions_total", curr.DingoChainsyncPlateauDecisions, prevMetrics.DingoChainsyncPlateauDecisions),
-		anomalyKV("Keepalive Timeouts", "dingo_keepalive_timeout_total", curr.DingoKeepaliveTimeouts, prevMetrics.DingoKeepaliveTimeouts),
+	fmt.Fprintf(
+		&sb,
+		" %s   %s\n",
+		anomalyKV(
+			"Plateau",
+			"dingo_chainsync_plateau_decisions_total",
+			curr.DingoChainsyncPlateauDecisions,
+			prevMetrics.DingoChainsyncPlateauDecisions,
+		),
+		anomalyKV(
+			"Keepalive Timeouts",
+			"dingo_keepalive_timeout_total",
+			curr.DingoKeepaliveTimeouts,
+			prevMetrics.DingoKeepaliveTimeouts,
+		),
 	)
 
 	sb.WriteString(uiSection("CBOR Cache"))
@@ -3921,9 +4889,17 @@ func getDingoStats() string {
 
 	sb.WriteString(uiSection("Event Bus / Slot Clock"))
 	eventErrorSeverity := dingoRateSeverity(eventErrorRate, uiSeverityCritical)
-	eventTimeoutSeverity := dingoRateSeverity(eventTimeoutRate, uiSeverityCritical)
-	fmt.Fprintf(&sb, " %s   %s   %s %s%s   %s %s%s\n",
-		uiKV("Subscribers", uiValue(strconv.FormatUint(curr.EventSubscribers, 10))),
+	eventTimeoutSeverity := dingoRateSeverity(
+		eventTimeoutRate,
+		uiSeverityCritical,
+	)
+	fmt.Fprintf(
+		&sb,
+		" %s   %s   %s %s%s   %s %s%s\n",
+		uiKV(
+			"Subscribers",
+			uiValue(strconv.FormatUint(curr.EventSubscribers, 10)),
+		),
 		uiKV("Events", uiValue(strconv.FormatUint(curr.EventTotal, 10))),
 		uiLabel("Err"),
 		uiSeverityValue(eventErrorRate, eventErrorSeverity),
@@ -3932,10 +4908,22 @@ func getDingoStats() string {
 		uiSeverityValue(eventTimeoutRate, eventTimeoutSeverity),
 		uiUnit("/s"),
 	)
-	fallbackSeverity := dingoCounterSeverity(curr.DingoSlotClockFallback, uiSeverityWarn)
-	forgeErrSeverity := dingoCounterSeverity(curr.DingoForgeSlotClockErr, uiSeverityWarn)
-	syncSkipSeverity := dingoCounterSeverity(curr.DingoForgeSyncSkip, uiSeverityWarn)
-	govSeverity := dingoCounterSeverity(curr.DingoGovernanceDecodeFailures, uiSeverityCritical)
+	fallbackSeverity := dingoCounterSeverity(
+		curr.DingoSlotClockFallback,
+		uiSeverityWarn,
+	)
+	forgeErrSeverity := dingoCounterSeverity(
+		curr.DingoForgeSlotClockErr,
+		uiSeverityWarn,
+	)
+	syncSkipSeverity := dingoCounterSeverity(
+		curr.DingoForgeSyncSkip,
+		uiSeverityWarn,
+	)
+	govSeverity := dingoCounterSeverity(
+		curr.DingoGovernanceDecodeFailures,
+		uiSeverityCritical,
+	)
 	fmt.Fprintf(&sb, " %s %s   %s %s   %s %s\n",
 		uiLabel("fallback"),
 		formatSeverityCount(curr.DingoSlotClockFallback, fallbackSeverity),
@@ -3953,15 +4941,41 @@ func getDingoStats() string {
 		),
 	)
 	sb.WriteString(uiSection("Stake / Runtime"))
-	stakeFailureSeverity := dingoCounterSeverity(curr.DingoStakeSnapshotFailure, uiSeverityCritical)
-	fmt.Fprintf(&sb, " %s   %s   %s\n",
-		uiKV("Snap Epoch", uiValue(strconv.FormatUint(curr.DingoStakeSnapshotLastEpoch, 10))),
-		uiKV("Pools", uiValue(strconv.FormatUint(curr.DingoStakeSnapshotPoolCount, 10))),
-		uiKV("Failures", formatSeverityCount(curr.DingoStakeSnapshotFailure, stakeFailureSeverity)),
+	stakeFailureSeverity := dingoCounterSeverity(
+		curr.DingoStakeSnapshotFailure,
+		uiSeverityCritical,
+	)
+	fmt.Fprintf(
+		&sb,
+		" %s   %s   %s\n",
+		uiKV(
+			"Snap Epoch",
+			uiValue(strconv.FormatUint(curr.DingoStakeSnapshotLastEpoch, 10)),
+		),
+		uiKV(
+			"Pools",
+			uiValue(strconv.FormatUint(curr.DingoStakeSnapshotPoolCount, 10)),
+		),
+		uiKV(
+			"Failures",
+			formatSeverityCount(
+				curr.DingoStakeSnapshotFailure,
+				stakeFailureSeverity,
+			),
+		),
 	)
 	if curr.DingoStakeSnapshotActiveStake > 0 {
-		fmt.Fprintf(&sb, " %s\n",
-			uiKV("Active Stake", uiValue(formatDingoADAFromLovelace(curr.DingoStakeSnapshotActiveStake))),
+		fmt.Fprintf(
+			&sb,
+			" %s\n",
+			uiKV(
+				"Active Stake",
+				uiValue(
+					formatDingoADAFromLovelace(
+						curr.DingoStakeSnapshotActiveStake,
+					),
+				),
+			),
 		)
 	}
 	fmt.Fprintf(&sb, " %s   %s   %s\n",
@@ -4064,12 +5078,21 @@ func getMithrilOverlayText(width int) string {
 	lines = append(lines,
 		dingoMetricRow(
 			innerWidth,
-			dingoMetricStyled("MITHRIL SYNC", uiSeverityValue(mithrilPhaseName(m), uiSeverityNeutral), activityPaneSeverity()),
+			dingoMetricStyled(
+				"MITHRIL SYNC",
+				uiSeverityValue(mithrilPhaseName(m), uiSeverityNeutral),
+				activityPaneSeverity(),
+			),
 			dingoMetric("Started", uiValue(startedAgo)),
-			dingoMetric("Snapshot", uiValue(formatDingoBytes(m.MithrilSyncSnapshotSize))),
+			dingoMetric(
+				"Snapshot",
+				uiValue(formatDingoBytes(m.MithrilSyncSnapshotSize)),
+			),
 		),
 	)
-	lines = append(lines, dingoConsoleMithrilProgressLines(m, innerWidth, 34, true)...)
+	lines = append(
+		lines,
+		dingoConsoleMithrilProgressLines(m, innerWidth, 34, true)...)
 	lines = append(lines, mithrilRestoreRow(m, innerWidth))
 	lines = append(
 		lines,
@@ -4077,15 +5100,28 @@ func getMithrilOverlayText(width int) string {
 			innerWidth,
 			dingoMetricSpan(
 				"Immutable",
-				uiSeverityValue(fmt.Sprintf("%5.1f%%", m.MithrilSyncImmutableCopyPercent), mithrilProgressSeverity(m.MithrilSyncImmutableCopyPercent))+
+				uiSeverityValue(
+					fmt.Sprintf("%5.1f%%", m.MithrilSyncImmutableCopyPercent),
+					mithrilProgressSeverity(m.MithrilSyncImmutableCopyPercent),
+				)+
 					" "+
-					uiProgressBar(m.MithrilSyncImmutableCopyPercent, 34, mithrilProgressSeverity(m.MithrilSyncImmutableCopyPercent)),
+					uiProgressBar(
+						m.MithrilSyncImmutableCopyPercent,
+						34,
+						mithrilProgressSeverity(
+							m.MithrilSyncImmutableCopyPercent,
+						),
+					),
 				3,
 			),
 			dingoMetric(
 				"Copied",
-				uiValue(strconv.FormatUint(m.MithrilSyncImmutableBlocksCopied, 10))+
-					uiUnit(" blocks"),
+				uiValue(
+					strconv.FormatUint(m.MithrilSyncImmutableBlocksCopied, 10),
+				)+
+					uiUnit(
+						" blocks",
+					),
 			),
 		),
 	)
@@ -4100,7 +5136,12 @@ func getMithrilOverlayText(width int) string {
 			dingoMetric("Slot", uiValue(strconv.FormatUint(m.SlotNum, 10))),
 			dingoMetricStyled(
 				"Tip Gap",
-				uiSeverityValue(strconv.FormatUint(tipGap, 10), tipSeverity)+uiUnit(" slots"),
+				uiSeverityValue(
+					strconv.FormatUint(tipGap, 10),
+					tipSeverity,
+				)+uiUnit(
+					" slots",
+				),
 				tipSeverity,
 			),
 		),
@@ -4108,9 +5149,16 @@ func getMithrilOverlayText(width int) string {
 			innerWidth,
 			dingoMetricSpan(
 				"Epoch",
-				uiSeverityValue(fmt.Sprintf("%5.1f%%", epochProgress), progressSeverity)+
+				uiSeverityValue(
+					fmt.Sprintf("%5.1f%%", epochProgress),
+					progressSeverity,
+				)+
 					" "+
-					uiProgressBar(epochProgress, 34, progressSeverity),
+					uiProgressBar(
+						epochProgress,
+						34,
+						progressSeverity,
+					),
 				2,
 			),
 			dingoMetric("Remaining", uiValue(formatEpochRemaining(m))),
@@ -4174,7 +5222,8 @@ func getMithrilStats() string {
 
 	startedAgo := "n/a"
 	if m.MithrilSyncStartedAt > 0 {
-		elapsed := time.Since(time.Unix(int64(m.MithrilSyncStartedAt), 0)).Truncate(time.Second)
+		elapsed := time.Since(time.Unix(int64(m.MithrilSyncStartedAt), 0)).
+			Truncate(time.Second)
 		startedAgo = elapsed.String() + " ago"
 	}
 
@@ -4210,28 +5259,54 @@ func getMithrilStats() string {
 	if m.MithrilSyncErrorsTotal > 0 {
 		errSeverity = uiSeverityCritical
 	}
-	fmt.Fprintf(&sb, " %s   %s   %s %s\n",
+	fmt.Fprintf(
+		&sb,
+		" %s   %s   %s %s\n",
 		uiKV("Snapshot", uiValue(snapshotStr)),
-		uiKV("Epoch", uiValue(strconv.FormatUint(m.MithrilSyncSnapshotEpoch, 10))),
+		uiKV(
+			"Epoch",
+			uiValue(strconv.FormatUint(m.MithrilSyncSnapshotEpoch, 10)),
+		),
 		uiLabel("Errors"),
 		formatSeverityCount(m.MithrilSyncErrorsTotal, errSeverity),
 	)
-	fmt.Fprintf(&sb, " %s %s   %s\n",
+	fmt.Fprintf(
+		&sb,
+		" %s %s   %s\n",
 		uiLabel("Snapshot Meta"),
 		uiKV(
 			"file",
 			uiValue(strconv.FormatUint(m.MithrilSyncSnapshotImmutableFile, 10)),
 		),
-		uiKV("Ancillary", uiValue(formatDingoBytes(m.MithrilSyncSnapshotAncillarySize))),
+		uiKV(
+			"Ancillary",
+			uiValue(formatDingoBytes(m.MithrilSyncSnapshotAncillarySize)),
+		),
 	)
 
 	restoreLabel, restoreSeverity := mithrilRestoreState(m)
-	fmt.Fprintf(&sb, " %s %s %s   %s   %s\n",
+	fmt.Fprintf(
+		&sb,
+		" %s %s %s   %s   %s\n",
 		uiLabel("Restore"),
 		uiStatusGlyph(restoreSeverity),
 		uiSeverityValue(restoreLabel, restoreSeverity),
-		uiKV("Source Picks", dingoCountValue(m, "dingo_mithril_source_decisions_total", m.MithrilSourceDecisions)),
-		uiKV("Fallbacks", dingoCountValue(m, "dingo_mithril_fallbacks_total", m.MithrilFallbacks)),
+		uiKV(
+			"Source Picks",
+			dingoCountValue(
+				m,
+				"dingo_mithril_source_decisions_total",
+				m.MithrilSourceDecisions,
+			),
+		),
+		uiKV(
+			"Fallbacks",
+			dingoCountValue(
+				m,
+				"dingo_mithril_fallbacks_total",
+				m.MithrilFallbacks,
+			),
+		),
 	)
 
 	sb.WriteString(uiSection("Progress"))
@@ -4267,7 +5342,9 @@ func getMithrilStats() string {
 		m.MithrilSyncLedgerImportTotal,
 		m.MithrilSyncLedgerImportPercent,
 	)
-	ldgSuffix := uiValue(strconv.FormatUint(m.MithrilSyncLedgerImportCurrent, 10))
+	ldgSuffix := uiValue(
+		strconv.FormatUint(m.MithrilSyncLedgerImportCurrent, 10),
+	)
 	if m.MithrilSyncLedgerImportTotal > 0 {
 		ldgSuffix = fmt.Sprintf(
 			"%s%s%s%s",
@@ -4344,8 +5421,13 @@ func getMithrilStats() string {
 	}
 
 	sb.WriteString(uiSection("Slots / Gap"))
-	fmt.Fprintf(&sb, " %s   %s\n",
-		uiKV("Ledger Slot", uiValue(strconv.FormatUint(m.MithrilSyncLedgerStateSlot, 10))),
+	fmt.Fprintf(
+		&sb,
+		" %s   %s\n",
+		uiKV(
+			"Ledger Slot",
+			uiValue(strconv.FormatUint(m.MithrilSyncLedgerStateSlot, 10)),
+		),
 		uiKV(
 			"Immutable Slot",
 			uiValue(strconv.FormatUint(m.MithrilSyncImmutableCurrentSlot, 10))+
@@ -4357,10 +5439,15 @@ func getMithrilStats() string {
 	if m.MithrilSyncGapBlocks > 0 {
 		gapSeverity = uiSeverityWarn
 	}
-	fmt.Fprintf(&sb, " %s %s %s%s\n",
+	fmt.Fprintf(
+		&sb,
+		" %s %s %s%s\n",
 		uiLabel("Gap Blocks"),
 		uiStatusGlyph(gapSeverity),
-		uiSeverityValue(strconv.FormatUint(m.MithrilSyncGapBlocks, 10), gapSeverity),
+		uiSeverityValue(
+			strconv.FormatUint(m.MithrilSyncGapBlocks, 10),
+			gapSeverity,
+		),
 		uiUnit(" blocks remaining"),
 	)
 
@@ -4405,15 +5492,20 @@ func getEpochProgress(metrics *PromMetrics) float32 {
 	return epochProgress
 }
 
-func currentEpochTimingForMetrics(cfg *config.Config, metrics *PromMetrics) (epochLengthSlots uint64, slotLengthMs uint64, ok bool) {
+func currentEpochTimingForMetrics(
+	cfg *config.Config,
+	metrics *PromMetrics,
+) (epochLengthSlots uint64, slotLengthMs uint64, ok bool) {
 	if metrics == nil {
 		return 0, 0, false
 	}
 	if cfg.Node.ShelleyTransEpoch >= 0 &&
 		metrics.EpochNum >= uint64(cfg.Node.ShelleyTransEpoch) {
-		return cfg.Node.ShelleyGenesis.EpochLength, cfg.Node.ShelleyGenesis.SlotLength, cfg.Node.ShelleyGenesis.EpochLength > 0 && cfg.Node.ShelleyGenesis.SlotLength > 0
+		return cfg.Node.ShelleyGenesis.EpochLength, cfg.Node.ShelleyGenesis.SlotLength, cfg.Node.ShelleyGenesis.EpochLength > 0 &&
+			cfg.Node.ShelleyGenesis.SlotLength > 0
 	}
-	return cfg.Node.ByronGenesis.EpochLength, cfg.Node.ByronGenesis.SlotLength, cfg.Node.ByronGenesis.EpochLength > 0 && cfg.Node.ByronGenesis.SlotLength > 0
+	return cfg.Node.ByronGenesis.EpochLength, cfg.Node.ByronGenesis.SlotLength, cfg.Node.ByronGenesis.EpochLength > 0 &&
+		cfg.Node.ByronGenesis.SlotLength > 0
 }
 
 func currentEpochSwitchTime(metrics *PromMetrics) (time.Time, bool) {
@@ -4443,7 +5535,8 @@ func currentEpochSwitchTime(metrics *PromMetrics) (time.Time, bool) {
 		return unixTimeFromUint64(switchUnix)
 	}
 
-	if cfg.Node.ByronGenesis.EpochLength == 0 || cfg.Node.ByronGenesis.SlotLength == 0 {
+	if cfg.Node.ByronGenesis.EpochLength == 0 ||
+		cfg.Node.ByronGenesis.SlotLength == 0 {
 		return time.Time{}, false
 	}
 	switchUnix := cfg.Node.ByronGenesis.StartTime +
@@ -4456,7 +5549,8 @@ func unixTimeFromUint64(seconds uint64) (time.Time, bool) {
 	if seconds > maxUnixSeconds {
 		return time.Time{}, false
 	}
-	return time.Unix(int64(seconds), 0), true //nolint:gosec // bounds checked above
+	secs := int64(seconds) //nolint:gosec // bounds checked above
+	return time.Unix(secs, 0), true
 }
 
 func getEpochRemainingSeconds(metrics *PromMetrics) (uint64, bool) {
@@ -4468,7 +5562,10 @@ func getEpochRemainingSeconds(metrics *PromMetrics) (uint64, bool) {
 		return uint64(remaining / time.Second), true
 	}
 
-	epochLength, slotLengthMs, ok := currentEpochTimingForMetrics(config.GetConfig(), metrics)
+	epochLength, slotLengthMs, ok := currentEpochTimingForMetrics(
+		config.GetConfig(),
+		metrics,
+	)
 	if !ok || metrics == nil {
 		return 0, false
 	}
@@ -4500,8 +5597,13 @@ func getEpochText(ctx context.Context) string {
 	epochProgress := getEpochProgress(promMetrics)
 	severity := mithrilProgressSeverity(float64(epochProgress))
 
-	fmt.Fprintf(&sb, " %s   %s\n",
-		uiKV("Epoch", uiValue(strconv.FormatUint(displayEpoch(promMetrics), 10))),
+	fmt.Fprintf(
+		&sb,
+		" %s   %s\n",
+		uiKV(
+			"Epoch",
+			uiValue(strconv.FormatUint(displayEpoch(promMetrics), 10)),
+		),
 		uiKV("Remaining", uiValue(formatEpochRemaining(promMetrics))),
 	)
 	fmt.Fprintf(&sb, " %s\n",
@@ -4556,9 +5658,17 @@ func getChainText(ctx context.Context) string {
 		uiPill("status", tipStatus, tipSeverity),
 		uiKV("Forks", uiValue(strconv.FormatUint(promMetrics.Forks, 10))),
 	)
-	fmt.Fprintf(&sb, " %s   %s   %s\n",
-		uiKV("Total Tx", uiValue(strconv.FormatUint(promMetrics.TxProcessed, 10))),
-		uiKV("Slot Epoch", uiValue(strconv.FormatUint(promMetrics.SlotInEpoch, 10))),
+	fmt.Fprintf(
+		&sb,
+		" %s   %s   %s\n",
+		uiKV(
+			"Total Tx",
+			uiValue(strconv.FormatUint(promMetrics.TxProcessed, 10)),
+		),
+		uiKV(
+			"Slot Epoch",
+			uiValue(strconv.FormatUint(promMetrics.SlotInEpoch, 10)),
+		),
 		uiKV(
 			"Mempool",
 			uiValue(strconv.FormatUint(promMetrics.MempoolTx, 10))+
@@ -4567,8 +5677,13 @@ func getChainText(ctx context.Context) string {
 				uiUnit("K"),
 		),
 	)
-	fmt.Fprintf(&sb, " %s\n",
-		uiKV("Density", uiValue(fmt.Sprintf("%3.5f%%", promMetrics.Density*100))),
+	fmt.Fprintf(
+		&sb,
+		" %s\n",
+		uiKV(
+			"Density",
+			uiValue(fmt.Sprintf("%3.5f%%", promMetrics.Density*100)),
+		),
 	)
 	return sb.String()
 }
@@ -4715,33 +5830,90 @@ func getCoreText(ctx context.Context) string {
 		if promMetrics.BlocksForged > 0 {
 			forgedSeverity = uiSeverityNeutral
 		}
-		fmt.Fprintf(&sb, " %s   %s\n",
+		fmt.Fprintf(
+			&sb,
+			" %s   %s\n",
 			uiPill("mode", forgeMode, forgeModeSeverity),
-			uiKVSeverityAligned(8, "Forged", strconv.FormatUint(promMetrics.BlocksForged, 10), forgedSeverity),
+			uiKVSeverityAligned(
+				8,
+				"Forged",
+				strconv.FormatUint(promMetrics.BlocksForged, 10),
+				forgedSeverity,
+			),
 		)
-		fmt.Fprintf(&sb, " %s   %s\n",
-			uiKVSeverityAligned(8, "Leader", strconv.FormatUint(promMetrics.IsLeader, 10), forgeRowSeverity),
-			uiKVStyledAligned(8, "Adopted", formatSeverityCount(promMetrics.Adopted, adoptedSeverity), adoptedSeverity),
+		fmt.Fprintf(
+			&sb,
+			" %s   %s\n",
+			uiKVSeverityAligned(
+				8,
+				"Leader",
+				strconv.FormatUint(promMetrics.IsLeader, 10),
+				forgeRowSeverity,
+			),
+			uiKVStyledAligned(
+				8,
+				"Adopted",
+				formatSeverityCount(promMetrics.Adopted, adoptedSeverity),
+				adoptedSeverity,
+			),
 		)
-		fmt.Fprintf(&sb, " %s   %s\n",
-			uiKVStyledAligned(8, "Invalid", formatSeverityCount(promMetrics.DidntAdopt, invalidSeverity), invalidSeverity),
+		fmt.Fprintf(
+			&sb,
+			" %s   %s\n",
+			uiKVStyledAligned(
+				8,
+				"Invalid",
+				formatSeverityCount(promMetrics.DidntAdopt, invalidSeverity),
+				invalidSeverity,
+			),
 			uiKVStyledAligned(
 				8,
 				"Missed",
-				formatSeverityPercentRatio(promMetrics.MissedSlots, missedSlotsPct, missedSeverity),
+				formatSeverityPercentRatio(
+					promMetrics.MissedSlots,
+					missedSlotsPct,
+					missedSeverity,
+				),
 				missedSeverity,
 			),
 		)
-		fmt.Fprintf(&sb, " %s   %s\n",
-			uiKVSeverityAligned(10, "KES period", strconv.FormatUint(promMetrics.KesPeriod, 10), forgeRowSeverity),
-			uiKVSeverityAligned(10, "KES remain", strconv.FormatUint(promMetrics.RemainingKesPeriods, 10), forgeRowSeverity),
+		fmt.Fprintf(
+			&sb,
+			" %s   %s\n",
+			uiKVSeverityAligned(
+				10,
+				"KES period",
+				strconv.FormatUint(promMetrics.KesPeriod, 10),
+				forgeRowSeverity,
+			),
+			uiKVSeverityAligned(
+				10,
+				"KES remain",
+				strconv.FormatUint(promMetrics.RemainingKesPeriods, 10),
+				forgeRowSeverity,
+			),
 		)
 		if promMetrics.DingoBlockForgingLatencyN > 0 {
 			avg := promMetrics.DingoBlockForgingLatencyS /
 				float64(promMetrics.DingoBlockForgingLatencyN)
-			fmt.Fprintf(&sb, " %s   %s\n",
-				uiKVAligned(12, "Latency Avg", uiValue(fmt.Sprintf("%.3fs", avg))),
-				uiKVAligned(12, "Samples", uiValue(strconv.FormatUint(promMetrics.DingoBlockForgingLatencyN, 10))),
+			fmt.Fprintf(
+				&sb,
+				" %s   %s\n",
+				uiKVAligned(
+					12,
+					"Latency Avg",
+					uiValue(fmt.Sprintf("%.3fs", avg)),
+				),
+				uiKVAligned(
+					12,
+					"Samples",
+					uiValue(
+						strconv.FormatUint(
+							promMetrics.DingoBlockForgingLatencyN,
+							10,
+						),
+					),
+				),
 			)
 		} else if getEffectiveNodeBinary() == DINGO_BINARY {
 			fmt.Fprintf(&sb, " %s\n", uiKVStyledAligned(12, "Latency Avg", uiMuted("n/a"), forgeRowSeverity))
@@ -4763,7 +5935,8 @@ func getBlockText(ctx context.Context) string {
 	if promMetrics == nil {
 		return blockText
 	}
-	if getEffectiveNodeBinary() == DINGO_BINARY && hasDingoPropagationMetrics(promMetrics) {
+	if getEffectiveNodeBinary() == DINGO_BINARY &&
+		hasDingoPropagationMetrics(promMetrics) {
 		return getDingoPropagationText()
 	}
 
@@ -4775,7 +5948,8 @@ func getBlockText(ctx context.Context) string {
 	if fd > math.MaxInt {
 		return "ERROR: invalid file descriptor"
 	}
-	tcols, tlines, err := terminal.GetSize(int(fd)) //nolint:gosec // fd validated above
+	fdInt := int(fd) //nolint:gosec // fd validated above
+	tcols, tlines, err := terminal.GetSize(fdInt)
 	if err != nil {
 		return fmt.Sprintf("ERROR: %v", err)
 	}
@@ -4816,11 +5990,16 @@ func getBlockText(ctx context.Context) string {
 	blk3Pct, _ := strconv.ParseFloat(blk3s, 64)
 	blk5Pct, _ := strconv.ParseFloat(blk5s, 64)
 
-	fmt.Fprintf(&sb, " %s %s%s   %s   %s %s\n",
+	fmt.Fprintf(
+		&sb,
+		" %s %s%s   %s   %s %s\n",
 		uiLabel("Last Delay"),
 		uiSeverityValue(delay, delaySeverity),
 		uiUnit("s"),
-		uiKV("Served", uiValue(strconv.FormatUint(promMetrics.BlocksServed, 10))),
+		uiKV(
+			"Served",
+			uiValue(strconv.FormatUint(promMetrics.BlocksServed, 10)),
+		),
 		uiLabel("Late >5s"),
 		formatSeverityCount(promMetrics.BlocksLate, lateSeverity),
 	)
@@ -4829,9 +6008,15 @@ func getBlockText(ctx context.Context) string {
 		uiPercentBar("<=3s", blk3Pct, dingoPropagationSeverity(blk3Pct), 8),
 		uiPercentBar("<=5s", blk5Pct, dingoPropagationSeverity(blk5Pct), 8),
 	)
-	fmt.Fprintf(&sb, " %s %s   %s\n",
+	fmt.Fprintf(
+		&sb,
+		" %s %s   %s\n",
 		uiLabel("CDF Shape"),
-		uiSparkline([]float64{blk1Pct, blk3Pct, blk5Pct}, 100, dingoPropagationSeverity(blk5Pct)),
+		uiSparkline(
+			[]float64{blk1Pct, blk3Pct, blk5Pct},
+			100,
+			dingoPropagationSeverity(blk5Pct),
+		),
 		uiMuted("1s 3s 5s"),
 	)
 
@@ -4906,10 +6091,26 @@ func getDingoPropagationText() string {
 	fmt.Fprintf(&sb, " %s %s\n",
 		uiLabel("Traffic Mix"),
 		uiSegmentBar([]uiSegment{
-			{Label: "blockfetch", Value: float64(m.DingoProtocolBlockfetchMessages), Severity: uiSeverityOK},
-			{Label: "chainsync", Value: float64(m.DingoProtocolChainsyncMessages), Severity: uiSeverityNeutral},
-			{Label: "keepalive", Value: float64(m.DingoProtocolKeepaliveMessages), Severity: uiSeverityWarn},
-			{Label: "txsubmit", Value: float64(m.DingoProtocolTxSubmitMessages), Severity: uiSeverityMuted},
+			{
+				Label:    "blockfetch",
+				Value:    float64(m.DingoProtocolBlockfetchMessages),
+				Severity: uiSeverityOK,
+			},
+			{
+				Label:    "chainsync",
+				Value:    float64(m.DingoProtocolChainsyncMessages),
+				Severity: uiSeverityNeutral,
+			},
+			{
+				Label:    "keepalive",
+				Value:    float64(m.DingoProtocolKeepaliveMessages),
+				Severity: uiSeverityWarn,
+			},
+			{
+				Label:    "txsubmit",
+				Value:    float64(m.DingoProtocolTxSubmitMessages),
+				Severity: uiSeverityMuted,
+			},
 		}, 24),
 	)
 
@@ -4917,23 +6118,57 @@ func getDingoPropagationText() string {
 		m.DingoBlockfetchGateSkippedFast > 0 ||
 		m.DingoBlockfetchGateSkippedPeer > 0 {
 		sb.WriteString(uiSection("Blockfetch Gate"))
-		fmt.Fprintf(&sb, " %s   %s   %s\n",
-			uiKVAligned(11, "Dispatched", uiValue(strconv.FormatUint(m.DingoBlockfetchGateDispatched, 10))),
-			uiKVAligned(11, "Skip Fast", uiValue(strconv.FormatUint(m.DingoBlockfetchGateSkippedFast, 10))),
-			uiKVAligned(11, "No Peer", uiValue(strconv.FormatUint(m.DingoBlockfetchGateSkippedPeer, 10))),
+		fmt.Fprintf(
+			&sb,
+			" %s   %s   %s\n",
+			uiKVAligned(
+				11,
+				"Dispatched",
+				uiValue(
+					strconv.FormatUint(m.DingoBlockfetchGateDispatched, 10),
+				),
+			),
+			uiKVAligned(
+				11,
+				"Skip Fast",
+				uiValue(
+					strconv.FormatUint(m.DingoBlockfetchGateSkippedFast, 10),
+				),
+			),
+			uiKVAligned(
+				11,
+				"No Peer",
+				uiValue(
+					strconv.FormatUint(m.DingoBlockfetchGateSkippedPeer, 10),
+				),
+			),
 		)
 		fmt.Fprintf(&sb, " %s %s\n",
 			uiLabel("Gate Mix"),
 			uiSegmentBar([]uiSegment{
-				{Label: "dispatch", Value: float64(m.DingoBlockfetchGateDispatched), Severity: uiSeverityOK},
-				{Label: "fast", Value: float64(m.DingoBlockfetchGateSkippedFast), Severity: uiSeverityMuted},
-				{Label: "no_peer", Value: float64(m.DingoBlockfetchGateSkippedPeer), Severity: uiSeverityWarn},
+				{
+					Label:    "dispatch",
+					Value:    float64(m.DingoBlockfetchGateDispatched),
+					Severity: uiSeverityOK,
+				},
+				{
+					Label:    "fast",
+					Value:    float64(m.DingoBlockfetchGateSkippedFast),
+					Severity: uiSeverityMuted,
+				},
+				{
+					Label:    "no_peer",
+					Value:    float64(m.DingoBlockfetchGateSkippedPeer),
+					Severity: uiSeverityWarn,
+				},
 			}, 24),
 		)
 	}
 
-	if m.BlockDelay > 0 || m.BlocksW1s > 0 || m.BlocksW3s > 0 || m.BlocksW5s > 0 ||
-		m.BlocksServed > 0 || m.BlocksLate > 0 {
+	if m.BlockDelay > 0 || m.BlocksW1s > 0 || m.BlocksW3s > 0 ||
+		m.BlocksW5s > 0 ||
+		m.BlocksServed > 0 ||
+		m.BlocksLate > 0 {
 		sb.WriteString(uiSection("Fetch Timing"))
 		blk1s := formatBlockPropagationPercent(m.BlocksW1s)
 		blk3s := formatBlockPropagationPercent(m.BlocksW3s)
@@ -4948,14 +6183,27 @@ func getDingoPropagationText() string {
 			delaySeverity = uiSeverityWarn
 		}
 		lateSeverity := dingoCounterSeverity(m.BlocksLate, uiSeverityWarn)
-		fmt.Fprintf(&sb, " %s   %s   %s\n",
+		fmt.Fprintf(
+			&sb,
+			" %s   %s   %s\n",
 			uiKVAligned(
 				10,
 				"Last",
-				uiSeverityValue(fmt.Sprintf("%.2fs", m.BlockDelay), delaySeverity),
+				uiSeverityValue(
+					fmt.Sprintf("%.2fs", m.BlockDelay),
+					delaySeverity,
+				),
 			),
-			uiKVAligned(10, "Served", uiValue(strconv.FormatUint(m.BlocksServed, 10))),
-			uiKVAligned(10, "Late >5s", formatSeverityCount(m.BlocksLate, lateSeverity)),
+			uiKVAligned(
+				10,
+				"Served",
+				uiValue(strconv.FormatUint(m.BlocksServed, 10)),
+			),
+			uiKVAligned(
+				10,
+				"Late >5s",
+				formatSeverityCount(m.BlocksLate, lateSeverity),
+			),
 		)
 		fmt.Fprintf(&sb, " %s   %s   %s\n",
 			uiPercentBar("<=1s", blk1Pct, dingoPropagationSeverity(blk1Pct), 8),
@@ -5056,7 +6304,11 @@ func getNodeText(ctx context.Context) string {
 
 	nodeVersion, nodeRevision := currentNodeVersionInfo()
 	var sb strings.Builder
-	fmt.Fprintf(&sb, " %s\n", uiPill("name", getEffectiveNodeName(), uiSeverityNeutral))
+	fmt.Fprintf(
+		&sb,
+		" %s\n",
+		uiPill("name", getEffectiveNodeName(), uiSeverityNeutral),
+	)
 	fmt.Fprintf(&sb, " %s   %s\n",
 		uiKV("Role", uiValue(role)),
 		uiKV("Network", uiValue(currentNetworkName())),
@@ -5112,7 +6364,8 @@ func getPeerText(ctx context.Context) string {
 
 	if promMetrics != nil {
 		sb.WriteString(uiSection("Selection"))
-		if getEffectiveNodeBinary() == AMARU_BINARY && !promMetrics.PeerSelectionExported {
+		if getEffectiveNodeBinary() == AMARU_BINARY &&
+			!promMetrics.PeerSelectionExported {
 			fmt.Fprintf(&sb, " %s\n", uiKV("Peers", uiMuted("n/a")))
 		} else {
 			fmt.Fprintf(&sb, " %s   %s   %s\n",
@@ -5173,7 +6426,11 @@ func getPeerText(ctx context.Context) string {
 		uiSegmentBar([]uiSegment{
 			{Label: "0-50", Value: float64(cnt1), Severity: uiSeverityOK},
 			{Label: "50-100", Value: float64(cnt2), Severity: uiSeverityWarn},
-			{Label: "100-200", Value: float64(cnt3), Severity: uiSeverityCritical},
+			{
+				Label:    "100-200",
+				Value:    float64(cnt3),
+				Severity: uiSeverityCritical,
+			},
 			{Label: ">200", Value: float64(cnt4), Severity: uiSeverityCritical},
 			{Label: "unknown", Value: float64(cnt0), Severity: uiSeverityMuted},
 		}, 22),
@@ -5222,7 +6479,12 @@ func getPeerText(ctx context.Context) string {
 	// Divider
 	sb.WriteString(uiMuted(strings.Repeat("-", width-1)) + "\n")
 
-	fmt.Fprintf(&sb, "   %s %24s  I/O RTT   Geolocation\n", uiLabel("#"), "REMOTE PEER")
+	fmt.Fprintf(
+		&sb,
+		"   %s %24s  I/O RTT   Geolocation\n",
+		uiLabel("#"),
+		"REMOTE PEER",
+	)
 	// peerLocationWidth := width - 41
 	for peerNbr, peer := range peers {
 		peerNbr++
@@ -5288,9 +6550,17 @@ func amaruResourceText(m *PromMetrics) string {
 	} else {
 		fmt.Fprintf(&sb, " %s\n", uiKV("CPU", uiMuted("n/a")))
 	}
-	fmt.Fprintf(&sb, " %s   %s\n",
-		uiKV("RSS", bytes("process_memory_live_resident", m.AmaruMemoryResident)),
-		uiKV("Footprint", bytes("process_memory_footprint", m.AmaruMemoryFootprint)),
+	fmt.Fprintf(
+		&sb,
+		" %s   %s\n",
+		uiKV(
+			"RSS",
+			bytes("process_memory_live_resident", m.AmaruMemoryResident),
+		),
+		uiKV(
+			"Footprint",
+			bytes("process_memory_footprint", m.AmaruMemoryFootprint),
+		),
 	)
 	fmt.Fprintf(&sb, " %s\n",
 		uiKV("Host Mem", bytes("host_memory_used", m.AmaruHostMemoryUsed)+
@@ -5552,7 +6822,9 @@ func dingoCandidatesByMetricsPort(
 	return matches
 }
 
-func lowestPIDDingoCandidate(candidates []dingoCandidate) (dingoCandidate, bool) {
+func lowestPIDDingoCandidate(
+	candidates []dingoCandidate,
+) (dingoCandidate, bool) {
 	if len(candidates) == 0 {
 		return dingoCandidate{}, false
 	}

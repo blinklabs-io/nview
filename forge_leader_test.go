@@ -179,7 +179,9 @@ func TestDingoForgeCounterHistoryHandlesResetAndMissingSamples(t *testing.T) {
 // Dingo registers dingo_equivocation_total as a labelled counter, so the
 // self_key="true" series does not exist until the node reports its own
 // equivocation. A healthy producer never exposes it.
-func TestDingoForgeCounterHistoryMissRatioWithoutOwnEquivocationSeries(t *testing.T) {
+func TestDingoForgeCounterHistoryMissRatioWithoutOwnEquivocationSeries(
+	t *testing.T,
+) {
 	var history dingoForgeCounterHistory
 	base := time.Unix(1000, 0)
 	scrape := func(won, missed, battles uint64) *PromMetrics {
@@ -210,7 +212,9 @@ func TestDingoForgeLeaderPanelLabelsFitWithoutTruncation(t *testing.T) {
 		metrics.PromMetricPresent[name] = true
 	}
 	for _, width := range []int{80, 118} {
-		panel := stripTviewTags(dingoConsoleForgeLeaderBandAt(metrics, width, now))
+		panel := stripTviewTags(
+			dingoConsoleForgeLeaderBandAt(metrics, width, now),
+		)
 		if strings.Contains(panel, "...") {
 			t.Errorf("width %d: panel truncates a label:\n%s", width, panel)
 		}
@@ -293,7 +297,8 @@ func TestDingoForgeLeaderPanelFailsClosedForStaleOrAbsentData(t *testing.T) {
 	stale.DingoForgeCredentialsValid = 1
 	stale.PromMetricPresent["dingo_forge_credentials_valid"] = true
 	panel := dingoConsoleForgeLeaderBandAt(stale, 118, now)
-	if !strings.Contains(panel, "stale") || strings.Contains(panel, "Credentials[white] valid") {
+	if !strings.Contains(panel, "stale") ||
+		strings.Contains(panel, "Credentials[white] valid") {
 		t.Fatalf("stale panel must not claim healthy credentials:\n%s", panel)
 	}
 
@@ -321,7 +326,13 @@ func TestDingoForgeLeaderPanelFitsCompactViewport(t *testing.T) {
 	wantWidth := tview.TaggedStringWidth(strings.Split(panel, "\n")[1])
 	for lineNumber, line := range strings.Split(strings.TrimSuffix(panel, "\n"), "\n") {
 		if got := tview.TaggedStringWidth(line); got > wantWidth {
-			t.Errorf("line %d width = %d, panel width = %d:\n%s", lineNumber, got, wantWidth, panel)
+			t.Errorf(
+				"line %d width = %d, panel width = %d:\n%s",
+				lineNumber,
+				got,
+				wantWidth,
+				panel,
+			)
 		}
 	}
 	for _, token := range []string{"Credentials", "KES Expiry", "Miss Ratio", "Own Equiv"} {

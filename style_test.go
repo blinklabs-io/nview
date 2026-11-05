@@ -124,9 +124,13 @@ func TestTerminalVisuals(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := terminalVisuals(tt.visualMode, tt.imageProtocol, func(key string) string {
-				return tt.env[key]
-			})
+			got := terminalVisuals(
+				tt.visualMode,
+				tt.imageProtocol,
+				func(key string) string {
+					return tt.env[key]
+				},
+			)
 			if got.Mode != tt.expectedMode {
 				t.Errorf("Mode = %d, expected %d", got.Mode, tt.expectedMode)
 			}
@@ -246,8 +250,11 @@ func TestCurrentTerminalVisualsReadsYAMLConfig(t *testing.T) {
 	}
 	got := currentTerminalVisuals()
 	if got.Mode != terminalVisualPlain || got.ImageProtocol != "none" {
-		t.Errorf("from YAML: Mode = %d, ImageProtocol = %q, expected plain and none",
-			got.Mode, got.ImageProtocol)
+		t.Errorf(
+			"from YAML: Mode = %d, ImageProtocol = %q, expected plain and none",
+			got.Mode,
+			got.ImageProtocol,
+		)
 	}
 
 	t.Setenv("NVIEW_VISUAL_MODE", "nerd")
@@ -255,6 +262,10 @@ func TestCurrentTerminalVisualsReadsYAMLConfig(t *testing.T) {
 		t.Fatalf("config.LoadConfig() error = %v", err)
 	}
 	if got := currentTerminalVisuals(); got.Mode != terminalVisualNerd {
-		t.Errorf("env override: Mode = %d, expected %d", got.Mode, terminalVisualNerd)
+		t.Errorf(
+			"env override: Mode = %d, expected %d",
+			got.Mode,
+			terminalVisualNerd,
+		)
 	}
 }

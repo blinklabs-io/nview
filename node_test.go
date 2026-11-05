@@ -68,10 +68,16 @@ func TestP2PFromNodeConfigCmdlineTrailingConfigDoesNotPanic(t *testing.T) {
 	cmd := "cardano-node run --other flag --config"
 	got, err := p2pFromNodeConfigCmdline(cmd, true)
 	if !errors.Is(err, errMissingConfigValue) {
-		t.Fatalf("p2pFromNodeConfigCmdline() error = %v, want errMissingConfigValue", err)
+		t.Fatalf(
+			"p2pFromNodeConfigCmdline() error = %v, want errMissingConfigValue",
+			err,
+		)
 	}
 	if got != true {
-		t.Fatalf("p2pFromNodeConfigCmdline() = %v, want unchanged current value true", got)
+		t.Fatalf(
+			"p2pFromNodeConfigCmdline() = %v, want unchanged current value true",
+			got,
+		)
 	}
 }
 
@@ -86,7 +92,10 @@ func TestP2PFromNodeConfigCmdlineRepeatedConfigUsesLast(t *testing.T) {
 		t.Fatalf("p2pFromNodeConfigCmdline() error = %v, want nil", err)
 	}
 	if got != true {
-		t.Fatalf("p2pFromNodeConfigCmdline() = %v, want true from last --config", got)
+		t.Fatalf(
+			"p2pFromNodeConfigCmdline() = %v, want true from last --config",
+			got,
+		)
 	}
 }
 
@@ -99,10 +108,16 @@ func TestP2PFromNodeConfigCmdlineRepeatedConfigLastMissingValue(t *testing.T) {
 	cmd := "--config " + firstPath + " --config"
 	got, err := p2pFromNodeConfigCmdline(cmd, false)
 	if !errors.Is(err, errMissingConfigValue) {
-		t.Fatalf("p2pFromNodeConfigCmdline() error = %v, want errMissingConfigValue", err)
+		t.Fatalf(
+			"p2pFromNodeConfigCmdline() error = %v, want errMissingConfigValue",
+			err,
+		)
 	}
 	if got != false {
-		t.Fatalf("p2pFromNodeConfigCmdline() = %v, want incoming current value false", got)
+		t.Fatalf(
+			"p2pFromNodeConfigCmdline() = %v, want incoming current value false",
+			got,
+		)
 	}
 }
 
@@ -114,23 +129,35 @@ func TestP2PFromNodeConfigCmdlineRepeatedConfigLastUnreadable(t *testing.T) {
 	cmd := "--config " + firstPath + " --config /nonexistent/path/config.json"
 	got, err := p2pFromNodeConfigCmdline(cmd, false)
 	if err == nil {
-		t.Fatal("p2pFromNodeConfigCmdline() error = nil, want a read error for the missing file")
+		t.Fatal(
+			"p2pFromNodeConfigCmdline() error = nil, want a read error for the missing file",
+		)
 	}
 	if got != false {
-		t.Fatalf("p2pFromNodeConfigCmdline() = %v, want incoming current value false", got)
+		t.Fatalf(
+			"p2pFromNodeConfigCmdline() = %v, want incoming current value false",
+			got,
+		)
 	}
 }
 
 // --config is followed by an empty string instead of a real path (not
 // missing, just blank). Reading that "file" fails, so the current P2P
 // value should be left unchanged rather than being reset.
-func TestP2PFromNodeConfigCmdlineEmptyValueLeavesCurrentUnchanged(t *testing.T) {
+func TestP2PFromNodeConfigCmdlineEmptyValueLeavesCurrentUnchanged(
+	t *testing.T,
+) {
 	cmd := "cardano-node run --config  --other flag"
 	got, err := p2pFromNodeConfigCmdline(cmd, true)
 	if err == nil {
-		t.Fatal("p2pFromNodeConfigCmdline() error = nil, want a read error for the empty path")
+		t.Fatal(
+			"p2pFromNodeConfigCmdline() error = nil, want a read error for the empty path",
+		)
 	}
 	if got != true {
-		t.Fatalf("p2pFromNodeConfigCmdline() = %v, want unchanged current value true", got)
+		t.Fatalf(
+			"p2pFromNodeConfigCmdline() = %v, want unchanged current value true",
+			got,
+		)
 	}
 }

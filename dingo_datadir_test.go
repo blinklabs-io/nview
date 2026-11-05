@@ -185,8 +185,12 @@ func TestResolveDataDirDingoSourcesOnRealProcess(t *testing.T) {
 	withEnv := startDingoProcessHelper(t, []string{
 		"HOME=" + t.TempDir(), "CARDANO_DATABASE_PATH=/data/from-env",
 	})
-	if env, err := withEnv.EnvironWithContext(ctx); err != nil || len(env) == 0 {
-		t.Logf("process environment unreadable on this OS (%v); skipping env source", err)
+	if env, err := withEnv.EnvironWithContext(ctx); err != nil ||
+		len(env) == 0 {
+		t.Logf(
+			"process environment unreadable on this OS (%v); skipping env source",
+			err,
+		)
 	} else if got := resolveDataDir(ctx, cfg, withEnv); got != "/data/from-env" {
 		t.Errorf("env var: got %q", got)
 	}
@@ -197,7 +201,10 @@ func TestResolveDataDirDingoSourcesOnRealProcess(t *testing.T) {
 	if err != nil {
 		t.Skipf("cannot read helper cwd: %v", err)
 	}
-	if got := resolveDataDir(ctx, cfg, bare); got != filepath.Join(cwd, ".dingo") {
+	if got := resolveDataDir(ctx, cfg, bare); got != filepath.Join(
+		cwd,
+		".dingo",
+	) {
 		t.Errorf("default: got %q", got)
 	}
 
@@ -239,7 +246,11 @@ func TestDingoConfigReadThroughNodeRoot(t *testing.T) {
 		"databasePath: /node/system\n")
 	// The same paths exist in nview's own namespace with other values.
 	hostRoot := t.TempDir()
-	writeDingoConfig(t, filepath.Join(hostRoot, "x.yaml"), "databasePath: /host/explicit\n")
+	writeDingoConfig(
+		t,
+		filepath.Join(hostRoot, "x.yaml"),
+		"databasePath: /host/explicit\n",
+	)
 	writeDingoConfig(t, dingoSystemConfig, "databasePath: /host/system\n")
 
 	info := func(args []string, env ...string) dingoProcessInfo {
@@ -260,6 +271,9 @@ func TestDingoConfigReadThroughNodeRoot(t *testing.T) {
 	empty := dingoInfo("/work", []string{"HOME=/home/nobody"})
 	empty.root = t.TempDir()
 	if got := dingoDataDir(empty); got != "/work/.dingo" {
-		t.Errorf("node has no config but nview does: got %q, want /work/.dingo", got)
+		t.Errorf(
+			"node has no config but nview does: got %q, want /work/.dingo",
+			got,
+		)
 	}
 }

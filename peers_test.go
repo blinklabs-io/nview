@@ -30,7 +30,8 @@ func TestParsePeerProbe(t *testing.T) {
 	if !ok {
 		t.Fatal("parsePeerProbe() returned false")
 	}
-	if probe.ip != "198.51.100.10" || probe.port != "3001" || probe.direction != "i+o" {
+	if probe.ip != "198.51.100.10" || probe.port != "3001" ||
+		probe.direction != "i+o" {
 		t.Fatalf("parsePeerProbe() = %#v", probe)
 	}
 	if _, ok := parsePeerProbe("198.51.100.10:3001"); ok {
@@ -56,7 +57,10 @@ func TestAppendFilteredPeerPrefersOutboundPort(t *testing.T) {
 		t.Fatalf("merged peer %q did not parse", peers[0])
 	}
 	if probe.port != "3001" || probe.direction != "i+o" {
-		t.Fatalf("merged peer = %#v, expected outbound port and i+o direction", probe)
+		t.Fatalf(
+			"merged peer = %#v, expected outbound port and i+o direction",
+			probe,
+		)
 	}
 }
 
@@ -196,7 +200,11 @@ func TestPingPeersStartsLazyBatchWithoutBlocking(t *testing.T) {
 	results := len(peerStats.RTTresultsSlice)
 	peerStatsMu.Unlock()
 	if inFlight != peerProbeBatchSize {
-		t.Fatalf("in-flight probes = %d, expected %d", inFlight, peerProbeBatchSize)
+		t.Fatalf(
+			"in-flight probes = %d, expected %d",
+			inFlight,
+			peerProbeBatchSize,
+		)
 	}
 	if results != 0 {
 		t.Fatalf("completed probe results = %d, expected 0", results)
@@ -290,7 +298,10 @@ func TestResetPeersClearsFilteredAndStats(t *testing.T) {
 			"198.51.100.20": time.Now(),
 		},
 	}
-	peerStats.RTTresultsMap["198.51.100.10"] = &Peer{IP: "198.51.100.10", RTT: 42}
+	peerStats.RTTresultsMap["198.51.100.10"] = &Peer{
+		IP:  "198.51.100.10",
+		RTT: 42,
+	}
 	peerStatsMu.Unlock()
 	peersFilteredMu.Unlock()
 	defer func() {

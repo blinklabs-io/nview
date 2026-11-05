@@ -205,7 +205,10 @@ cardano_node_metrics_Epoch_int 658
 		t.Fatalf("metrics unmarshal error = %v", err)
 	}
 	if values["cardano_node_metrics_basicInfo"] != float64(1) {
-		t.Errorf("info metric value = %v, expected 1", values["cardano_node_metrics_basicInfo"])
+		t.Errorf(
+			"info metric value = %v, expected 1",
+			values["cardano_node_metrics_basicInfo"],
+		)
 	}
 	if metrics.Network != "preview" {
 		t.Errorf("Network = %q, expected preview", metrics.Network)
@@ -415,21 +418,69 @@ event_delivery_timeouts_total{topic="tx"} 45
 		{"DingoCacheBlockLruHits", metrics.DingoCacheBlockLruHits, 300},
 		{"DingoCacheBlockLruMiss", metrics.DingoCacheBlockLruMiss, 30},
 		{"DingoCacheColdExtract", metrics.DingoCacheColdExtract, 40},
-		{"DingoProtocolBlockfetchMessages", metrics.DingoProtocolBlockfetchMessages, 5669},
-		{"DingoProtocolChainsyncMessages", metrics.DingoProtocolChainsyncMessages, 356904},
-		{"DingoProtocolKeepaliveMessages", metrics.DingoProtocolKeepaliveMessages, 6254},
-		{"DingoProtocolTxSubmitMessages", metrics.DingoProtocolTxSubmitMessages, 1},
-		{"DingoProtocolBlockfetchCount", metrics.DingoProtocolBlockfetchCount, 10},
-		{"DingoProtocolChainsyncCount", metrics.DingoProtocolChainsyncCount, 20},
-		{"DingoBlockfetchGateDispatched", metrics.DingoBlockfetchGateDispatched, 12},
-		{"DingoBlockfetchGateSkippedFast", metrics.DingoBlockfetchGateSkippedFast, 2472},
-		{"DingoBlockfetchGateSkippedPeer", metrics.DingoBlockfetchGateSkippedPeer, 30},
+		{
+			"DingoProtocolBlockfetchMessages",
+			metrics.DingoProtocolBlockfetchMessages,
+			5669,
+		},
+		{
+			"DingoProtocolChainsyncMessages",
+			metrics.DingoProtocolChainsyncMessages,
+			356904,
+		},
+		{
+			"DingoProtocolKeepaliveMessages",
+			metrics.DingoProtocolKeepaliveMessages,
+			6254,
+		},
+		{
+			"DingoProtocolTxSubmitMessages",
+			metrics.DingoProtocolTxSubmitMessages,
+			1,
+		},
+		{
+			"DingoProtocolBlockfetchCount",
+			metrics.DingoProtocolBlockfetchCount,
+			10,
+		},
+		{
+			"DingoProtocolChainsyncCount",
+			metrics.DingoProtocolChainsyncCount,
+			20,
+		},
+		{
+			"DingoBlockfetchGateDispatched",
+			metrics.DingoBlockfetchGateDispatched,
+			12,
+		},
+		{
+			"DingoBlockfetchGateSkippedFast",
+			metrics.DingoBlockfetchGateSkippedFast,
+			2472,
+		},
+		{
+			"DingoBlockfetchGateSkippedPeer",
+			metrics.DingoBlockfetchGateSkippedPeer,
+			30,
+		},
 		{"DingoBlockForgingLatencyN", metrics.DingoBlockForgingLatencyN, 2},
 		{"DingoStakeSnapshotSuccess", metrics.DingoStakeSnapshotSuccess, 2},
 		{"DingoStakeSnapshotFailure", metrics.DingoStakeSnapshotFailure, 1},
-		{"DingoStakeSnapshotLastEpoch", metrics.DingoStakeSnapshotLastEpoch, 1340},
-		{"DingoStakeSnapshotPoolCount", metrics.DingoStakeSnapshotPoolCount, 658},
-		{"DingoStakeSnapshotActiveStake", metrics.DingoStakeSnapshotActiveStake, 1496610126371652},
+		{
+			"DingoStakeSnapshotLastEpoch",
+			metrics.DingoStakeSnapshotLastEpoch,
+			1340,
+		},
+		{
+			"DingoStakeSnapshotPoolCount",
+			metrics.DingoStakeSnapshotPoolCount,
+			658,
+		},
+		{
+			"DingoStakeSnapshotActiveStake",
+			metrics.DingoStakeSnapshotActiveStake,
+			1496610126371652,
+		},
 		{"GoRoutines", metrics.GoRoutines, 452},
 		{"GoThreads", metrics.GoThreads, 22},
 		{"ProcessOpenFDs", metrics.ProcessOpenFDs, 965},
@@ -467,10 +518,16 @@ event_delivery_timeouts_total{topic="tx"} 45
 		)
 	}
 	if metrics.DingoProtocolBlockfetchSum != 0.02 {
-		t.Errorf("DingoProtocolBlockfetchSum = %f, expected 0.02", metrics.DingoProtocolBlockfetchSum)
+		t.Errorf(
+			"DingoProtocolBlockfetchSum = %f, expected 0.02",
+			metrics.DingoProtocolBlockfetchSum,
+		)
 	}
 	if metrics.DingoProtocolChainsyncSum != 0.04 {
-		t.Errorf("DingoProtocolChainsyncSum = %f, expected 0.04", metrics.DingoProtocolChainsyncSum)
+		t.Errorf(
+			"DingoProtocolChainsyncSum = %f, expected 0.04",
+			metrics.DingoProtocolChainsyncSum,
+		)
 	}
 	if metrics.DingoBuildVersion != "v0.57.0 (commit 62809b98)" {
 		t.Errorf("DingoBuildVersion = %q", metrics.DingoBuildVersion)
@@ -491,12 +548,20 @@ func TestHistogramSampleCountPrefersFloatCount(t *testing.T) {
 		SampleCountFloat: &sampleCountFloat,
 	}
 	if got := histogramSampleCount(histogram); got != sampleCountFloat {
-		t.Fatalf("histogramSampleCount() = %f, expected %f", got, sampleCountFloat)
+		t.Fatalf(
+			"histogramSampleCount() = %f, expected %f",
+			got,
+			sampleCountFloat,
+		)
 	}
 
 	histogram.SampleCountFloat = nil
 	if got := histogramSampleCount(histogram); got != float64(sampleCount) {
-		t.Fatalf("histogramSampleCount() fallback = %f, expected %d", got, sampleCount)
+		t.Fatalf(
+			"histogramSampleCount() fallback = %f, expected %d",
+			got,
+			sampleCount,
+		)
 	}
 }
 
@@ -575,20 +640,68 @@ dingo_governance_proposal_decode_failures_total 3
 	}{
 		{"MithrilSyncCompleted", metrics.MithrilSyncCompleted, 0},
 		{"MithrilSyncErrorsTotal", metrics.MithrilSyncErrorsTotal, 1},
-		{"MithrilSyncDownloadBytes", metrics.MithrilSyncDownloadBytes, 1073741824},
-		{"MithrilSyncDownloadTotalBytes", metrics.MithrilSyncDownloadTotalBytes, 2147483648},
-		{"MithrilSyncSnapshotSize", metrics.MithrilSyncSnapshotSize, 2147483648},
+		{
+			"MithrilSyncDownloadBytes",
+			metrics.MithrilSyncDownloadBytes,
+			1073741824,
+		},
+		{
+			"MithrilSyncDownloadTotalBytes",
+			metrics.MithrilSyncDownloadTotalBytes,
+			2147483648,
+		},
+		{
+			"MithrilSyncSnapshotSize",
+			metrics.MithrilSyncSnapshotSize,
+			2147483648,
+		},
 		{"MithrilSyncSnapshotEpoch", metrics.MithrilSyncSnapshotEpoch, 500},
-		{"MithrilSyncSnapshotAncillarySize", metrics.MithrilSyncSnapshotAncillarySize, 482418384},
-		{"MithrilSyncSnapshotImmutableFile", metrics.MithrilSyncSnapshotImmutableFile, 26153},
-		{"MithrilSyncLedgerImportCurrent", metrics.MithrilSyncLedgerImportCurrent, 0},
-		{"MithrilSyncLedgerImportTotal", metrics.MithrilSyncLedgerImportTotal, 0},
-		{"MithrilSyncLedgerStateSlot", metrics.MithrilSyncLedgerStateSlot, 112986212},
-		{"MithrilSyncImmutableBlocksCopied", metrics.MithrilSyncImmutableBlocksCopied, 1234},
-		{"MithrilSyncImmutableCurrentSlot", metrics.MithrilSyncImmutableCurrentSlot, 112985271},
-		{"MithrilSyncImmutableTipSlot", metrics.MithrilSyncImmutableTipSlot, 112985271},
+		{
+			"MithrilSyncSnapshotAncillarySize",
+			metrics.MithrilSyncSnapshotAncillarySize,
+			482418384,
+		},
+		{
+			"MithrilSyncSnapshotImmutableFile",
+			metrics.MithrilSyncSnapshotImmutableFile,
+			26153,
+		},
+		{
+			"MithrilSyncLedgerImportCurrent",
+			metrics.MithrilSyncLedgerImportCurrent,
+			0,
+		},
+		{
+			"MithrilSyncLedgerImportTotal",
+			metrics.MithrilSyncLedgerImportTotal,
+			0,
+		},
+		{
+			"MithrilSyncLedgerStateSlot",
+			metrics.MithrilSyncLedgerStateSlot,
+			112986212,
+		},
+		{
+			"MithrilSyncImmutableBlocksCopied",
+			metrics.MithrilSyncImmutableBlocksCopied,
+			1234,
+		},
+		{
+			"MithrilSyncImmutableCurrentSlot",
+			metrics.MithrilSyncImmutableCurrentSlot,
+			112985271,
+		},
+		{
+			"MithrilSyncImmutableTipSlot",
+			metrics.MithrilSyncImmutableTipSlot,
+			112985271,
+		},
 		{"MithrilSyncGapBlocks", metrics.MithrilSyncGapBlocks, 1200},
-		{"DingoGovernanceDecodeFailures", metrics.DingoGovernanceDecodeFailures, 3},
+		{
+			"DingoGovernanceDecodeFailures",
+			metrics.DingoGovernanceDecodeFailures,
+			3,
+		},
 	}
 	for _, tt := range uintTests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -604,11 +717,27 @@ dingo_governance_proposal_decode_failures_total 3
 		want float64
 	}{
 		{"MithrilSyncStartedAt", metrics.MithrilSyncStartedAt, 1700000000},
-		{"MithrilSyncDownloadPercent", metrics.MithrilSyncDownloadPercent, 45.5},
+		{
+			"MithrilSyncDownloadPercent",
+			metrics.MithrilSyncDownloadPercent,
+			45.5,
+		},
 		{"MithrilSyncDownloadRate", metrics.MithrilSyncDownloadRate, 1048576},
-		{"MithrilSyncLedgerImportPercent", metrics.MithrilSyncLedgerImportPercent, 0},
-		{"MithrilSyncImmutableCopyPerSecond", metrics.MithrilSyncImmutableCopyPerSecond, 56.0},
-		{"MithrilSyncImmutableCopyPercent", metrics.MithrilSyncImmutableCopyPercent, 23.1},
+		{
+			"MithrilSyncLedgerImportPercent",
+			metrics.MithrilSyncLedgerImportPercent,
+			0,
+		},
+		{
+			"MithrilSyncImmutableCopyPerSecond",
+			metrics.MithrilSyncImmutableCopyPerSecond,
+			56.0,
+		},
+		{
+			"MithrilSyncImmutableCopyPercent",
+			metrics.MithrilSyncImmutableCopyPercent,
+			23.1,
+		},
 		{"MithrilPhaseBootstrap", metrics.MithrilPhaseBootstrap, 0},
 		{"MithrilPhaseImmutable", metrics.MithrilPhaseImmutable, 1},
 		{"MithrilPhaseLedger", metrics.MithrilPhaseLedger, 0},
@@ -628,8 +757,22 @@ dingo_governance_proposal_decode_failures_total 3
 		stage string
 		want  MithrilLedgerImportStage
 	}{
-		{"accounts", MithrilLedgerImportStage{Current: 89720, Total: 89720, Percent: 100}},
-		{"utxo", MithrilLedgerImportStage{Current: 12345, Total: 18230, Percent: 67.7}},
+		{
+			"accounts",
+			MithrilLedgerImportStage{
+				Current: 89720,
+				Total:   89720,
+				Percent: 100,
+			},
+		},
+		{
+			"utxo",
+			MithrilLedgerImportStage{
+				Current: 12345,
+				Total:   18230,
+				Percent: 67.7,
+			},
+		},
 	}
 	for _, tt := range stageTests {
 		t.Run("stage "+tt.stage, func(t *testing.T) {
@@ -638,7 +781,12 @@ dingo_governance_proposal_decode_failures_total 3
 				t.Fatalf("missing ledger import stage %q", tt.stage)
 			}
 			if got != tt.want {
-				t.Errorf("ledger import stage %q = %+v, expected %+v", tt.stage, got, tt.want)
+				t.Errorf(
+					"ledger import stage %q = %+v, expected %+v",
+					tt.stage,
+					got,
+					tt.want,
+				)
 			}
 		})
 	}
@@ -880,7 +1028,9 @@ countLoop:
 // refresh cadence instead of continuing to retry quickly. It measures the
 // gap after the first observed call, rather than racing a fixed deadline
 // against that first call, so scheduling variance cannot fail the assertion.
-func TestRunEpochUpdateLoopPreservesRefreshCadenceAfterValidEpoch(t *testing.T) {
+func TestRunEpochUpdateLoopPreservesRefreshCadenceAfterValidEpoch(
+	t *testing.T,
+) {
 	originalCurrentEpoch := currentEpoch
 	defer func() { currentEpoch = originalCurrentEpoch }()
 	currentEpoch = 0
@@ -981,10 +1131,20 @@ cardano_node_metrics_peerSelection_hot 4
 	metrics := decodePromMetrics(t, prom)
 
 	if metrics.ConnIncoming != 10 || metrics.ConnOutgoing != 5 {
-		t.Errorf("Conn = %d/%d, expected 10/5", metrics.ConnIncoming, metrics.ConnOutgoing)
+		t.Errorf(
+			"Conn = %d/%d, expected 10/5",
+			metrics.ConnIncoming,
+			metrics.ConnOutgoing,
+		)
 	}
-	if metrics.PeersCold != 7 || metrics.PeersWarm != 6 || metrics.PeersHot != 4 {
-		t.Errorf("Peers = %d/%d/%d, expected 7/6/4", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
+	if metrics.PeersCold != 7 || metrics.PeersWarm != 6 ||
+		metrics.PeersHot != 4 {
+		t.Errorf(
+			"Peers = %d/%d/%d, expected 7/6/4",
+			metrics.PeersCold,
+			metrics.PeersWarm,
+			metrics.PeersHot,
+		)
 	}
 }
 
@@ -1007,7 +1167,10 @@ cardano_node_metrics_peerSelection_ActivePeers_int 20
 # EOF
 `)
 
-	b, err := prom2jsonWithContentType(prom, "application/openmetrics-text; version=1.0.0; charset=utf-8")
+	b, err := prom2jsonWithContentType(
+		prom,
+		"application/openmetrics-text; version=1.0.0; charset=utf-8",
+	)
 	if err != nil {
 		t.Fatalf("prom2jsonWithContentType() error = %v", err)
 	}
@@ -1017,10 +1180,20 @@ cardano_node_metrics_peerSelection_ActivePeers_int 20
 	}
 
 	if metrics.ConnIncoming != 2 || metrics.ConnOutgoing != 40 {
-		t.Errorf("Conn = %d/%d, expected 2/40", metrics.ConnIncoming, metrics.ConnOutgoing)
+		t.Errorf(
+			"Conn = %d/%d, expected 2/40",
+			metrics.ConnIncoming,
+			metrics.ConnOutgoing,
+		)
 	}
-	if metrics.PeersCold != 120 || metrics.PeersWarm != 10 || metrics.PeersHot != 20 {
-		t.Errorf("Peers = %d/%d/%d, expected 120/10/20", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
+	if metrics.PeersCold != 120 || metrics.PeersWarm != 10 ||
+		metrics.PeersHot != 20 {
+		t.Errorf(
+			"Peers = %d/%d/%d, expected 120/10/20",
+			metrics.PeersCold,
+			metrics.PeersWarm,
+			metrics.PeersHot,
+		)
 	}
 }
 
@@ -1040,11 +1213,23 @@ cardano_node_metrics_peerSelection_ActivePeers 5
 
 	metrics := decodePromMetrics(t, prom)
 
-	if metrics.PeersCold != 30 || metrics.PeersWarm != 2 || metrics.PeersHot != 5 {
-		t.Errorf("Peers = %d/%d/%d, expected 30/2/5", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
+	if metrics.PeersCold != 30 || metrics.PeersWarm != 2 ||
+		metrics.PeersHot != 5 {
+		t.Errorf(
+			"Peers = %d/%d/%d, expected 30/2/5",
+			metrics.PeersCold,
+			metrics.PeersWarm,
+			metrics.PeersHot,
+		)
 	}
-	if metrics.PeersKnown != 40 || metrics.PeersEstablished != 8 || metrics.PeersActive != 5 {
-		t.Errorf("totals = %d/%d/%d, expected 40/8/5", metrics.PeersKnown, metrics.PeersEstablished, metrics.PeersActive)
+	if metrics.PeersKnown != 40 || metrics.PeersEstablished != 8 ||
+		metrics.PeersActive != 5 {
+		t.Errorf(
+			"totals = %d/%d/%d, expected 40/8/5",
+			metrics.PeersKnown,
+			metrics.PeersEstablished,
+			metrics.PeersActive,
+		)
 	}
 }
 
@@ -1071,17 +1256,37 @@ cardano_node_metrics_peerSelection_ActivePeers_int 100
 
 	metrics := decodePromMetrics(t, prom)
 
-	if metrics.ConnUniDir != 1 || metrics.ConnBiDir != 36 || metrics.ConnFullDuplex != 2 {
-		t.Errorf("Conn uni/bi/full = %d/%d/%d, expected 1/36/2", metrics.ConnUniDir, metrics.ConnBiDir, metrics.ConnFullDuplex)
+	if metrics.ConnUniDir != 1 || metrics.ConnBiDir != 36 ||
+		metrics.ConnFullDuplex != 2 {
+		t.Errorf(
+			"Conn uni/bi/full = %d/%d/%d, expected 1/36/2",
+			metrics.ConnUniDir,
+			metrics.ConnBiDir,
+			metrics.ConnFullDuplex,
+		)
 	}
 	if metrics.PeerWarmPromotions != 7 || metrics.PeerWarmDemotions != 4 {
-		t.Errorf("Warm promotions/demotions = %d/%d, expected 7/4", metrics.PeerWarmPromotions, metrics.PeerWarmDemotions)
+		t.Errorf(
+			"Warm promotions/demotions = %d/%d, expected 7/4",
+			metrics.PeerWarmPromotions,
+			metrics.PeerWarmDemotions,
+		)
 	}
 	if metrics.PeerChurnKnownUp != 5 || metrics.PeerChurnKnownDown != 3 {
-		t.Errorf("Churn up/down = %d/%d, expected 5/3", metrics.PeerChurnKnownUp, metrics.PeerChurnKnownDown)
+		t.Errorf(
+			"Churn up/down = %d/%d, expected 5/3",
+			metrics.PeerChurnKnownUp,
+			metrics.PeerChurnKnownDown,
+		)
 	}
-	if metrics.PeersCold != 120 || metrics.PeersWarm != 10 || metrics.PeersHot != 20 {
-		t.Errorf("Peers = %d/%d/%d, expected 120/10/20", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
+	if metrics.PeersCold != 120 || metrics.PeersWarm != 10 ||
+		metrics.PeersHot != 20 {
+		t.Errorf(
+			"Peers = %d/%d/%d, expected 120/10/20",
+			metrics.PeersCold,
+			metrics.PeersWarm,
+			metrics.PeersHot,
+		)
 	}
 }
 
@@ -1114,8 +1319,14 @@ cardano_node_metrics_peerSelection_ActivePeers 5
 
 	metrics := decodePromMetrics(t, prom)
 
-	if metrics.PeersCold != 30 || metrics.PeersWarm != 3 || metrics.PeersHot != 5 {
-		t.Errorf("Peers = %d/%d/%d, expected 30/3/5", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
+	if metrics.PeersCold != 30 || metrics.PeersWarm != 3 ||
+		metrics.PeersHot != 5 {
+		t.Errorf(
+			"Peers = %d/%d/%d, expected 30/3/5",
+			metrics.PeersCold,
+			metrics.PeersWarm,
+			metrics.PeersHot,
+		)
 	}
 }
 
@@ -1130,8 +1341,14 @@ cardano_node_metrics_peerSelection_EstablishedPeers_int 8
 
 	metrics := decodePromMetrics(t, prom)
 
-	if metrics.PeersCold != 0 || metrics.PeersWarm != 0 || metrics.PeersHot != 0 {
-		t.Errorf("Peers = %d/%d/%d, expected 0/0/0", metrics.PeersCold, metrics.PeersWarm, metrics.PeersHot)
+	if metrics.PeersCold != 0 || metrics.PeersWarm != 0 ||
+		metrics.PeersHot != 0 {
+		t.Errorf(
+			"Peers = %d/%d/%d, expected 0/0/0",
+			metrics.PeersCold,
+			metrics.PeersWarm,
+			metrics.PeersHot,
+		)
 	}
 }
 
@@ -1187,11 +1404,25 @@ cardano_node_metrics_Forge_didnt_adopt_int 1
 
 	metrics := decodePromMetrics(t, prom)
 
-	if metrics.ForgingEnabled != 1 || metrics.BlocksForged != 29 || metrics.MissedSlots != 2 {
-		t.Errorf("forging/forged/missed = %d/%d/%d, expected 1/29/2", metrics.ForgingEnabled, metrics.BlocksForged, metrics.MissedSlots)
+	if metrics.ForgingEnabled != 1 || metrics.BlocksForged != 29 ||
+		metrics.MissedSlots != 2 {
+		t.Errorf(
+			"forging/forged/missed = %d/%d/%d, expected 1/29/2",
+			metrics.ForgingEnabled,
+			metrics.BlocksForged,
+			metrics.MissedSlots,
+		)
 	}
-	if metrics.IsLeader != 30 || metrics.AboutToLead != 55 || metrics.Adopted != 30 || metrics.DidntAdopt != 1 {
-		t.Errorf("Forge counters = %d/%d/%d/%d, expected 30/55/30/1", metrics.IsLeader, metrics.AboutToLead, metrics.Adopted, metrics.DidntAdopt)
+	if metrics.IsLeader != 30 || metrics.AboutToLead != 55 ||
+		metrics.Adopted != 30 ||
+		metrics.DidntAdopt != 1 {
+		t.Errorf(
+			"Forge counters = %d/%d/%d/%d, expected 30/55/30/1",
+			metrics.IsLeader,
+			metrics.AboutToLead,
+			metrics.Adopted,
+			metrics.DidntAdopt,
+		)
 	}
 }
 
@@ -1204,7 +1435,10 @@ func TestSetRoleDetectsCardanoNode11BlockProducer(t *testing.T) {
 		role = prevRole
 		promMetrics.Store(prevMetrics)
 	})
-	metrics := decodePromMetrics(t, []byte("cardano_node_metrics_Forge_about_to_lead_counter 55\n"))
+	metrics := decodePromMetrics(
+		t,
+		[]byte("cardano_node_metrics_Forge_about_to_lead_counter 55\n"),
+	)
 	promMetrics.Store(&metrics)
 
 	setRole()
@@ -1281,13 +1515,27 @@ cardano_node_metrics_blockfetchclient_blockdelay_cdfFive 0.999
 
 	metrics := decodePromMetrics(t, prom)
 
-	if metrics.TxProcessed != 1475 || metrics.Forks != 27 || metrics.BlocksServed != 69 || metrics.BlocksLate != 3 {
-		t.Errorf("counters = %d/%d/%d/%d, expected 1475/27/69/3",
-			metrics.TxProcessed, metrics.Forks, metrics.BlocksServed, metrics.BlocksLate)
+	if metrics.TxProcessed != 1475 || metrics.Forks != 27 ||
+		metrics.BlocksServed != 69 ||
+		metrics.BlocksLate != 3 {
+		t.Errorf(
+			"counters = %d/%d/%d/%d, expected 1475/27/69/3",
+			metrics.TxProcessed,
+			metrics.Forks,
+			metrics.BlocksServed,
+			metrics.BlocksLate,
+		)
 	}
-	if metrics.BlockDelay != 0.5 || metrics.BlocksW1s != 0.99 || metrics.BlocksW3s != 0.995 || metrics.BlocksW5s != 0.999 {
-		t.Errorf("delays = %v/%v/%v/%v, expected 0.5/0.99/0.995/0.999",
-			metrics.BlockDelay, metrics.BlocksW1s, metrics.BlocksW3s, metrics.BlocksW5s)
+	if metrics.BlockDelay != 0.5 || metrics.BlocksW1s != 0.99 ||
+		metrics.BlocksW3s != 0.995 ||
+		metrics.BlocksW5s != 0.999 {
+		t.Errorf(
+			"delays = %v/%v/%v/%v, expected 0.5/0.99/0.995/0.999",
+			metrics.BlockDelay,
+			metrics.BlocksW1s,
+			metrics.BlocksW3s,
+			metrics.BlocksW5s,
+		)
 	}
 }
 
@@ -1307,7 +1555,10 @@ cardano_node_metrics_blockfetchclient_blockdelay_real 0.25
 # EOF
 `)
 
-	b, err := prom2jsonWithContentType(prom, "application/openmetrics-text; version=1.0.0; charset=utf-8")
+	b, err := prom2jsonWithContentType(
+		prom,
+		"application/openmetrics-text; version=1.0.0; charset=utf-8",
+	)
 	if err != nil {
 		t.Fatalf("prom2jsonWithContentType() error = %v", err)
 	}
@@ -1316,9 +1567,16 @@ cardano_node_metrics_blockfetchclient_blockdelay_real 0.25
 		t.Fatalf("json.Unmarshal() error = %v", err)
 	}
 
-	if metrics.TxProcessed != 1475 || metrics.Forks != 27 || metrics.BlocksServed != 69 || metrics.BlocksLate != 3 {
-		t.Errorf("counters = %d/%d/%d/%d, expected 1475/27/69/3",
-			metrics.TxProcessed, metrics.Forks, metrics.BlocksServed, metrics.BlocksLate)
+	if metrics.TxProcessed != 1475 || metrics.Forks != 27 ||
+		metrics.BlocksServed != 69 ||
+		metrics.BlocksLate != 3 {
+		t.Errorf(
+			"counters = %d/%d/%d/%d, expected 1475/27/69/3",
+			metrics.TxProcessed,
+			metrics.Forks,
+			metrics.BlocksServed,
+			metrics.BlocksLate,
+		)
 	}
 	if metrics.BlockDelay != 0.25 {
 		t.Errorf("BlockDelay = %v, expected 0.25", metrics.BlockDelay)
@@ -1339,19 +1597,31 @@ dingo_ledger_last_block_added_timestamp_seconds{network="preview"} 1.79314029040
 	metrics := decodePromMetrics(t, prom)
 
 	if metrics.DingoPipelineHalted != 1 {
-		t.Errorf("DingoPipelineHalted = %d, expected 1", metrics.DingoPipelineHalted)
+		t.Errorf(
+			"DingoPipelineHalted = %d, expected 1",
+			metrics.DingoPipelineHalted,
+		)
 	}
 	if metrics.DingoPipelineStuck != 1 {
-		t.Errorf("DingoPipelineStuck = %d, expected 1", metrics.DingoPipelineStuck)
+		t.Errorf(
+			"DingoPipelineStuck = %d, expected 1",
+			metrics.DingoPipelineStuck,
+		)
 	}
 	if !metrics.DingoPipelinePresent {
 		t.Error("DingoPipelinePresent = false, expected true")
 	}
 	if metrics.DingoPipelineRestarts != 3 {
-		t.Errorf("DingoPipelineRestarts = %d, expected 3", metrics.DingoPipelineRestarts)
+		t.Errorf(
+			"DingoPipelineRestarts = %d, expected 3",
+			metrics.DingoPipelineRestarts,
+		)
 	}
 	if metrics.DingoLastBlockAdded != 1.7931402904092171e+09 {
-		t.Errorf("DingoLastBlockAdded = %v, expected 1.7931402904092171e+09", metrics.DingoLastBlockAdded)
+		t.Errorf(
+			"DingoLastBlockAdded = %v, expected 1.7931402904092171e+09",
+			metrics.DingoLastBlockAdded,
+		)
 	}
 }
 
@@ -1431,7 +1701,10 @@ dingo_mithril_sync_backfill_percent{network="preview"} 50
 		}
 	}
 	if m.MithrilBackfillBlocksPerSecond != 12.5 {
-		t.Errorf("backfill rate = %v, expected 12.5", m.MithrilBackfillBlocksPerSecond)
+		t.Errorf(
+			"backfill rate = %v, expected 12.5",
+			m.MithrilBackfillBlocksPerSecond,
+		)
 	}
 	if m.MithrilBackfillPercent != 50 {
 		t.Errorf("backfill percent = %v, expected 50", m.MithrilBackfillPercent)

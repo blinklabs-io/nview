@@ -68,7 +68,9 @@ func TestParseNodeVersionOutput(t *testing.T) {
 			)
 			if tt.wantErr {
 				if err == nil {
-					t.Fatal("parseNodeVersionOutput() error = nil, expected error")
+					t.Fatal(
+						"parseNodeVersionOutput() error = nil, expected error",
+					)
 				}
 				return
 			}
@@ -141,6 +143,10 @@ EOF
 		t.Fatalf("getNodeVersion() retry failed: %v", err)
 	}
 	if version != "10.1.0" || revision != "abcdef12" {
-		t.Fatalf("getNodeVersion() = %q, %q; expected 10.1.0, abcdef12", version, revision)
+		t.Fatalf(
+			"getNodeVersion() = %q, %q; expected 10.1.0, abcdef12",
+			version,
+			revision,
+		)
 	}
 }

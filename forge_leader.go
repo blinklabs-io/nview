@@ -200,13 +200,25 @@ func dingoConsoleForgeLeaderBandAt(
 		equivocationSeverity = uiSeverityMuted
 	}
 
-	credentialsCell := dingoMetricStyled("Credentials", credentials, credentialsSeverity)
+	credentialsCell := dingoMetricStyled(
+		"Credentials",
+		credentials,
+		credentialsSeverity,
+	)
 	opCertCell := dingoMetricStyled("OpCert", opCert, opCertSeverity)
-	kesExpiryCell := dingoMetricStyledWide("KES Expiry", kesExpiry, kesExpirySeverity)
+	kesExpiryCell := dingoMetricStyledWide(
+		"KES Expiry",
+		kesExpiry,
+		kesExpirySeverity,
+	)
 	kesAgentCell := dingoMetricStyled("KES Agent", kesAgent, kesAgentSeverity)
 	kesSuccessCell := dingoMetric(
 		"KES OK",
-		dingoCounterDisplay(metrics, dingoCounterKESSuccess, metrics.DingoKESAgentSignSuccess),
+		dingoCounterDisplay(
+			metrics,
+			dingoCounterKESSuccess,
+			metrics.DingoKESAgentSignSuccess,
+		),
 	)
 	kesFailureSeverity := dingoTrackedCounterSeverity(
 		metrics,
@@ -215,16 +227,28 @@ func dingoConsoleForgeLeaderBandAt(
 	)
 	kesFailureCell := dingoMetricStyled(
 		"KES Fail",
-		dingoCounterDisplay(metrics, dingoCounterKESFailure, metrics.DingoKESAgentSignFailure),
+		dingoCounterDisplay(
+			metrics,
+			dingoCounterKESFailure,
+			metrics.DingoKESAgentSignFailure,
+		),
 		kesFailureSeverity,
 	)
 	wonCell := dingoMetric(
 		"Won",
-		dingoCounterDisplay(metrics, dingoCounterLeaderWon, metrics.DingoLeaderWon),
+		dingoCounterDisplay(
+			metrics,
+			dingoCounterLeaderWon,
+			metrics.DingoLeaderWon,
+		),
 	)
 	notWonTotalCell := dingoMetric(
 		"Not Won",
-		dingoCounterDisplay(metrics, dingoCounterLeaderLost, metrics.DingoLeaderNotWon),
+		dingoCounterDisplay(
+			metrics,
+			dingoCounterLeaderLost,
+			metrics.DingoLeaderNotWon,
+		),
 	)
 	missedSeverity := dingoTrackedCounterSeverity(
 		metrics,
@@ -233,7 +257,11 @@ func dingoConsoleForgeLeaderBandAt(
 	)
 	missedCell := dingoMetricStyled(
 		"Missed",
-		dingoCounterDisplay(metrics, dingoCounterMissed, metrics.DingoMissedLeaderSlots),
+		dingoCounterDisplay(
+			metrics,
+			dingoCounterMissed,
+			metrics.DingoMissedLeaderSlots,
+		),
 		missedSeverity,
 	)
 	battlesSeverity := dingoTrackedCounterSeverity(
@@ -243,15 +271,31 @@ func dingoConsoleForgeLeaderBandAt(
 	)
 	battlesCell := dingoMetricStyled(
 		"Battles",
-		dingoCounterDisplay(metrics, dingoCounterBattles, metrics.DingoSlotBattles),
+		dingoCounterDisplay(
+			metrics,
+			dingoCounterBattles,
+			metrics.DingoSlotBattles,
+		),
 		battlesSeverity,
 	)
-	missRatioCell := dingoMetricStyled("Miss Ratio", missRatio, missRatioSeverity)
-	lastEpochCell := dingoMetricStyled("Last Epoch", lastEpoch, lastEpochSeverity)
+	missRatioCell := dingoMetricStyled(
+		"Miss Ratio",
+		missRatio,
+		missRatioSeverity,
+	)
+	lastEpochCell := dingoMetricStyled(
+		"Last Epoch",
+		lastEpoch,
+		lastEpochSeverity,
+	)
 	scheduleCell := dingoMetric("Schedule", dingoLastEpochSchedule(metrics))
 	equivocationCell := dingoMetricStyled(
 		"Own Equiv",
-		dingoCounterDisplay(metrics, dingoCounterOwnEquiv, metrics.DingoOwnEquivocations),
+		dingoCounterDisplay(
+			metrics,
+			dingoCounterOwnEquiv,
+			metrics.DingoOwnEquivocations,
+		),
 		equivocationSeverity,
 	)
 	notWonCell := dingoMetric("Ep. Not Won", dingoLastEpochNotWon(metrics))
@@ -391,7 +435,10 @@ func dingoKESExpiryStatus(metrics *PromMetrics) (string, uiSeverity) {
 		return uiMuted("n/a"), uiSeverityMuted
 	}
 	if metrics.RemainingKesPeriods > math.MaxUint64/metrics.DingoForgeSlotsPerKESPeriod {
-		return uiSeverityValue("invalid", uiSeverityCritical), uiSeverityCritical
+		return uiSeverityValue(
+			"invalid",
+			uiSeverityCritical,
+		), uiSeverityCritical
 	}
 	slots := metrics.RemainingKesPeriods * metrics.DingoForgeSlotsPerKESPeriod
 	slotLength := config.GetConfig().Node.ShelleyGenesis.SlotLength
@@ -420,10 +467,17 @@ func dingoKESAgentStatus(metrics *PromMetrics) (string, uiSeverity) {
 	if metrics.DingoKESAgentConnected == 1 {
 		return uiSeverityValue("connected", uiSeverityOK), uiSeverityOK
 	}
-	return uiSeverityValue("disconnected", uiSeverityCritical), uiSeverityCritical
+	return uiSeverityValue(
+		"disconnected",
+		uiSeverityCritical,
+	), uiSeverityCritical
 }
 
-func dingoCounterDisplay(metrics *PromMetrics, key string, total uint64) string {
+func dingoCounterDisplay(
+	metrics *PromMetrics,
+	key string,
+	total uint64,
+) string {
 	metricName, ok := dingoCounterMetricNames[key]
 	if !ok || !metrics.PromMetricPresent[metricName] {
 		return uiMuted("n/a")
@@ -431,13 +485,19 @@ func dingoCounterDisplay(metrics *PromMetrics, key string, total uint64) string 
 	value := uiValue(strconv.FormatUint(total, 10))
 	if metrics.DingoCounterWindow.Available[key] {
 		value += uiUnit(" (+") +
-			uiValue(strconv.FormatUint(metrics.DingoCounterWindow.Deltas[key], 10)) +
+			uiValue(
+				strconv.FormatUint(metrics.DingoCounterWindow.Deltas[key], 10),
+			) +
 			uiUnit(")")
 	}
 	return value
 }
 
-func dingoTrackedCounterSeverity(metrics *PromMetrics, key string, value uint64) uiSeverity {
+func dingoTrackedCounterSeverity(
+	metrics *PromMetrics,
+	key string,
+	value uint64,
+) uiSeverity {
 	metricName, ok := dingoCounterMetricNames[key]
 	if !ok || !metrics.PromMetricPresent[metricName] {
 		return uiSeverityMuted

@@ -17,11 +17,16 @@ import (
 // behind an OpenTelemetry Collector, which answers in text format.
 func decodeAmaruFixture(t *testing.T) *PromMetrics {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join("testdata", "amaru-10.11.0-relay.prom.txt"))
+	b, err := os.ReadFile(
+		filepath.Join("testdata", "amaru-10.11.0-relay.prom.txt"),
+	)
 	if err != nil {
 		t.Fatalf("ReadFile() error = %v", err)
 	}
-	out, err := prom2jsonWithContentType(b, string(expfmt.NewFormat(expfmt.TypeTextPlain)))
+	out, err := prom2jsonWithContentType(
+		b,
+		string(expfmt.NewFormat(expfmt.TypeTextPlain)),
+	)
 	if err != nil {
 		t.Fatalf("prom2jsonWithContentType() error = %v", err)
 	}
@@ -65,10 +70,17 @@ func TestPromMetricsRecordedAmaruRelay(t *testing.T) {
 		}
 	}
 	if m.AmaruProcessCPU < 0.41 || m.AmaruProcessCPU > 0.42 {
-		t.Errorf("AmaruProcessCPU = %v, expected about 0.415", m.AmaruProcessCPU)
+		t.Errorf(
+			"AmaruProcessCPU = %v, expected about 0.415",
+			m.AmaruProcessCPU,
+		)
 	}
 	if m.AmaruBuildVersion != "10.11.0" || m.AmaruBuildRevision != "d182f86" {
-		t.Errorf("build = %q @ %q, expected 10.11.0 @ d182f86", m.AmaruBuildVersion, m.AmaruBuildRevision)
+		t.Errorf(
+			"build = %q @ %q, expected 10.11.0 @ d182f86",
+			m.AmaruBuildVersion,
+			m.AmaruBuildRevision,
+		)
 	}
 }
 
@@ -114,7 +126,11 @@ func TestDetectNodeTypeRecognisesAmaru(t *testing.T) {
 
 	detectNodeType(&PromMetrics{})
 	if got := getEffectiveNodeBinary(); got != CARDANO_BINARY {
-		t.Fatalf("binary for an empty scrape = %q, expected %q", got, CARDANO_BINARY)
+		t.Fatalf(
+			"binary for an empty scrape = %q, expected %q",
+			got,
+			CARDANO_BINARY,
+		)
 	}
 
 	config.GetConfig().Node.Binary = DINGO_BINARY
@@ -132,7 +148,11 @@ func TestAmaruShowsVersionUptimeAndResourcesFromScrape(t *testing.T) {
 
 	version, revision := currentNodeVersionInfo()
 	if version != "10.11.0" || revision != "d182f86" {
-		t.Errorf("version = %q @ %q, expected 10.11.0 @ d182f86", version, revision)
+		t.Errorf(
+			"version = %q @ %q, expected 10.11.0 @ d182f86",
+			version,
+			revision,
+		)
 	}
 
 	text := getResourceText(context.Background())
@@ -160,10 +180,17 @@ func TestAmaruWithoutLocalProcessIsNotAFailure(t *testing.T) {
 		failures := subsystemFailures[healthSubsystemProcess].Load()
 		failed := failures > 0
 		if binary == AMARU_BINARY && failed {
-			t.Errorf("%s: %d failures recorded, expected none", binary, failures)
+			t.Errorf(
+				"%s: %d failures recorded, expected none",
+				binary,
+				failures,
+			)
 		}
 		if binary == CARDANO_BINARY && !failed {
-			t.Errorf("%s: a missing node process must still count as a failure", binary)
+			t.Errorf(
+				"%s: a missing node process must still count as a failure",
+				binary,
+			)
 		}
 	}
 
@@ -173,7 +200,9 @@ func TestAmaruWithoutLocalProcessIsNotAFailure(t *testing.T) {
 	}
 	detectedNodeBinary.Store(CARDANO_BINARY)
 	if err := filterPeers(context.Background()); err == nil {
-		t.Error("filterPeers() without a process must still fail for cardano-node")
+		t.Error(
+			"filterPeers() without a process must still fail for cardano-node",
+		)
 	}
 }
 
@@ -200,7 +229,9 @@ func TestAmaruIntakeShowsHeaderAndMempoolOutcomes(t *testing.T) {
 	}
 
 	// A scrape without the series must not read as zero.
-	bare := &PromMetrics{DingoPresentMetrics: map[string]bool{"process_runtime": true}}
+	bare := &PromMetrics{
+		DingoPresentMetrics: map[string]bool{"process_runtime": true},
+	}
 	promMetrics.Store(bare)
 	text = amaruIntakeText(bare)
 	if strings.Count(text, "n/a") < 4 {
@@ -224,25 +255,47 @@ func TestAmaruWithoutNetworkSeriesReadsNotAvailable(t *testing.T) {
 	detectNodeType(m)
 	text := getConnectionText(context.Background())
 	if strings.Count(text, "n/a") != 8 {
-		t.Errorf("all eight connection and peer rows should read n/a:\n%s", text)
+		t.Errorf(
+			"all eight connection and peer rows should read n/a:\n%s",
+			text,
+		)
 	}
 
-	exported := &PromMetrics{ConnIncoming: 3, ConnectionsExported: true, PeerSelectionExported: true}
+	exported := &PromMetrics{
+		ConnIncoming:          3,
+		ConnectionsExported:   true,
+		PeerSelectionExported: true,
+	}
 	promMetrics.Store(exported)
 	text = getConnectionText(context.Background())
-	if !strings.Contains(text, "Incoming") || !strings.Contains(text, "3") || strings.Contains(text, "n/a") {
+	if !strings.Contains(text, "Incoming") || !strings.Contains(text, "3") ||
+		strings.Contains(text, "n/a") {
 		t.Errorf("exported counts should be shown:\n%s", text)
 	}
 }
 
 func TestPromMetricsNetworkExportedFollowsSeries(t *testing.T) {
-	m := decodePromMetrics(t, []byte("cardano_node_metrics_connectionManager_inboundConns_int 2\n"))
+	m := decodePromMetrics(
+		t,
+		[]byte("cardano_node_metrics_connectionManager_inboundConns_int 2\n"),
+	)
 	if !m.ConnectionsExported || m.PeerSelectionExported {
-		t.Errorf("connection series: connections=%v peers=%v, expected true/false", m.ConnectionsExported, m.PeerSelectionExported)
+		t.Errorf(
+			"connection series: connections=%v peers=%v, expected true/false",
+			m.ConnectionsExported,
+			m.PeerSelectionExported,
+		)
 	}
-	m = decodePromMetrics(t, []byte("cardano_node_metrics_peerSelection_KnownPeers_int 9\n"))
+	m = decodePromMetrics(
+		t,
+		[]byte("cardano_node_metrics_peerSelection_KnownPeers_int 9\n"),
+	)
 	if m.ConnectionsExported || !m.PeerSelectionExported {
-		t.Errorf("peer series: connections=%v peers=%v, expected false/true", m.ConnectionsExported, m.PeerSelectionExported)
+		t.Errorf(
+			"peer series: connections=%v peers=%v, expected false/true",
+			m.ConnectionsExported,
+			m.PeerSelectionExported,
+		)
 	}
 	m = decodePromMetrics(t, []byte("cardano_node_metrics_slotNum_int 5\n"))
 	if m.ConnectionsExported || m.PeerSelectionExported {
@@ -262,7 +315,10 @@ func TestDisplayEpochUsesTheScrapeBeingDrawn(t *testing.T) {
 	}
 	currentEpoch = 12
 	if got := displayEpoch(&PromMetrics{}); got != 12 {
-		t.Errorf("displayEpoch() = %d without an epoch in the scrape, expected the cached 12", got)
+		t.Errorf(
+			"displayEpoch() = %d without an epoch in the scrape, expected the cached 12",
+			got,
+		)
 	}
 	if got := displayEpoch(nil); got != 12 {
 		t.Errorf("displayEpoch(nil) = %d, expected the cached 12", got)
@@ -271,7 +327,8 @@ func TestDisplayEpochUsesTheScrapeBeingDrawn(t *testing.T) {
 
 func TestAmaruLatencyShowsAverageAndRecent(t *testing.T) {
 	m := decodeAmaruFixture(t)
-	if m.AmaruBlockFetchSum != 128088283 || m.AmaruSlotToHeaderSum != 128388335 {
+	if m.AmaruBlockFetchSum != 128088283 ||
+		m.AmaruSlotToHeaderSum != 128388335 {
 		t.Fatalf("sums = %v, %v", m.AmaruBlockFetchSum, m.AmaruSlotToHeaderSum)
 	}
 
@@ -297,8 +354,13 @@ func TestAmaruLatencyShowsAverageAndRecent(t *testing.T) {
 		t.Errorf("latency text missing the recent 1.00s:\n%s", text)
 	}
 
-	if avg, ok := amaruLatencyRows(m, nil)[0].average(); !ok || avg != 128088283.0/649.0 {
-		t.Errorf("average fetch = %v, %v, expected the sum over the count", avg, ok)
+	if avg, ok := amaruLatencyRows(m, nil)[0].average(); !ok ||
+		avg != 128088283.0/649.0 {
+		t.Errorf(
+			"average fetch = %v, %v, expected the sum over the count",
+			avg,
+			ok,
+		)
 	}
 
 	// No new samples, or counters that went backwards after a restart.
@@ -327,14 +389,23 @@ func TestAmaruLatencyWithoutSamplesReadsNotAvailable(t *testing.T) {
 }
 
 func TestPromMetricsAmaruLatencySumsOutcomes(t *testing.T) {
-	m := decodePromMetrics(t, []byte(`# TYPE amaru_consensus_block_fetch_duration_microseconds histogram
+	m := decodePromMetrics(
+		t,
+		[]byte(
+			`# TYPE amaru_consensus_block_fetch_duration_microseconds histogram
 amaru_consensus_block_fetch_duration_microseconds_sum{outcome="valid"} 100
 amaru_consensus_block_fetch_duration_microseconds_count{outcome="valid"} 4
 amaru_consensus_block_fetch_duration_microseconds_sum{outcome="invalid"} 50
 amaru_consensus_block_fetch_duration_microseconds_count{outcome="invalid"} 1
-`))
+`,
+		),
+	)
 	if m.AmaruBlockFetchSum != 150 || m.AmaruBlockFetchCount != 5 {
-		t.Errorf("fetch = %v over %d, expected 150 over 5", m.AmaruBlockFetchSum, m.AmaruBlockFetchCount)
+		t.Errorf(
+			"fetch = %v over %d, expected 150 over 5",
+			m.AmaruBlockFetchSum,
+			m.AmaruBlockFetchCount,
+		)
 	}
 }
 
@@ -346,7 +417,9 @@ func TestAmaruFocusPaneShowsLatency(t *testing.T) {
 	cfg := config.GetConfig()
 	originalSlotLength := cfg.Node.ShelleyGenesis.SlotLength
 	cfg.Node.ShelleyGenesis.SlotLength = 1000
-	t.Cleanup(func() { cfg.Node.ShelleyGenesis.SlotLength = originalSlotLength })
+	t.Cleanup(
+		func() { cfg.Node.ShelleyGenesis.SlotLength = originalSlotLength },
+	)
 
 	first := decodeAmaruFixture(t)
 	second := *first
@@ -377,16 +450,26 @@ func TestAmaruPartialNetworkSeriesAreJudgedSeparately(t *testing.T) {
 	promMetrics.Store(&PromMetrics{ConnIncoming: 7, ConnectionsExported: true})
 	text := getConnectionText(context.Background())
 	if !strings.Contains(text, "7") || strings.Count(text, "n/a") != 3 {
-		t.Errorf("connections only: expected counts for connections and n/a for Cold, Warm and Hot:\n%s", text)
+		t.Errorf(
+			"connections only: expected counts for connections and n/a for Cold, Warm and Hot:\n%s",
+			text,
+		)
 	}
-	if peers := getPeerText(context.Background()); !strings.Contains(peers, "Peers") || !strings.Contains(peers, "n/a") {
+	if peers := getPeerText(context.Background()); !strings.Contains(
+		peers,
+		"Peers",
+	) ||
+		!strings.Contains(peers, "n/a") {
 		t.Errorf("connections only: peer selection should read n/a:\n%s", peers)
 	}
 
 	promMetrics.Store(&PromMetrics{PeersHot: 5, PeerSelectionExported: true})
 	text = getConnectionText(context.Background())
 	if strings.Count(text, "n/a") != 5 {
-		t.Errorf("peers only: expected n/a for the five connection rows:\n%s", text)
+		t.Errorf(
+			"peers only: expected n/a for the five connection rows:\n%s",
+			text,
+		)
 	}
 }
 
@@ -408,7 +491,10 @@ func TestAmaruResourcesReadNotAvailablePerSeries(t *testing.T) {
 		t.Errorf("exported RSS missing:\n%s", text)
 	}
 	if strings.Count(text, "n/a") != 4 {
-		t.Errorf("CPU, footprint and both host memory values should read n/a:\n%s", text)
+		t.Errorf(
+			"CPU, footprint and both host memory values should read n/a:\n%s",
+			text,
+		)
 	}
 }
 

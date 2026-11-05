@@ -263,12 +263,24 @@ func uiSectionSeverity(title string, severity uiSeverity) string {
 	if severity == uiSeverityMuted {
 		color = uiColorMuted
 	}
-	return fmt.Sprintf(" [%s]%s %s[%s]\n", color, glyphs.Section, tview.Escape(title), uiColorValue)
+	return fmt.Sprintf(
+		" [%s]%s %s[%s]\n",
+		color,
+		glyphs.Section,
+		tview.Escape(title),
+		uiColorValue,
+	)
 }
 
 func uiInlineSection(title string) string {
 	glyphs := uiGlyphs()
-	return fmt.Sprintf("[%s]%s %s[%s]", uiColorAccent, glyphs.Section, tview.Escape(title), uiColorValue)
+	return fmt.Sprintf(
+		"[%s]%s %s[%s]",
+		uiColorAccent,
+		glyphs.Section,
+		tview.Escape(title),
+		uiColorValue,
+	)
 }
 
 func uiStatusGlyph(severity uiSeverity) string {
@@ -331,7 +343,11 @@ func uiKV(label, value string) string {
 	return fmt.Sprintf("%s %s", uiLabel(label), value)
 }
 
-func uiKVStyledAligned(labelWidth int, label, value string, labelSeverity uiSeverity) string {
+func uiKVStyledAligned(
+	labelWidth int,
+	label, value string,
+	labelSeverity uiSeverity,
+) string {
 	if labelWidth < len(label) {
 		labelWidth = len(label)
 	}
@@ -346,7 +362,11 @@ func uiKVAligned(labelWidth int, label, value string) string {
 	return uiKVStyledAligned(labelWidth, label, value, uiSeverityNeutral)
 }
 
-func uiKVSeverityAligned(labelWidth int, label, value string, severity uiSeverity) string {
+func uiKVSeverityAligned(
+	labelWidth int,
+	label, value string,
+	severity uiSeverity,
+) string {
 	return uiKVStyledAligned(
 		labelWidth,
 		label,
@@ -376,7 +396,12 @@ func uiKey(key, label string) string {
 	)
 }
 
-func uiPercentBar(label string, percent float64, severity uiSeverity, width int) string {
+func uiPercentBar(
+	label string,
+	percent float64,
+	severity uiSeverity,
+	width int,
+) string {
 	return fmt.Sprintf(
 		"%s %s %s",
 		uiLabel(label),
@@ -437,7 +462,11 @@ func uiSegmentBar(segments []uiSegment, width int) string {
 	return sb.String()
 }
 
-func uiSparkline(values []float64, maxValue float64, severity uiSeverity) string {
+func uiSparkline(
+	values []float64,
+	maxValue float64,
+	severity uiSeverity,
+) string {
 	if len(values) == 0 {
 		return ""
 	}
