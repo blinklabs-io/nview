@@ -1272,9 +1272,8 @@ func terminalSizeWithFallback(defaultWidth int) (int, int) {
 	if fd > math.MaxInt {
 		return defaultWidth, DashboardHeightDefault
 	}
-	cols, rows, err := terminal.GetSize(
-		int(fd),
-	) //nolint:gosec // fd validated above
+	fdInt := int(fd) //nolint:gosec // fd validated above
+	cols, rows, err := terminal.GetSize(fdInt)
 	if err != nil || cols <= 0 || rows <= 0 {
 		return defaultWidth, DashboardHeightDefault
 	}
@@ -5550,10 +5549,8 @@ func unixTimeFromUint64(seconds uint64) (time.Time, bool) {
 	if seconds > maxUnixSeconds {
 		return time.Time{}, false
 	}
-	return time.Unix(
-		int64(seconds),
-		0,
-	), true //nolint:gosec // bounds checked above
+	secs := int64(seconds) //nolint:gosec // bounds checked above
+	return time.Unix(secs, 0), true
 }
 
 func getEpochRemainingSeconds(metrics *PromMetrics) (uint64, bool) {
@@ -5951,9 +5948,8 @@ func getBlockText(ctx context.Context) string {
 	if fd > math.MaxInt {
 		return "ERROR: invalid file descriptor"
 	}
-	tcols, tlines, err := terminal.GetSize(
-		int(fd),
-	) //nolint:gosec // fd validated above
+	fdInt := int(fd) //nolint:gosec // fd validated above
+	tcols, tlines, err := terminal.GetSize(fdInt)
 	if err != nil {
 		return fmt.Sprintf("ERROR: %v", err)
 	}
