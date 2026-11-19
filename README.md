@@ -11,7 +11,8 @@ running nodes. The TUI (terminal user interface) is built to fit most screens
 and provides real-time metrics and status information.
 
 <div align="center">
-    <img src="./nview-20240208.png" alt="nview screenshot" width="640">
+    <img src="./nview-cardano-node-20261119.png" alt="nview monitoring a cardano-node block producer" width="640">
+    <img src="./nview-dingo-20261119.png" alt="nview monitoring a Dingo node" width="640">
 </div>
 
 ## Design and functionality
