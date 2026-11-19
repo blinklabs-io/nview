@@ -330,6 +330,9 @@ type PromMetrics struct {
 	PeerSelectionExported bool               `json:"peer_selection_metrics_present"`
 	CollectedAt           time.Time          `json:"-"`
 	DingoCounterWindow    DingoCounterWindow `json:"-"`
+	History               *MetricHistory     `json:"-"`
+	MetricSeries          []PromMetricSeries `json:"metric_series"`
+	MetricSeriesTruncated bool               `json:"metric_series_truncated"`
 
 	// DingoPresentMetrics records which optional Dingo series the scrape
 	// carried, so a series a node does not export is not read as a zero.
@@ -371,6 +374,8 @@ func getPromMetrics(ctx context.Context) (*PromMetrics, error) {
 		return &metrics, fmt.Errorf("failed JSON unmarshal: %w", err)
 	}
 	metrics.CollectedAt = time.Now()
+	globalPromMetricHistory.Observe(metrics.CollectedAt, &metrics)
+	metrics.History = globalPromMetricHistory
 	globalDingoForgeCounterHistory.Apply(&metrics, metrics.CollectedAt)
 
 	// Detect node type based on metrics
@@ -470,6 +475,7 @@ func prometheusText2json(prom []byte) ([]byte, error) {
 					name,
 					m.GetCounter().GetValue(),
 					m.GetLabel(),
+					PromMetricCounter,
 				)
 			case dto.MetricType_GAUGE:
 				setPromMetricValueWithLabels(
@@ -477,6 +483,7 @@ func prometheusText2json(prom []byte) ([]byte, error) {
 					name,
 					m.GetGauge().GetValue(),
 					m.GetLabel(),
+					PromMetricGauge,
 				)
 			case dto.MetricType_UNTYPED:
 				setPromMetricValueWithLabels(
@@ -484,9 +491,17 @@ func prometheusText2json(prom []byte) ([]byte, error) {
 					name,
 					m.GetUntyped().GetValue(),
 					m.GetLabel(),
+					promMetricSeriesKind(name, nil),
 				)
 			case dto.MetricType_SUMMARY:
 				// Extract count from SUMMARY metrics (e.g. go_gc_duration_seconds_count)
+				recordPromMetricSeries(
+					out,
+					name+"_count",
+					float64(m.GetSummary().GetSampleCount()),
+					m.GetLabel(),
+					PromMetricCounter,
+				)
 				setPromMetricValue(
 					out,
 					name+"_count",
@@ -494,12 +509,17 @@ func prometheusText2json(prom []byte) ([]byte, error) {
 				)
 			case dto.MetricType_HISTOGRAM,
 				dto.MetricType_GAUGE_HISTOGRAM:
+				kind := PromMetricCounter
+				if val.GetType() == dto.MetricType_GAUGE_HISTOGRAM {
+					kind = PromMetricGauge
+				}
 				setPromHistogramValueWithLabels(
 					out,
 					name,
 					histogramSampleCount(m.GetHistogram()),
 					m.GetHistogram().GetSampleSum(),
 					m.GetLabel(),
+					kind,
 				)
 			default:
 				// Skip unknown types
@@ -688,6 +708,7 @@ func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
 		return nil, errors.New("unsupported OpenMetrics format")
 	}
 	out := make(map[string]any)
+	metricTypes := make(map[string]PromMetricKind)
 	var parsedLabels labels.Labels
 	for {
 		entry, err := parser.Next()
@@ -696,6 +717,11 @@ func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
 		}
 		if err != nil {
 			return nil, err
+		}
+		if entry == textparse.EntryType {
+			name, metricType := parser.Type()
+			metricTypes[string(name)] = promMetricKindFromModel(metricType)
+			continue
 		}
 		if entry != textparse.EntrySeries {
 			continue
@@ -714,7 +740,13 @@ func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
 				&dto.LabelPair{Name: &name, Value: &labelValue},
 			)
 		})
-		setPromMetricValueWithLabels(out, name, value, metricLabels)
+		setPromMetricValueWithLabels(
+			out,
+			name,
+			value,
+			metricLabels,
+			promMetricSeriesKind(name, metricTypes),
+		)
 	}
 	applyPromMetricAliases(out)
 	return json.MarshalIndent(out, "", "    ")
@@ -734,10 +766,12 @@ func setPromMetricValueWithLabels(
 	name string,
 	value float64,
 	labels []*dto.LabelPair,
+	kind PromMetricKind,
 ) {
 	if math.IsNaN(value) || math.IsInf(value, 0) {
 		return
 	}
+	recordPromMetricSeries(out, name, value, labels, kind)
 	if network := strings.TrimSpace(labelValue(labels, "network")); network != "" {
 		if existing, ok := out["network"].(string); !ok || existing == "" {
 			out["network"] = network
@@ -875,7 +909,10 @@ func setPromHistogramValueWithLabels(
 	count float64,
 	sum float64,
 	labels []*dto.LabelPair,
+	kind PromMetricKind,
 ) {
+	recordPromMetricSeries(out, name+"_count", count, labels, kind)
+	recordPromMetricSeries(out, name+"_sum", sum, labels, kind)
 	if isLeiosPromMetric(name) {
 		setNamedMetricValue(out, "leios_metrics", name+"_count", count, labels)
 		setNamedMetricValue(out, "leios_metrics", name+"_sum", sum, labels)
