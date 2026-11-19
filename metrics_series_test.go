@@ -112,6 +112,54 @@ request_duration_seconds_count{route="tip"} 3
 	}
 }
 
+func TestOpenMetricsSummaryQuantilesAreGauges(t *testing.T) {
+	decode := func(value, count float64) *PromMetrics {
+		encoded, err := prom2jsonWithContentType(
+			[]byte(fmt.Sprintf(`# TYPE request_duration_seconds summary
+request_duration_seconds{quantile="0.5"} %g
+request_duration_seconds_sum 10
+request_duration_seconds_count %g
+# EOF
+`, value, count)),
+			"application/openmetrics-text; version=1.0.0; charset=utf-8",
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var metrics PromMetrics
+		if err := json.Unmarshal(encoded, &metrics); err != nil {
+			t.Fatal(err)
+		}
+		return &metrics
+	}
+	history := NewMetricHistory(4, 2)
+	history.Observe(time.Unix(100, 0), decode(8, 2))
+	history.Observe(time.Unix(101, 0), decode(2, 3))
+	if delta, _, ok := history.CounterDelta(
+		"request_duration_seconds",
+		map[string]string{"quantile": "0.5"},
+	); ok {
+		t.Fatalf("summary quantile produced counter delta %v", delta)
+	}
+	delta, _, ok := history.CounterDelta("request_duration_seconds_count", nil)
+	if !ok || delta != 1 {
+		t.Fatalf("summary count delta = %v, %v; expected 1", delta, ok)
+	}
+}
+
+func TestPromMetricSeriesReservedNamesDoNotCorruptDecode(t *testing.T) {
+	metrics := decodePromMetrics(t, []byte(`# TYPE metric_series gauge
+metric_series 1
+# TYPE metric_series_truncated gauge
+metric_series_truncated 2
+`))
+	if len(metrics.MetricSeries) != 2 ||
+		metrics.MetricSeries[0].Name != promMetricSeriesKey ||
+		metrics.MetricSeries[1].Name != promMetricSeriesTruncatedKey {
+		t.Fatalf("reserved-name series = %#v", metrics.MetricSeries)
+	}
+}
+
 func TestPromMetricSeriesHistoryHandlesCounterReset(t *testing.T) {
 	history := NewMetricHistory(2, 3)
 	labels := []PromMetricLabel{{Name: "peer", Value: "alpha"}}
@@ -199,6 +247,23 @@ request_duration_seconds_count{route="block"} 2
 	all, ok := metrics.Histogram("request_duration_seconds", nil)
 	if !ok || all.Sum != 5.5 || all.Count != 5 {
 		t.Fatalf("combined histogram = %#v, %v", all, ok)
+	}
+}
+
+func TestPromMetricsHistogramRequiresMatchingLabelPairs(t *testing.T) {
+	tip := []PromMetricLabel{{Name: "route", Value: "tip"}}
+	block := []PromMetricLabel{{Name: "route", Value: "block"}}
+	metrics := &PromMetrics{MetricSeries: []PromMetricSeries{
+		{Name: "latency_sum", Value: 1.5, Labels: tip},
+		{Name: "latency_count", Value: 3, Labels: tip},
+		{Name: "latency_sum", Value: 4, Labels: block},
+	}}
+	if _, ok := metrics.Histogram("latency", nil); ok {
+		t.Fatal("histogram with an incomplete selected identity was available")
+	}
+	got, ok := metrics.Histogram("latency", map[string]string{"route": "tip"})
+	if !ok || got.Sum != 1.5 || got.Count != 3 {
+		t.Fatalf("complete selected histogram = %#v, %v", got, ok)
 	}
 }
 

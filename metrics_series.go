@@ -32,6 +32,8 @@ const (
 	maxPromMetricLabelBytes      = 4096
 	defaultMetricHistorySeries   = 512
 	defaultMetricHistorySamples  = 12
+	promMetricSeriesKey          = "metric_series"
+	promMetricSeriesTruncatedKey = "metric_series_truncated"
 )
 
 // PromMetricKind identifies how a structured Prometheus series behaves.
@@ -231,22 +233,41 @@ func (m *PromMetrics) Histogram(
 	if m == nil {
 		return PromHistogram{}, false
 	}
-	var result PromHistogram
-	var sumFound, countFound bool
+	type parts struct {
+		histogram PromHistogram
+		hasSum    bool
+		hasCount  bool
+	}
+	selected := make(map[string]parts)
+	matched := false
 	for _, metric := range m.MetricSeries {
 		if !promMetricLabelsContain(metric.Labels, selector) {
 			continue
 		}
+		key := metricSeriesIdentity("", metric.Labels)
+		part := selected[key]
 		switch metric.Name {
 		case name + "_sum":
-			result.Sum += metric.Value
-			sumFound = true
+			part.histogram.Sum += metric.Value
+			part.hasSum = true
 		case name + "_count":
-			result.Count += metric.Value
-			countFound = true
+			part.histogram.Count += metric.Value
+			part.hasCount = true
+		default:
+			continue
 		}
+		selected[key] = part
+		matched = true
 	}
-	return result, sumFound && countFound
+	var result PromHistogram
+	for _, part := range selected {
+		if !part.hasSum || !part.hasCount {
+			return PromHistogram{}, false
+		}
+		result.Sum += part.histogram.Sum
+		result.Count += part.histogram.Count
+	}
+	return result, matched
 }
 
 func recordPromMetricSeries(
@@ -260,20 +281,20 @@ func recordPromMetricSeries(
 		return
 	}
 	if len(name) > maxPromMetricNameBytes {
-		out["metric_series_truncated"] = true
+		out[promMetricSeriesTruncatedKey] = true
 		return
 	}
-	series, _ := out["metric_series"].([]PromMetricSeries)
+	series, _ := out[promMetricSeriesKey].([]PromMetricSeries)
 	if len(series) >= maxPromMetricSeries {
-		out["metric_series_truncated"] = true
+		out[promMetricSeriesTruncatedKey] = true
 		return
 	}
 	structured, ok := structuredPromMetricLabels(labels)
 	if !ok {
-		out["metric_series_truncated"] = true
+		out[promMetricSeriesTruncatedKey] = true
 		return
 	}
-	out["metric_series"] = append(series, PromMetricSeries{
+	out[promMetricSeriesKey] = append(series, PromMetricSeries{
 		Name:   name,
 		Value:  value,
 		Kind:   kind,
@@ -307,16 +328,15 @@ func structuredPromMetricLabels(labels []*dto.LabelPair) ([]PromMetricLabel, boo
 
 func promMetricKindFromModel(kind model.MetricType) PromMetricKind {
 	switch kind {
-	case model.MetricTypeCounter,
-		model.MetricTypeHistogram,
-		model.MetricTypeSummary:
+	case model.MetricTypeCounter:
 		return PromMetricCounter
 	case model.MetricTypeGauge,
 		model.MetricTypeGaugeHistogram,
 		model.MetricTypeInfo,
-		model.MetricTypeStateset:
+		model.MetricTypeStateset,
+		model.MetricTypeSummary:
 		return PromMetricGauge
-	case model.MetricTypeUnknown:
+	case model.MetricTypeHistogram, model.MetricTypeUnknown:
 		return PromMetricUnknown
 	default:
 		return PromMetricUnknown
@@ -325,14 +345,14 @@ func promMetricKindFromModel(kind model.MetricType) PromMetricKind {
 
 func promMetricSeriesKind(
 	name string,
-	types map[string]PromMetricKind,
+	types map[string]model.MetricType,
 ) PromMetricKind {
-	if kind, ok := types[name]; ok {
-		return kind
+	if familyType, ok := types[name]; ok {
+		return promMetricKindFromModel(familyType)
 	}
 	if strings.HasSuffix(name, "_total") {
-		if kind, ok := types[strings.TrimSuffix(name, "_total")]; ok {
-			return kind
+		if familyType, ok := types[strings.TrimSuffix(name, "_total")]; ok {
+			return promMetricKindFromModel(familyType)
 		}
 		return PromMetricCounter
 	}
@@ -341,7 +361,8 @@ func promMetricSeriesKind(
 			continue
 		}
 		base := strings.TrimSuffix(name, suffix)
-		if kind, ok := types[base]; ok && kind == PromMetricGauge {
+		if familyType, ok := types[base]; ok &&
+			familyType == model.MetricTypeGaugeHistogram {
 			return PromMetricGauge
 		}
 		return PromMetricCounter

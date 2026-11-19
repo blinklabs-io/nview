@@ -708,7 +708,7 @@ func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
 		return nil, errors.New("unsupported OpenMetrics format")
 	}
 	out := make(map[string]any)
-	metricTypes := make(map[string]PromMetricKind)
+	metricTypes := make(map[string]model.MetricType)
 	var parsedLabels labels.Labels
 	for {
 		entry, err := parser.Next()
@@ -720,7 +720,7 @@ func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
 		}
 		if entry == textparse.EntryType {
 			name, metricType := parser.Type()
-			metricTypes[string(name)] = promMetricKindFromModel(metricType)
+			metricTypes[string(name)] = metricType
 			continue
 		}
 		if entry != textparse.EntrySeries {
@@ -753,6 +753,9 @@ func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
 }
 
 func setPromMetricValue(out map[string]any, name string, value float64) {
+	if name == promMetricSeriesKey || name == promMetricSeriesTruncatedKey {
+		return
+	}
 	if shouldAggregatePromMetric(name) {
 		if prev, ok := out[name].(float64); ok {
 			value += prev
