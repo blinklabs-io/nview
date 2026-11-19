@@ -71,8 +71,9 @@ type PromMetricSample struct {
 	Value float64
 }
 
-// MetricHistory retains a bounded number of samples for a bounded number of
-// exact metric identities. New identities evict the oldest tracked identity.
+// MetricHistory retains a bounded number of samples for a stable, bounded set
+// of exact metric identities. New identities replace the oldest identity that
+// is absent from the current scrape; otherwise they are not admitted.
 type MetricHistory struct {
 	mu         sync.RWMutex
 	maxSeries  int

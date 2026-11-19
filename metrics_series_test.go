@@ -78,6 +78,18 @@ request_duration_seconds_count{route="tip"} 3
 	}
 }
 
+func TestPromMetricSeriesExposeSummarySumAndCount(t *testing.T) {
+	metrics := decodePromMetrics(t, []byte(`# TYPE request_duration_seconds summary
+request_duration_seconds{quantile="0.5"} 0.4
+request_duration_seconds_sum 1.5
+request_duration_seconds_count 3
+`))
+	histogram, ok := metrics.Histogram("request_duration_seconds", nil)
+	if !ok || histogram.Sum != 1.5 || histogram.Count != 3 {
+		t.Fatalf("summary = %#v, %v", histogram, ok)
+	}
+}
+
 func TestOpenMetricsPreservesStructuredSeries(t *testing.T) {
 	encoded, err := prom2jsonWithContentType(
 		[]byte(`# TYPE requests counter
@@ -279,6 +291,28 @@ func TestPromMetricSeriesCardinalityIsBounded(t *testing.T) {
 	}
 	if !metrics.MetricSeriesTruncated {
 		t.Fatal("cardinality truncation was not reported")
+	}
+}
+
+func TestPromMetricSeriesTextFamiliesAreDeterministic(t *testing.T) {
+	var input strings.Builder
+	for i := maxPromMetricSeries; i >= 0; i-- {
+		fmt.Fprintf(&input, "# TYPE metric_%04d gauge\nmetric_%04d %d\n", i, i, i)
+	}
+	metrics := decodePromMetrics(t, []byte(input.String()))
+	if !metrics.MetricSeriesTruncated ||
+		len(metrics.MetricSeries) != maxPromMetricSeries {
+		t.Fatalf(
+			"bounded series = %d, truncated %v",
+			len(metrics.MetricSeries),
+			metrics.MetricSeriesTruncated,
+		)
+	}
+	if first := metrics.MetricSeries[0].Name; first != "metric_0000" {
+		t.Fatalf("first retained family = %q", first)
+	}
+	if last := metrics.MetricSeries[len(metrics.MetricSeries)-1].Name; last != "metric_2047" {
+		t.Fatalf("last retained family = %q", last)
 	}
 }
 

@@ -24,6 +24,7 @@ import (
 	"mime"
 	"net/http"
 	"slices"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -465,7 +466,13 @@ func prometheusText2json(prom []byte) ([]byte, error) {
 	if err != nil {
 		return b, err
 	}
-	for _, val := range families {
+	familyNames := make([]string, 0, len(families))
+	for name := range families {
+		familyNames = append(familyNames, name)
+	}
+	sort.Strings(familyNames)
+	for _, familyName := range familyNames {
+		val := families[familyName]
 		for _, m := range val.GetMetric() {
 			name := val.GetName()
 			switch val.GetType() {
@@ -494,7 +501,7 @@ func prometheusText2json(prom []byte) ([]byte, error) {
 					promMetricSeriesKind(name, nil),
 				)
 			case dto.MetricType_SUMMARY:
-				// Extract count from SUMMARY metrics (e.g. go_gc_duration_seconds_count)
+				// Extract sum and count from SUMMARY metrics.
 				recordPromMetricSeries(
 					out,
 					name+"_count",
@@ -506,6 +513,18 @@ func prometheusText2json(prom []byte) ([]byte, error) {
 					out,
 					name+"_count",
 					float64(m.GetSummary().GetSampleCount()),
+				)
+				recordPromMetricSeries(
+					out,
+					name+"_sum",
+					m.GetSummary().GetSampleSum(),
+					m.GetLabel(),
+					PromMetricCounter,
+				)
+				setPromMetricValue(
+					out,
+					name+"_sum",
+					m.GetSummary().GetSampleSum(),
 				)
 			case dto.MetricType_HISTOGRAM,
 				dto.MetricType_GAUGE_HISTOGRAM:
