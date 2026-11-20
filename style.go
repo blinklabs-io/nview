@@ -549,6 +549,27 @@ func uiBrailleChart(
 	return uiSeverityValue(sb.String(), severity)
 }
 
+// uiBrailleChartFit is uiBrailleChart limited to cells terminal columns. It
+// keeps the newest samples that fit and draws nothing when there is no room.
+func uiBrailleChartFit(
+	values []float64,
+	maxValue float64,
+	severity uiSeverity,
+	cells int,
+) string {
+	if cells < 1 {
+		return ""
+	}
+	perCell := 2
+	if currentTerminalVisuals().Mode == terminalVisualPlain {
+		perCell = 1
+	}
+	if keep := cells * perCell; len(values) > keep {
+		values = values[len(values)-keep:]
+	}
+	return uiBrailleChart(values, maxValue, severity)
+}
+
 func brailleColumn(value, maxValue float64, dots [4]rune) rune {
 	if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 {
 		value = 0

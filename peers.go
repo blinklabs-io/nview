@@ -45,7 +45,9 @@ const (
 	// useful window instead of one burst of probe results.
 	peerRTTTrendEvery   = 3 * time.Second
 	peerRTTTrendSamples = defaultMetricHistorySamples
-	peerProbeStaleFor   = 30 * time.Second
+	// peerRTTTrendStale is three ping cycles: past it nothing is sampling.
+	peerRTTTrendStale = 30 * time.Second
+	peerProbeStaleFor = 30 * time.Second
 )
 
 type peerProbe struct {
@@ -395,10 +397,15 @@ func recordPeerRTTTrendLocked(at time.Time) {
 	}
 }
 
-// peerRTTTrend returns a copy of the retained mean-RTT samples.
+// peerRTTTrend returns a copy of the retained mean-RTT samples. Peers are only
+// probed while a peer view is shown, so samples older than peerRTTTrendStale
+// are no longer current and are not returned.
 func peerRTTTrend() []float64 {
 	peerStatsMu.Lock()
 	defer peerStatsMu.Unlock()
+	if time.Since(peerStats.rttTrendAt) > peerRTTTrendStale {
+		return nil
+	}
 	return slices.Clone(peerStats.RTTTrend)
 }
 

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/blinklabs-io/nview/internal/config"
+	"github.com/rivo/tview"
 )
 
 var trendBase = time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC)
@@ -264,19 +265,62 @@ func TestOverviewShowsTrendRowOnlyForThePanelLayout(t *testing.T) {
 	}
 }
 
-func TestDingoTipGapValueAddsTheTrend(t *testing.T) {
+func TestDingoTipGapCellAddsTheTrend(t *testing.T) {
 	setTestVisuals(t, "unicode", "none")
 
-	bare := stripTviewTags(dingoTipGapValue(&PromMetrics{}, 6, uiSeverityOK))
-	if bare != "6 slots" {
-		t.Fatalf("without history = %q, expected %q", bare, "6 slots")
+	bare := dingoTipGapCell(&PromMetrics{}, 6, uiSeverityOK)
+	if got := stripTviewTags(dingoMetricCellText(bare, 40)); strings.TrimSpace(
+		got,
+	) != "Tip Gap      6 slots" {
+		t.Fatalf("without history = %q", got)
 	}
 
 	m := trendTestMetrics(nil, nil, []float64{9, 7, 4}, false)
-	got := stripTviewTags(dingoTipGapValue(m, 4, uiSeverityOK))
-	if !strings.HasPrefix(got, "4 slots ") ||
-		len([]rune(got)) <= len("4 slots ") {
+	cell := dingoTipGapCell(m, 4, uiSeverityOK)
+	got := stripTviewTags(dingoMetricCellText(cell, 40))
+	if !strings.Contains(got, "4 slots ") || !hasBrailleCell(got) {
 		t.Fatalf("with history = %q, expected the slots then a chart", got)
+	}
+}
+
+// A chart must never widen its cell: the cell pads but does not truncate, so an
+// overflow would push the rest of the row out of its column.
+func TestDingoTipGapChartFitsItsCell(t *testing.T) {
+	samples := make([]float64, 12)
+	for i := range samples {
+		samples[i] = float64(i * 100)
+	}
+	m := trendTestMetrics(nil, nil, samples, false)
+
+	for _, mode := range []string{"unicode", "plain"} {
+		setTestVisuals(t, mode, "none")
+		for width := 14; width <= 40; width++ {
+			cell := dingoTipGapCell(m, 1000, uiSeverityWarn)
+			bare := dingoTipGapCell(&PromMetrics{}, 1000, uiSeverityWarn)
+			got := tview.TaggedStringWidth(dingoMetricCellText(cell, width))
+			base := tview.TaggedStringWidth(dingoMetricCellText(bare, width))
+			if got != base {
+				t.Fatalf(
+					"%s width %d: cell with a chart is %d columns, without %d",
+					mode,
+					width,
+					got,
+					base,
+				)
+			}
+		}
+	}
+
+	setTestVisuals(t, "unicode", "none")
+	cell := dingoTipGapCell(m, 4, uiSeverityOK)
+	roomy := stripTviewTags(dingoMetricCellText(cell, 40))
+	tight := stripTviewTags(dingoMetricCellText(cell, 24))
+	if strings.Count(roomy, "") <= strings.Count(tight, "") {
+		t.Errorf(
+			"a wide cell did not get a longer chart: %q vs %q",
+			roomy,
+			tight,
+		)
 	}
 }
 
@@ -324,45 +368,77 @@ func TestRecordPeerRTTTrend(t *testing.T) {
 		peerStats = original
 		peerStatsMu.Unlock()
 	})
-	peerStatsMu.Lock()
-	peerStats = PeerStats{}
 
-	// No answered peer: RTTAVG is zero but is not a measurement.
-	peerStats.RTTresultsSlice = peerRTTresultsSlice{{RTT: RTTUnreachable}}
-	peerStats.CNT0 = 1
-	recordPeerRTTTrendLocked(trendBase)
-	if len(peerStats.RTTTrend) != 0 {
-		t.Fatalf("recorded %v with no reachable peer", peerStats.RTTTrend)
+	record := func(at time.Time, avg int) []float64 {
+		peerStatsMu.Lock()
+		defer peerStatsMu.Unlock()
+		peerStats.RTTAVG = avg
+		recordPeerRTTTrendLocked(at)
+		return slices.Clone(peerStats.RTTTrend)
+	}
+	setPeers := func(peers peerRTTresultsSlice, unreachable int) {
+		peerStatsMu.Lock()
+		defer peerStatsMu.Unlock()
+		peerStats.RTTresultsSlice = peers
+		peerStats.CNT0 = unreachable
 	}
 
-	peerStats.RTTresultsSlice = peerRTTresultsSlice{{RTT: 30}, {RTT: 50}}
-	peerStats.CNT0 = 0
-	peerStats.RTTAVG = 40
-	recordPeerRTTTrendLocked(trendBase)
-	recordPeerRTTTrendLocked(trendBase.Add(peerRTTTrendEvery - time.Nanosecond))
-	if len(peerStats.RTTTrend) != 1 || peerStats.RTTTrend[0] != 40 {
-		t.Fatalf("throttled record = %v, expected [40]", peerStats.RTTTrend)
+	peerStatsMu.Lock()
+	peerStats = PeerStats{}
+	peerStatsMu.Unlock()
+
+	// No answered peer: RTTAVG is zero but is not a measurement.
+	setPeers(peerRTTresultsSlice{{RTT: RTTUnreachable}}, 1)
+	if got := record(trendBase, 0); len(got) != 0 {
+		t.Fatalf("recorded %v with no reachable peer", got)
+	}
+
+	setPeers(peerRTTresultsSlice{{RTT: 30}, {RTT: 50}}, 0)
+	record(trendBase, 40)
+	got := record(trendBase.Add(peerRTTTrendEvery-time.Nanosecond), 41)
+	if len(got) != 1 || got[0] != 40 {
+		t.Fatalf("throttled record = %v, expected [40]", got)
 	}
 
 	for i := 1; i <= peerRTTTrendSamples+3; i++ {
-		peerStats.RTTAVG = 100 + i
-		recordPeerRTTTrendLocked(
-			trendBase.Add(time.Duration(i) * peerRTTTrendEvery),
-		)
+		got = record(trendBase.Add(time.Duration(i)*peerRTTTrendEvery), 100+i)
 	}
-	got := slices.Clone(peerStats.RTTTrend)
-	peerStatsMu.Unlock()
 	if len(got) != peerRTTTrendSamples ||
 		got[len(got)-1] != float64(100+peerRTTTrendSamples+3) {
 		t.Fatalf("capped trend = %v", got)
 	}
-	if copied := peerRTTTrend(); len(copied) != len(got) {
-		t.Fatalf("peerRTTTrend() = %v, expected %v", copied, got)
+}
+
+// Peers are only probed while a peer view is shown, so a chart whose samples
+// stopped arriving must disappear rather than keep showing old data.
+func TestPeerRTTTrendIsHiddenOnceStale(t *testing.T) {
+	original := peerStats
+	t.Cleanup(func() {
+		peerStatsMu.Lock()
+		peerStats = original
+		peerStatsMu.Unlock()
+	})
+
+	peerStatsMu.Lock()
+	peerStats = PeerStats{
+		RTTTrend:   []float64{20, 90, 40},
+		rttTrendAt: time.Now(),
+	}
+	peerStatsMu.Unlock()
+	if got := peerRTTTrend(); len(got) != 3 {
+		t.Fatalf("fresh trend = %v, expected 3 samples", got)
+	}
+
+	peerStatsMu.Lock()
+	peerStats.rttTrendAt = time.Now().Add(-2 * peerRTTTrendStale)
+	peerStatsMu.Unlock()
+	if got := peerRTTTrend(); got != nil {
+		t.Fatalf("stale trend = %v, expected nothing", got)
 	}
 
 	resetPeers()
-	if len(peerRTTTrend()) != 0 {
-		t.Fatalf("reset kept %v", peerRTTTrend())
+	if got := peerRTTTrend(); len(got) != 0 {
+		t.Fatalf("reset kept %v", got)
 	}
 }
 
@@ -383,7 +459,10 @@ func TestOverviewShowsPeerRTTTrend(t *testing.T) {
 	promMetrics.Store(&PromMetrics{})
 	detectedNodeBinary.Store(CARDANO_BINARY)
 	peerStatsMu.Lock()
-	peerStats = PeerStats{RTTTrend: []float64{20, 90, 40}}
+	peerStats = PeerStats{
+		RTTTrend:   []float64{20, 90, 40},
+		rttTrendAt: time.Now(),
+	}
 	peerStatsMu.Unlock()
 
 	if got := stripTviewTags(getOverviewText(context.Background())); !strings.Contains(

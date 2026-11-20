@@ -1535,6 +1535,10 @@ type dingoMetricCell struct {
 	Value         string
 	LabelSeverity uiSeverity
 	Span          int
+	// Trend is drawn after Value as a chart, trimmed to the room left in the
+	// cell.
+	Trend         []float64
+	TrendSeverity uiSeverity
 }
 
 func dingoPanel(
@@ -1781,6 +1785,17 @@ func dingoMetricCellText(cell dingoMetricCell, width int) string {
 	) +
 		" " +
 		cell.Value
+	if len(cell.Trend) >= trendMinSamples {
+		room := width - tview.TaggedStringWidth(text) - 1
+		if chart := uiBrailleChartFit(
+			cell.Trend,
+			0,
+			cell.TrendSeverity,
+			room,
+		); chart != "" {
+			text += " " + chart
+		}
+	}
 	return dingoPadTaggedRight(text, width)
 }
 
@@ -2395,11 +2410,7 @@ func dingoConsoleDashboardCompact(metrics *PromMetrics, width int) string {
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
-				dingoMetricStyled(
-					"Tip Gap",
-					dingoTipGapValue(metrics, tipGap, tipSeverity),
-					tipSeverity,
-				),
+				dingoTipGapCell(metrics, tipGap, tipSeverity),
 				dingoMetric(
 					"Remaining",
 					uiValue(formatEpochRemaining(metrics)),
@@ -2878,11 +2889,7 @@ func dingoConsoleChainLane(metrics *PromMetrics, width int) string {
 					"Slot",
 					uiValue(strconv.FormatUint(metrics.SlotNum, 10)),
 				),
-				dingoMetricStyled(
-					"Tip Gap",
-					dingoTipGapValue(metrics, tipGap, tipSeverity),
-					tipSeverity,
-				),
+				dingoTipGapCell(metrics, tipGap, tipSeverity),
 			),
 			dingoMetricRow(
 				innerWidth,
@@ -2954,11 +2961,7 @@ func dingoConsoleChainCompact(metrics *PromMetrics, width int) string {
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
-				dingoMetricStyled(
-					"Tip Gap",
-					dingoTipGapValue(metrics, tipGap, tipSeverity),
-					tipSeverity,
-				),
+				dingoTipGapCell(metrics, tipGap, tipSeverity),
 				dingoMetric("Epoch", uiValue(strconv.FormatUint(epoch, 10))),
 			),
 			dingoMetricRowColumns(

@@ -118,7 +118,10 @@ func getTrendText(
 	if len(peerRTT) >= trendMinSamples {
 		parts = append(
 			parts,
-			uiKV("Peer RTT", uiBrailleChart(peerRTT, RTTThreshold3, uiSeverityNeutral)),
+			uiKV(
+				"Peer RTT",
+				uiBrailleChart(peerRTT, RTTThreshold3, uiSeverityNeutral),
+			),
 		)
 	}
 	if len(parts) == 0 {
@@ -127,23 +130,20 @@ func getTrendText(
 	return " " + uiMuted("Trend") + "   " + strings.Join(parts, "   ") + "\n"
 }
 
-// dingoTipGapValue is the Tip Gap cell value in the Dingo console, with the
-// gap's trend after it once there is one.
-func dingoTipGapValue(
+// dingoTipGapCell is the Tip Gap cell of the Dingo console. Its chart is
+// added when the cell is laid out, because only then is the room known.
+func dingoTipGapCell(
 	metrics *PromMetrics,
 	tipGap uint64,
 	tipSeverity uiSeverity,
-) string {
-	value := uiSeverityValue(
-		strconv.FormatUint(tipGap, 10),
+) dingoMetricCell {
+	cell := dingoMetricStyled(
+		"Tip Gap",
+		uiSeverityValue(strconv.FormatUint(tipGap, 10), tipSeverity)+
+			uiUnit(" slots"),
 		tipSeverity,
-	) + uiUnit(
-		" slots",
 	)
-	if gap := tipGapTrend(metrics, DINGO_BINARY, slotTipRefAt); len(
-		gap,
-	) >= trendMinSamples {
-		value += " " + uiBrailleChart(gap, 0, tipSeverity)
-	}
-	return value
+	cell.Trend = tipGapTrend(metrics, DINGO_BINARY, slotTipRefAt)
+	cell.TrendSeverity = tipSeverity
+	return cell
 }
