@@ -15,6 +15,7 @@
 package main
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -267,5 +268,75 @@ func TestCurrentTerminalVisualsReadsYAMLConfig(t *testing.T) {
 			got.Mode,
 			terminalVisualNerd,
 		)
+	}
+}
+
+func TestUIBrailleChart(t *testing.T) {
+	setTestVisuals(t, "unicode", "none")
+
+	tests := []struct {
+		name     string
+		values   []float64
+		maxValue float64
+		want     string
+	}{
+		{"empty", nil, 0, ""},
+		{"flat zero keeps a baseline", []float64{0, 0}, 0, "[green]⣀[white]"},
+		{"full height", []float64{4, 4}, 0, "[green]⣿[white]"},
+		{"rising pairs", []float64{1, 2, 3, 4}, 0, "[green]⣠⣾[white]"},
+		{
+			"odd count leaves the last column empty",
+			[]float64{4},
+			0,
+			"[green]⡇[white]",
+		},
+		{
+			"invalid samples draw the baseline",
+			[]float64{math.NaN(), -3},
+			0,
+			"[green]⣀[white]",
+		},
+		{
+			"infinity is ignored when scaling",
+			[]float64{math.Inf(1), 2},
+			0,
+			"[green]⣸[white]",
+		},
+		{"explicit maximum clamps", []float64{20, 5}, 10, "[green]⣧[white]"},
+	}
+	for _, tt := range tests {
+		got := uiBrailleChart(tt.values, tt.maxValue, uiSeverityOK)
+		if got != tt.want {
+			t.Errorf(
+				"%s: uiBrailleChart() = %q, expected %q",
+				tt.name,
+				got,
+				tt.want,
+			)
+		}
+	}
+}
+
+func TestUIBrailleChartPlainFallsBackToSparkline(t *testing.T) {
+	setTestVisuals(t, "plain", "none")
+
+	values := []float64{0, 50, 100}
+	got := uiBrailleChart(values, 100, uiSeverityOK)
+	want := uiSparkline(values, 100, uiSeverityOK)
+	if got != want || got != "[green].+@[white]" {
+		t.Errorf("plain chart = %q, expected the sparkline %q", got, want)
+	}
+	for _, r := range got {
+		if r >= 0x2800 && r <= 0x28FF {
+			t.Errorf("plain mode drew a braille cell %q", r)
+		}
+	}
+}
+
+func TestUIBrailleChartNerdUsesBraille(t *testing.T) {
+	setTestVisuals(t, "nerd", "none")
+
+	if got := uiBrailleChart([]float64{4, 4}, 0, uiSeverityOK); got != "[green]⣿[white]" {
+		t.Errorf("nerd mode chart = %q, expected braille", got)
 	}
 }

@@ -505,6 +505,66 @@ func uiSparkline(
 	return uiSeverityValue(sb.String(), severity)
 }
 
+// Braille cells are U+2800 plus one bit per dot. Read from the bottom up, the
+// four dots of a chart column are dots 7, 3, 2 and 1 on the left and dots 8,
+// 6, 5 and 4 on the right.
+var (
+	brailleLeftColumn  = [4]rune{0x40, 0x04, 0x02, 0x01}
+	brailleRightColumn = [4]rune{0x80, 0x20, 0x10, 0x08}
+)
+
+// uiBrailleChart draws values as a mini-chart with one braille cell per two
+// samples, oldest first. Each sample is a column of up to four dots filled
+// from the bottom, and every valid sample shows at least its bottom dot so a
+// flat zero line is still visible. A maxValue of zero or less scales to the
+// largest value. Plain mode has no braille, so it falls back to uiSparkline.
+func uiBrailleChart(
+	values []float64,
+	maxValue float64,
+	severity uiSeverity,
+) string {
+	if len(values) == 0 {
+		return ""
+	}
+	if currentTerminalVisuals().Mode == terminalVisualPlain {
+		return uiSparkline(values, maxValue, severity)
+	}
+	if maxValue <= 0 {
+		for _, value := range values {
+			if !math.IsNaN(value) && !math.IsInf(value, 0) && value > maxValue {
+				maxValue = value
+			}
+		}
+	}
+
+	var sb strings.Builder
+	for i := 0; i < len(values); i += 2 {
+		cell := rune(0x2800) |
+			brailleColumn(values[i], maxValue, brailleLeftColumn)
+		if i+1 < len(values) {
+			cell |= brailleColumn(values[i+1], maxValue, brailleRightColumn)
+		}
+		sb.WriteRune(cell)
+	}
+	return uiSeverityValue(sb.String(), severity)
+}
+
+func brailleColumn(value, maxValue float64, dots [4]rune) rune {
+	if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 {
+		value = 0
+	}
+	height := 1
+	if maxValue > 0 {
+		height = int(math.Round(math.Min(value, maxValue) / maxValue * 4))
+		height = max(height, 1)
+	}
+	var column rune
+	for _, dot := range dots[:height] {
+		column |= dot
+	}
+	return column
+}
+
 func uiPanelTitle(title string, severity uiSeverity) string {
 	return fmt.Sprintf(
 		" %s %s ",

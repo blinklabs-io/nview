@@ -1096,6 +1096,14 @@ func getOverviewText(ctx context.Context) string {
 		uiKVAligned(9, "Peers", peerStateSegmentBar(promMetrics, 12)),
 		gsmBadge,
 	)
+	if getEffectiveNodeBinary() != DINGO_BINARY {
+		sb.WriteString(getTrendText(
+			promMetrics,
+			getEffectiveNodeBinary(),
+			tipSeverity,
+			peerRTTTrend(),
+		))
+	}
 	if getEffectiveNodeBinary() == DINGO_BINARY {
 		forgeLabel := "disabled"
 		forgeSeverity := uiSeverityMuted
@@ -2389,12 +2397,7 @@ func dingoConsoleDashboardCompact(metrics *PromMetrics, width int) string {
 				2,
 				dingoMetricStyled(
 					"Tip Gap",
-					uiSeverityValue(
-						strconv.FormatUint(tipGap, 10),
-						tipSeverity,
-					)+uiUnit(
-						" slots",
-					),
+					dingoTipGapValue(metrics, tipGap, tipSeverity),
 					tipSeverity,
 				),
 				dingoMetric(
@@ -2877,12 +2880,7 @@ func dingoConsoleChainLane(metrics *PromMetrics, width int) string {
 				),
 				dingoMetricStyled(
 					"Tip Gap",
-					uiSeverityValue(
-						strconv.FormatUint(tipGap, 10),
-						tipSeverity,
-					)+uiUnit(
-						" slots",
-					),
+					dingoTipGapValue(metrics, tipGap, tipSeverity),
 					tipSeverity,
 				),
 			),
@@ -2958,12 +2956,7 @@ func dingoConsoleChainCompact(metrics *PromMetrics, width int) string {
 				2,
 				dingoMetricStyled(
 					"Tip Gap",
-					uiSeverityValue(
-						strconv.FormatUint(tipGap, 10),
-						tipSeverity,
-					)+uiUnit(
-						" slots",
-					),
+					dingoTipGapValue(metrics, tipGap, tipSeverity),
 					tipSeverity,
 				),
 				dingoMetric("Epoch", uiValue(strconv.FormatUint(epoch, 10))),

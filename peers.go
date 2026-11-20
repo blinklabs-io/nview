@@ -41,7 +41,11 @@ var (
 const (
 	peerProbeBatchSize = 8
 	peerProbeFreshFor  = 10 * time.Minute
-	peerProbeStaleFor  = 30 * time.Second
+	// peerRTTTrendEvery spaces the retained RTT samples so the chart spans a
+	// useful window instead of one burst of probe results.
+	peerRTTTrendEvery   = 3 * time.Second
+	peerRTTTrendSamples = defaultMetricHistorySamples
+	peerProbeStaleFor   = 30 * time.Second
 )
 
 type peerProbe struct {
@@ -231,6 +235,7 @@ func pingPeers(ctx context.Context) {
 		}
 	}
 	recomputePeerStatsLocked()
+	recordPeerRTTTrendLocked(now)
 	peerStatsMu.Unlock()
 
 	for _, probe := range probes {
@@ -372,6 +377,31 @@ func recomputePeerStatsLocked() {
 	peerStats.PCT4items = int(peerStats.PCT4) * granularitySmall / 100
 }
 
+// recordPeerRTTTrendLocked keeps the mean RTT of reachable peers, oldest
+// first, for the Command Deck chart. Nothing is recorded while no peer has
+// answered, because RTTAVG is then zero rather than a measurement.
+func recordPeerRTTTrendLocked(at time.Time) {
+	if len(peerStats.RTTresultsSlice) == peerStats.CNT0 {
+		return
+	}
+	if !peerStats.rttTrendAt.IsZero() &&
+		at.Sub(peerStats.rttTrendAt) < peerRTTTrendEvery {
+		return
+	}
+	peerStats.rttTrendAt = at
+	peerStats.RTTTrend = append(peerStats.RTTTrend, float64(peerStats.RTTAVG))
+	if extra := len(peerStats.RTTTrend) - peerRTTTrendSamples; extra > 0 {
+		peerStats.RTTTrend = peerStats.RTTTrend[extra:]
+	}
+}
+
+// peerRTTTrend returns a copy of the retained mean-RTT samples.
+func peerRTTTrend() []float64 {
+	peerStatsMu.Lock()
+	defer peerStatsMu.Unlock()
+	return slices.Clone(peerStats.RTTTrend)
+}
+
 func resetPeers() {
 	peersFilteredMu.Lock()
 	peerStatsMu.Lock()
@@ -392,6 +422,8 @@ func resetPeerStatsLocked() {
 var peerStats PeerStats
 
 type PeerStats struct {
+	RTTTrend        []float64
+	rttTrendAt      time.Time
 	RTTSUM          int
 	RTTAVG          int
 	CNT0            int
