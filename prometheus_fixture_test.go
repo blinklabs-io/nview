@@ -62,7 +62,24 @@ func TestPromMetricsRecordedCardanoNode11Relay(t *testing.T) {
 		{"PeersCold", m.PeersCold, 120},
 		{"PeersWarm", m.PeersWarm, 10},
 		{"PeersHot", m.PeersHot, 20},
+		{"GSMState", m.GSMState, 2},
+		{"BigLedgerKnown", m.BigLedgerKnown, 15},
+		{"BigLedgerEstablished", m.BigLedgerEstablished, 10},
+		{"BigLedgerActive", m.BigLedgerActive, 5},
+		{"InboundIdle", m.InboundIdle, 0},
+		{"InboundCold", m.InboundCold, 36},
+		{"InboundWarm", m.InboundWarm, 2},
+		{"InboundHot", m.InboundHot, 3},
+		{"HeadersServed", m.HeadersServed, 3425},
+		{"ChainSyncHeadersServed", m.ChainSyncHeadersServed, 6962},
+		{"TxSyncDuration", m.TxSyncDuration, 0},
 		{"ForgingEnabled", m.ForgingEnabled, 0},
+	}
+	if m.BlockReplayProgress != 99.99500729525249 {
+		t.Errorf(
+			"BlockReplayProgress = %v, expected 99.99500729525249",
+			m.BlockReplayProgress,
+		)
 	}
 	for _, tt := range counts {
 		if tt.got != tt.want {
@@ -104,6 +121,15 @@ func TestPromMetricsRecordedCardanoNode11BlockProducer(t *testing.T) {
 		{"IsLeader", m.IsLeader, 40640},
 		{"AboutToLead", m.AboutToLead, 80763},
 		{"Adopted", m.Adopted, 40640},
+		{"GSMState", m.GSMState, 1},
+		{"OpCertStartKES", m.OpCertStartKES, 0},
+		{"OpCertExpiryKES", m.OpCertExpiryKES, 60},
+		{"ForgedSlotLast", m.ForgedSlotLast, 80759},
+		{"NodeNotLeader", m.NodeNotLeader, 40123},
+		{"LocalRootsKnown", m.LocalRootsKnown, 1},
+		{"LocalRootsEstablished", m.LocalRootsEstablished, 0},
+		{"LocalRootsActive", m.LocalRootsActive, 0},
+		{"UTxOSize", m.UTxOSize, 3},
 		{"EpochNum", m.EpochNum, 269},
 		{"BlockNum", m.BlockNum, 40639},
 	}
