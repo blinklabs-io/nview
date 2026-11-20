@@ -6017,7 +6017,7 @@ func getCoreText(ctx context.Context) string {
 						),
 					),
 					uiKV(
-						"Bad forge",
+						"Bad",
 						cardanoMetricSeverityCount(
 							promMetrics,
 							"cardano_node_metrics_Forge_forged_invalid_counter",
@@ -6026,7 +6026,7 @@ func getCoreText(ctx context.Context) string {
 						),
 					),
 					uiKV(
-						"Adopt died",
+						"Adopt",
 						cardanoMetricSeverityCount(
 							promMetrics,
 							"cardano_node_metrics_Forge_adoption_thread_died_counter",

@@ -70,7 +70,9 @@ func TestCardanoNodeHealthViewsUseRecordedMetrics(t *testing.T) {
 	}()
 
 	cfg.Node.Binary = ""
-	cfg.Node.ByronGenesis.StartTime = 1_506_203_091
+	cfg.Node.ByronGenesis.StartTime = uint64(
+		time.Now().Add(-50 * 129_600 * time.Second).Unix(),
+	)
 	cfg.Node.ByronGenesis.EpochLength = 21_600
 	cfg.Node.ByronGenesis.SlotLength = 20_000
 	cfg.Node.ShelleyGenesis.EpochLength = 86_400
@@ -87,6 +89,10 @@ func TestCardanoNodeHealthViewsUseRecordedMetrics(t *testing.T) {
 	producer.PromMetricPresent["cardano_node_metrics_Forge_forged_invalid_counter"] = true
 	producer.PromMetricPresent["cardano_node_metrics_Forge_adoption_thread_died_counter"] = true
 	promMetrics.Store(&producer)
+	expectedExpiry, _ := cardanoKESExpiryStatusAt(&producer, time.Now())
+	if expectedExpiry == "expired" || strings.HasPrefix(expectedExpiry, "period ") {
+		t.Fatalf("test fixture has no future KES countdown: %q", expectedExpiry)
+	}
 
 	for name, rendered := range map[string]string{
 		"overview": getOverviewText(context.Background()),
@@ -97,7 +103,7 @@ func TestCardanoNodeHealthViewsUseRecordedMetrics(t *testing.T) {
 			"overview": {"sync", "syncing"},
 			"core": {
 				"Not leader", "40123", "Last forged", "0 slots",
-				"Cannot", "2", "Bad forge", "3", "Adopt died", "4",
+				"Cannot", "2", "Bad", "3", "Adopt", "4",
 				"KES window", "0-60", "KES expiry",
 			},
 			"peers": {"Local roots", "1", "active"},
@@ -125,8 +131,14 @@ func TestCardanoNodeHealthViewsUseRecordedMetrics(t *testing.T) {
 	for _, cell := range cells {
 		visible.WriteString(string(cell.Runes))
 	}
-	if !strings.Contains(visible.String(), "expired") {
-		t.Fatalf("KES expiry is clipped from the Forge pane:\n%s", visible.String())
+	for _, part := range strings.Fields(expectedExpiry) {
+		if !strings.Contains(visible.String(), part) {
+			t.Fatalf(
+				"KES expiry part %q is clipped from the Forge pane:\n%s",
+				part,
+				visible.String(),
+			)
+		}
 	}
 
 	relay := decodeFixture(t, "cardano-node-11.1.3-relay.om.txt")
