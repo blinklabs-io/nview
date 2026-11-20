@@ -107,6 +107,8 @@ type PromMetrics struct {
 	ForgingEnabled      uint64  `json:"cardano_node_metrics_forging_enabled"`
 	NodeStartTime       uint64  `json:"cardano_node_metrics_nodeStartTime_int"`
 	KesPeriod           uint64  `json:"cardano_node_metrics_currentKESPeriod_int"`
+	OpCertStartKES      uint64  `json:"cardano_node_metrics_operationalCertificateStartKESPeriod_int"`
+	OpCertExpiryKES     uint64  `json:"cardano_node_metrics_operationalCertificateExpiryKESPeriod_int"`
 	RemainingKesPeriods uint64  `json:"cardano_node_metrics_remainingKESPeriods_int"`
 	IsLeader            uint64  `json:"cardano_node_metrics_Forge_node_is_leader_int"`
 	Adopted             uint64  `json:"cardano_node_metrics_Forge_adopted_int"`

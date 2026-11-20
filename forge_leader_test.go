@@ -32,6 +32,8 @@ dingo_forge_opcert_counter_loaded 7
 dingo_forge_opcert_counter_onchain 6
 dingo_forge_slots_per_kes_period 129600
 cardano_node_metrics_currentKESPeriod_int 141
+cardano_node_metrics_operationalCertificateStartKESPeriod_int 100
+cardano_node_metrics_operationalCertificateExpiryKESPeriod_int 145
 cardano_node_metrics_remainingKESPeriods_int 4
 dingo_kes_agent_connected 1
 dingo_kes_agent_sign_success_total 23
@@ -85,6 +87,9 @@ dingo_equivocation_total{pool_id="other",self_key="false"} 9
 				"opcert loaded":      got.DingoForgeOpCertLoaded,
 				"opcert on-chain":    got.DingoForgeOpCertOnChain,
 				"slots/KES":          got.DingoForgeSlotsPerKESPeriod,
+				"KES current":        got.KesPeriod,
+				"KES start":          got.OpCertStartKES,
+				"KES expiry":         got.OpCertExpiryKES,
 				"KES connected":      got.DingoKESAgentConnected,
 				"KES sign successes": got.DingoKESAgentSignSuccess,
 				"KES sign failures":  got.DingoKESAgentSignFailure,
@@ -101,6 +106,7 @@ dingo_equivocation_total{pool_id="other",self_key="false"} 9
 			want := map[string]uint64{
 				"credentials": 1, "opcert loaded": 7, "opcert on-chain": 6,
 				"slots/KES": 129600, "KES connected": 1,
+				"KES current": 141, "KES start": 100, "KES expiry": 145,
 				"KES sign successes": 23, "KES sign failures": 2,
 				"leader won": 12, "leader not won": 88, "missed": 3,
 				"battles": 4, "last checked": 100, "last won": 12,
@@ -235,6 +241,9 @@ func TestDingoForgeLeaderPanelShowsProducerHealth(t *testing.T) {
 	metrics.DingoForgeOpCertLoaded = 7
 	metrics.DingoForgeOpCertOnChain = 6
 	metrics.DingoForgeSlotsPerKESPeriod = 129600
+	metrics.KesPeriod = 141
+	metrics.OpCertStartKES = 100
+	metrics.OpCertExpiryKES = 145
 	metrics.RemainingKesPeriods = 4
 	metrics.DingoKESAgentConnected = 1
 	metrics.DingoKESAgentSignSuccess = 23
@@ -273,7 +282,8 @@ func TestDingoForgeLeaderPanelShowsProducerHealth(t *testing.T) {
 	panel := stripTviewTags(dingoConsoleForgeLeaderBandAt(metrics, 118, now))
 	for _, token := range []string{
 		"FORGE / LEADER", "Credentials", "valid", "OpCert", "7 / 6",
-		"KES Expiry", "518400 slots", "6.0 days", "KES Agent", "connected",
+		"KES Life", "4 periods", "6.0d", "8.9%", uiGlyphs().BarFull,
+		"KES Agent", "connected",
 		"Won", "12 (+4)", "Not Won", "88 (+0)", "Missed", "3 (+1)", "Battles", "4 (+2)",
 		"Miss Ratio", "25.0%", "Last Epoch", "550", "12 / 100 won",
 		"Own Equiv", "2",
@@ -335,7 +345,7 @@ func TestDingoForgeLeaderPanelFitsCompactViewport(t *testing.T) {
 			)
 		}
 	}
-	for _, token := range []string{"Credentials", "KES Expiry", "Miss Ratio", "Own Equiv"} {
+	for _, token := range []string{"Credentials", "KES Life", "Miss Ratio", "Own Equiv"} {
 		if !strings.Contains(panel, token) {
 			t.Errorf("compact panel missing %q:\n%s", token, panel)
 		}
