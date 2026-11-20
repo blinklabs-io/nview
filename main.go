@@ -1026,8 +1026,6 @@ func hasForgeMetrics(metrics *PromMetrics) bool {
 		metrics.DidntAdopt > 0 ||
 		metrics.AboutToLead > 0 ||
 		metrics.MissedSlots > 0 ||
-		metrics.KesPeriod > 0 ||
-		metrics.RemainingKesPeriods > 0 ||
 		metrics.DingoBlockForgingLatencyN > 0
 }
 
@@ -6233,6 +6231,13 @@ func getCoreText(ctx context.Context) string {
 				),
 			)
 		}
+		kesLifetime, kesLifetimeSeverity := kesLifetimeStatus(promMetrics, 7)
+		fmt.Fprintf(&sb, " %s\n", uiKVStyledAligned(
+			8,
+			"KES left",
+			kesLifetime,
+			kesLifetimeSeverity,
+		))
 		if promMetrics.DingoBlockForgingLatencyN > 0 {
 			avg := promMetrics.DingoBlockForgingLatencyS /
 				float64(promMetrics.DingoBlockForgingLatencyN)

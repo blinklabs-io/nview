@@ -1,0 +1,5 @@
+cardano-node Forge
+ KES left 50 periods / 75.0d  83.3% ######-
+
+Dingo Forge / Leader
+ KES Life 50 periods / 75.0d  83.3% ##########--

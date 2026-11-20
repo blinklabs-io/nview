@@ -40,6 +40,8 @@ var dingoForgeLeaderMetricNames = []string{
 	"dingo_forge_opcert_counter_onchain",
 	"dingo_forge_slots_per_kes_period",
 	"cardano_node_metrics_currentKESPeriod_int",
+	"cardano_node_metrics_operationalCertificateStartKESPeriod_int",
+	"cardano_node_metrics_operationalCertificateExpiryKESPeriod_int",
 	"cardano_node_metrics_remainingKESPeriods_int",
 	"dingo_kes_agent_connected",
 	"dingo_kes_agent_sign_success_total",
@@ -188,7 +190,7 @@ func dingoConsoleForgeLeaderBandAt(
 	innerWidth := dingoPanelInnerWidth(width)
 	credentials, credentialsSeverity := dingoCredentialStatus(metrics)
 	opCert, opCertSeverity := dingoOpCertStatus(metrics)
-	kesExpiry, kesExpirySeverity := dingoKESExpiryStatus(metrics)
+	kesLifetime, kesLifetimeSeverity := kesLifetimeStatus(metrics, 12)
 	kesAgent, kesAgentSeverity := dingoKESAgentStatus(metrics)
 	missRatio, missRatioSeverity := dingoMissRatio(metrics)
 	lastEpoch, lastEpochSeverity := dingoLastEpochStatus(metrics)
@@ -206,10 +208,10 @@ func dingoConsoleForgeLeaderBandAt(
 		credentialsSeverity,
 	)
 	opCertCell := dingoMetricStyled("OpCert", opCert, opCertSeverity)
-	kesExpiryCell := dingoMetricStyledWide(
-		"KES Expiry",
-		kesExpiry,
-		kesExpirySeverity,
+	kesLifetimeCell := dingoMetricStyledWide(
+		"KES Life",
+		kesLifetime,
+		kesLifetimeSeverity,
 	)
 	kesAgentCell := dingoMetricStyled("KES Agent", kesAgent, kesAgentSeverity)
 	kesSuccessCell := dingoMetric(
@@ -305,7 +307,7 @@ func dingoConsoleForgeLeaderBandAt(
 			innerWidth,
 			credentialsCell,
 			opCertCell,
-			kesExpiryCell,
+			kesLifetimeCell,
 		),
 		dingoMetricRow(
 			innerWidth,
@@ -337,7 +339,7 @@ func dingoConsoleForgeLeaderBandAt(
 	if innerWidth < 88 {
 		lines = []string{
 			dingoMetricRowColumns(innerWidth, 2, credentialsCell, opCertCell),
-			dingoMetricRowColumns(innerWidth, 2, kesExpiryCell),
+			dingoMetricRowColumns(innerWidth, 2, kesLifetimeCell),
 			dingoMetricRowColumns(innerWidth, 2, kesAgentCell, kesSuccessCell),
 			dingoMetricRowColumns(innerWidth, 2, kesFailureCell, missRatioCell),
 			dingoMetricRowColumns(innerWidth, 2, wonCell, notWonTotalCell),
@@ -352,7 +354,7 @@ func dingoConsoleForgeLeaderBandAt(
 		worstSeverity(
 			credentialsSeverity,
 			opCertSeverity,
-			kesExpirySeverity,
+			kesLifetimeSeverity,
 			kesAgentSeverity,
 			kesFailureSeverity,
 			missedSeverity,
@@ -426,38 +428,6 @@ func dingoOpCertStatus(metrics *PromMetrics) (string, uiSeverity) {
 		fmt.Sprintf("%d / %d", loaded, onChain),
 		severity,
 	) + uiUnit(" ("+drift+")"), severity
-}
-
-func dingoKESExpiryStatus(metrics *PromMetrics) (string, uiSeverity) {
-	if !metrics.PromMetricPresent["dingo_forge_slots_per_kes_period"] ||
-		!metrics.PromMetricPresent["cardano_node_metrics_remainingKESPeriods_int"] ||
-		metrics.DingoForgeSlotsPerKESPeriod == 0 {
-		return uiMuted("n/a"), uiSeverityMuted
-	}
-	if metrics.RemainingKesPeriods > math.MaxUint64/metrics.DingoForgeSlotsPerKESPeriod {
-		return uiSeverityValue(
-			"invalid",
-			uiSeverityCritical,
-		), uiSeverityCritical
-	}
-	slots := metrics.RemainingKesPeriods * metrics.DingoForgeSlotsPerKESPeriod
-	slotLength := config.GetConfig().Node.ShelleyGenesis.SlotLength
-	severity := uiSeverityOK
-	if slots == 0 {
-		severity = uiSeverityCritical
-	}
-	if slotLength == 0 {
-		return uiSeverityValue(strconv.FormatUint(slots, 10), severity) +
-			uiUnit(" slots / ") + uiMuted("n/a days"), severity
-	}
-	days := float64(slots) * float64(slotLength) / (1000 * 86400)
-	if slots > 0 && days < 7 {
-		severity = uiSeverityWarn
-	}
-	return uiSeverityValue(strconv.FormatUint(slots, 10), severity) +
-		uiUnit(" slots / ") +
-		uiSeverityValue(fmt.Sprintf("%.1f", days), severity) +
-		uiUnit(" days"), severity
 }
 
 func dingoKESAgentStatus(metrics *PromMetrics) (string, uiSeverity) {

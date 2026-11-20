@@ -116,6 +116,10 @@ func TestPromMetricsRecordedCardanoNode11BlockProducer(t *testing.T) {
 		want uint64
 	}{
 		{"ForgingEnabled", m.ForgingEnabled, 1},
+		{"KesPeriod", m.KesPeriod, 0},
+		{"OpCertStartKES", m.OpCertStartKES, 0},
+		{"OpCertExpiryKES", m.OpCertExpiryKES, 60},
+		{"RemainingKesPeriods", m.RemainingKesPeriods, 60},
 		{"BlocksForged", m.BlocksForged, 40640},
 		{"MissedSlots", m.MissedSlots, 0},
 		{"IsLeader", m.IsLeader, 40640},
@@ -136,6 +140,16 @@ func TestPromMetricsRecordedCardanoNode11BlockProducer(t *testing.T) {
 	for _, tt := range counts {
 		if tt.got != tt.want {
 			t.Errorf("%s = %d, expected %d", tt.name, tt.got, tt.want)
+		}
+	}
+	for _, name := range []string{
+		kesCurrentMetric,
+		kesStartMetric,
+		kesExpiryMetric,
+		kesRemainingMetric,
+	} {
+		if !m.PromMetricPresent[name] {
+			t.Errorf("KES metric %q not marked present", name)
 		}
 	}
 }
