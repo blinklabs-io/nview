@@ -108,20 +108,52 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, string, error) {
 
 // Calculate slot number
 func getSlotTipRef() uint64 {
+	slot, _ := networkSlotAt(time.Now().Add(-time.Second))
+	return slot
+}
+
+func networkSlotAt(now time.Time) (uint64, bool) {
 	cfg := config.GetConfig()
-	// Time since epoch is in range
-	// #nosec G115
-	currentTimeSec := uint64(time.Now().Unix() - 1)
-	// #nosec G115
-	byronSlots := uint64(
-		cfg.Node.ShelleyTransEpoch,
-	) * cfg.Node.ByronGenesis.EpochLength
-	// #nosec G115
-	byronEndTime := cfg.Node.ByronGenesis.StartTime + ((uint64(cfg.Node.ShelleyTransEpoch) * cfg.Node.ByronGenesis.EpochLength * cfg.Node.ByronGenesis.SlotLength) / 1000)
-	if currentTimeSec < byronEndTime {
-		return ((currentTimeSec - cfg.Node.ByronGenesis.StartTime) * 1000) / cfg.Node.ByronGenesis.SlotLength
+	if cfg.Node.ShelleyTransEpoch < 0 || now.UnixMilli() < 0 ||
+		cfg.Node.ByronGenesis.StartTime > math.MaxUint64/1000 {
+		return 0, false
 	}
-	return byronSlots + ((currentTimeSec - byronEndTime) / uint64(cfg.Node.ShelleyGenesis.SlotLength/1000))
+	startMillis := cfg.Node.ByronGenesis.StartTime * 1000
+	currentMillis := uint64(now.UnixMilli())
+	if currentMillis < startMillis {
+		return 0, false
+	}
+	transitionEpoch := uint64(cfg.Node.ShelleyTransEpoch)
+	if cfg.Node.ByronGenesis.EpochLength != 0 &&
+		transitionEpoch > math.MaxUint64/cfg.Node.ByronGenesis.EpochLength {
+		return 0, false
+	}
+	byronSlots := transitionEpoch * cfg.Node.ByronGenesis.EpochLength
+	if cfg.Node.ByronGenesis.SlotLength != 0 &&
+		byronSlots > math.MaxUint64/cfg.Node.ByronGenesis.SlotLength {
+		return 0, false
+	}
+	byronDurationMillis := byronSlots * cfg.Node.ByronGenesis.SlotLength
+	if startMillis > math.MaxUint64-byronDurationMillis {
+		return 0, false
+	}
+	byronEndMillis := startMillis + byronDurationMillis
+	if currentMillis < byronEndMillis {
+		if cfg.Node.ByronGenesis.SlotLength == 0 {
+			return 0, false
+		}
+		return (currentMillis - startMillis) /
+			cfg.Node.ByronGenesis.SlotLength, true
+	}
+	if cfg.Node.ShelleyGenesis.SlotLength == 0 {
+		return 0, false
+	}
+	shelleySlots := (currentMillis - byronEndMillis) /
+		cfg.Node.ShelleyGenesis.SlotLength
+	if byronSlots > math.MaxUint64-shelleySlots {
+		return 0, false
+	}
+	return byronSlots + shelleySlots, true
 }
 
 // Time is in seconds

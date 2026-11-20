@@ -73,6 +73,7 @@ const (
 	TerminalWidthDefault    = 71
 	DashboardWidthDefault   = 118
 	DashboardHeightDefault  = 30
+	corePaneHeight          = 9
 	ProgressBarGranularity  = 68
 	ProcessDiscoveryRefresh = 30 * time.Second
 	mithrilOverlayPageName  = "mithril-overlay"
@@ -737,6 +738,20 @@ func corePaneSeverity() uiSeverity {
 	if promMetrics.DidntAdopt > 0 {
 		return uiSeverityCritical
 	}
+	if promMetrics.CouldNotForge > 0 || promMetrics.ForgedInvalid > 0 ||
+		promMetrics.AdoptionThreadDied > 0 ||
+		cardanoKESStateUnavailable(promMetrics) {
+		return uiSeverityCritical
+	}
+	if getEffectiveNodeBinary() == CARDANO_BINARY {
+		_, severity := cardanoKESExpiryStatusAt(promMetrics, time.Now())
+		if severity == uiSeverityCritical {
+			return uiSeverityCritical
+		}
+		if severity == uiSeverityWarn {
+			return uiSeverityWarn
+		}
+	}
 	if promMetrics.IsLeader != promMetrics.Adopted ||
 		promMetrics.MissedSlots > 0 {
 		return uiSeverityWarn
@@ -919,6 +934,12 @@ func getOverviewText(ctx context.Context) string {
 
 	tipGap, tipSeverity := currentTipGap(promMetrics)
 	epochProgress := float64(getEpochProgress(promMetrics))
+	gsmBadge := ""
+	if getEffectiveNodeBinary() == CARDANO_BINARY {
+		if label, severity, ok := cardanoGSMStatus(promMetrics); ok {
+			gsmBadge = "   " + uiPill("sync", label, severity)
+		}
+	}
 	fmt.Fprintf(&sb, " %s   %s   %s\n",
 		uiKV("Block", uiValue(strconv.FormatUint(promMetrics.BlockNum, 10))),
 		uiKV("Slot", uiValue(strconv.FormatUint(promMetrics.SlotNum, 10))),
@@ -930,7 +951,7 @@ func getOverviewText(ctx context.Context) string {
 	)
 	fmt.Fprintf(
 		&sb,
-		" %s   %s   %s\n",
+		" %s   %s   %s%s\n",
 		uiPercentBar(
 			"Epoch",
 			epochProgress,
@@ -939,6 +960,7 @@ func getOverviewText(ctx context.Context) string {
 		),
 		uiKVAligned(9, "Remaining", uiValue(formatEpochRemaining(promMetrics))),
 		uiKVAligned(9, "Peers", peerStateSegmentBar(promMetrics, 12)),
+		gsmBadge,
 	)
 	if getEffectiveNodeBinary() == DINGO_BINARY {
 		forgeLabel := "disabled"
@@ -1164,6 +1186,34 @@ func getOperatorFocusText(ctx context.Context) string {
 		uiKV("Mempool", uiValue(strconv.FormatUint(promMetrics.MempoolTx, 10))),
 		uiKV("Forks", uiValue(strconv.FormatUint(promMetrics.Forks, 10))),
 	)
+	if hasAnyPromMetric(
+		promMetrics,
+		"cardano_node_metrics_blockReplayProgress_real",
+		"cardano_node_metrics_utxoSize_int",
+	) {
+		sb.WriteString(uiSection("Ledger"))
+		replay := uiMuted("n/a")
+		if promMetrics.hasPromMetric(
+			"cardano_node_metrics_blockReplayProgress_real",
+		) {
+			replay = uiValue(
+				fmt.Sprintf("%.3f%%", promMetrics.BlockReplayProgress),
+			)
+		}
+		fmt.Fprintf(
+			&sb,
+			" %s   %s\n",
+			uiKV("Replay", replay),
+			uiKV(
+				"UTxO",
+				cardanoMetricValue(
+					promMetrics,
+					"cardano_node_metrics_utxoSize_int",
+					promMetrics.UTxOSize,
+				),
+			),
+		)
+	}
 	sb.WriteString(uiSection("Block Service"))
 	lateSeverity := dingoCounterSeverity(promMetrics.BlocksLate, uiSeverityWarn)
 	fmt.Fprintf(
@@ -1175,6 +1225,64 @@ func getOperatorFocusText(ctx context.Context) string {
 		),
 		uiKV("Late", formatSeverityCount(promMetrics.BlocksLate, lateSeverity)),
 	)
+	if hasAnyPromMetric(
+		promMetrics,
+		"cardano_node_metrics_served_header_counter",
+		"cardano_node_metrics_ChainSync_HeadersServed_counter",
+	) {
+		fmt.Fprintf(
+			&sb,
+			" %s   %s\n",
+			uiKV(
+				"Headers",
+				cardanoMetricValue(
+					promMetrics,
+					"cardano_node_metrics_served_header_counter",
+					promMetrics.HeadersServed,
+				),
+			),
+			uiKV(
+				"ChainSync",
+				cardanoMetricValue(
+					promMetrics,
+					"cardano_node_metrics_ChainSync_HeadersServed_counter",
+					promMetrics.ChainSyncHeadersServed,
+				),
+			),
+		)
+	}
+	if hasAnyPromMetric(
+		promMetrics,
+		"cardano_node_metrics_txsSyncDuration_int",
+		"cardano_node_metrics_txsMempoolTimeoutSoft_counter",
+	) {
+		sb.WriteString(uiSection("Mempool Pressure"))
+		timeoutSeverity := dingoCounterSeverity(
+			promMetrics.TxMempoolTimeoutSoft,
+			uiSeverityWarn,
+		)
+		fmt.Fprintf(
+			&sb,
+			" %s   %s\n",
+			uiKV(
+				"Sync duration",
+				cardanoMetricValue(
+					promMetrics,
+					"cardano_node_metrics_txsSyncDuration_int",
+					promMetrics.TxSyncDuration,
+				),
+			),
+			uiKV(
+				"Soft timeout",
+				cardanoMetricSeverityCount(
+					promMetrics,
+					"cardano_node_metrics_txsMempoolTimeoutSoft_counter",
+					promMetrics.TxMempoolTimeoutSoft,
+					timeoutSeverity,
+				),
+			),
+		)
+	}
 	if getEffectiveNodeBinary() == AMARU_BINARY {
 		sb.WriteString(amaruIntakeText(promMetrics))
 		prev, _ := dingoPreviousSample(promMetrics)
@@ -4179,7 +4287,7 @@ func main() {
 		AddItem(connectionTextView, 0, 1, false)
 	centerColumn.
 		AddItem(chainTextView, 10, 0, false).
-		AddItem(coreTextView, 8, 0, false).
+		AddItem(coreTextView, corePaneHeight, 0, false).
 		AddItem(blockTextView, 0, 1, false)
 	rightColumn.
 		AddItem(dingoTextView, 0, 1, false).
@@ -5877,22 +5985,111 @@ func getCoreText(ctx context.Context) string {
 				missedSeverity,
 			),
 		)
-		fmt.Fprintf(
-			&sb,
-			" %s   %s\n",
-			uiKVSeverityAligned(
-				10,
-				"KES period",
-				strconv.FormatUint(promMetrics.KesPeriod, 10),
-				forgeRowSeverity,
-			),
-			uiKVSeverityAligned(
-				10,
-				"KES remain",
-				strconv.FormatUint(promMetrics.RemainingKesPeriods, 10),
-				forgeRowSeverity,
-			),
-		)
+		if getEffectiveNodeBinary() == CARDANO_BINARY {
+			if hasAnyPromMetric(
+				promMetrics,
+				"cardano_node_metrics_Forge_could_not_forge_counter",
+				"cardano_node_metrics_Forge_forged_invalid_counter",
+				"cardano_node_metrics_Forge_adoption_thread_died_counter",
+			) {
+				couldNotSeverity := dingoCounterSeverity(
+					promMetrics.CouldNotForge,
+					uiSeverityCritical,
+				)
+				forgedInvalidSeverity := dingoCounterSeverity(
+					promMetrics.ForgedInvalid,
+					uiSeverityCritical,
+				)
+				adoptionSeverity := dingoCounterSeverity(
+					promMetrics.AdoptionThreadDied,
+					uiSeverityCritical,
+				)
+				fmt.Fprintf(
+					&sb,
+					" %s   %s   %s\n",
+					uiKV(
+						"Cannot",
+						cardanoMetricSeverityCount(
+							promMetrics,
+							"cardano_node_metrics_Forge_could_not_forge_counter",
+							promMetrics.CouldNotForge,
+							couldNotSeverity,
+						),
+					),
+					uiKV(
+						"Bad",
+						cardanoMetricSeverityCount(
+							promMetrics,
+							"cardano_node_metrics_Forge_forged_invalid_counter",
+							promMetrics.ForgedInvalid,
+							forgedInvalidSeverity,
+						),
+					),
+					uiKV(
+						"Adopt",
+						cardanoMetricSeverityCount(
+							promMetrics,
+							"cardano_node_metrics_Forge_adoption_thread_died_counter",
+							promMetrics.AdoptionThreadDied,
+							adoptionSeverity,
+						),
+					),
+				)
+			}
+			if hasAnyPromMetric(
+				promMetrics,
+				"cardano_node_metrics_Forge_node_not_leader_counter",
+				"cardano_node_metrics_forgedSlotLast_int",
+			) {
+				fmt.Fprintf(
+					&sb,
+					" %s   %s\n",
+					uiKV(
+						"Not leader",
+						cardanoMetricValue(
+							promMetrics,
+							"cardano_node_metrics_Forge_node_not_leader_counter",
+							promMetrics.NodeNotLeader,
+						),
+					),
+					uiKV(
+						"Last forged",
+						uiValue(cardanoLastForged(promMetrics)),
+					),
+				)
+			}
+			expiry, expirySeverity := cardanoKESExpiryStatusAt(
+				promMetrics,
+				time.Now(),
+			)
+			if cardanoKESStateUnavailable(promMetrics) {
+				expiry = "state unavailable; " + expiry
+				expirySeverity = uiSeverityCritical
+			}
+			fmt.Fprintf(
+				&sb,
+				" %s   %s\n",
+				uiKV("KES window", uiValue(cardanoKESWindow(promMetrics))),
+				uiKV("KES expiry", uiSeverityValue(expiry, expirySeverity)),
+			)
+		} else {
+			fmt.Fprintf(
+				&sb,
+				" %s   %s\n",
+				uiKVSeverityAligned(
+					10,
+					"KES period",
+					strconv.FormatUint(promMetrics.KesPeriod, 10),
+					forgeRowSeverity,
+				),
+				uiKVSeverityAligned(
+					10,
+					"KES remain",
+					strconv.FormatUint(promMetrics.RemainingKesPeriods, 10),
+					forgeRowSeverity,
+				),
+			)
+		}
 		if promMetrics.DingoBlockForgingLatencyN > 0 {
 			avg := promMetrics.DingoBlockForgingLatencyS /
 				float64(promMetrics.DingoBlockForgingLatencyN)
@@ -6377,6 +6574,160 @@ func getPeerText(ctx context.Context) string {
 				uiKV("Hot", uiValue(strconv.FormatUint(promMetrics.PeersHot, 10))),
 				uiKV("Warm", uiValue(strconv.FormatUint(promMetrics.PeersWarm, 10))),
 				uiKV("Cold", uiValue(strconv.FormatUint(promMetrics.PeersCold, 10))),
+			)
+		}
+		if hasAnyPromMetric(
+			promMetrics,
+			"cardano_node_metrics_peerSelection_KnownBigLedgerPeers_int",
+			"cardano_node_metrics_peerSelection_EstablishedBigLedgerPeers_int",
+			"cardano_node_metrics_peerSelection_ActiveBigLedgerPeers_int",
+		) {
+			fmt.Fprintf(&sb, " %s   %s   %s\n",
+				uiKV(
+					"Big known",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_peerSelection_KnownBigLedgerPeers_int",
+						promMetrics.BigLedgerKnown,
+					),
+				),
+				uiKV(
+					"est",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_peerSelection_EstablishedBigLedgerPeers_int",
+						promMetrics.BigLedgerEstablished,
+					),
+				),
+				uiKV(
+					"active",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_peerSelection_ActiveBigLedgerPeers_int",
+						promMetrics.BigLedgerActive,
+					),
+				),
+			)
+		}
+		if hasAnyPromMetric(
+			promMetrics,
+			"cardano_node_metrics_peerSelection_KnownLocalRootPeers_int",
+			"cardano_node_metrics_peerSelection_EstablishedLocalRootPeers_int",
+			"cardano_node_metrics_peerSelection_ActiveLocalRootPeers_int",
+		) {
+			fmt.Fprintf(&sb, " %s   %s   %s\n",
+				uiKV(
+					"Local roots",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_peerSelection_ActiveLocalRootPeers_int",
+						promMetrics.LocalRootsActive,
+					)+uiUnit(" active"),
+				),
+				uiKV(
+					"known",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_peerSelection_KnownLocalRootPeers_int",
+						promMetrics.LocalRootsKnown,
+					),
+				),
+				uiKV(
+					"est",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_peerSelection_EstablishedLocalRootPeers_int",
+						promMetrics.LocalRootsEstablished,
+					),
+				),
+			)
+		}
+		if hasAnyPromMetric(
+			promMetrics,
+			"cardano_node_metrics_inboundGovernor_idle_int",
+			"cardano_node_metrics_inboundGovernor_cold_int",
+			"cardano_node_metrics_inboundGovernor_warm_int",
+			"cardano_node_metrics_inboundGovernor_hot_int",
+		) {
+			fmt.Fprintf(
+				&sb,
+				" %s   %s   %s   %s\n",
+				uiKV(
+					"Inbound idle",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_inboundGovernor_idle_int",
+						promMetrics.InboundIdle,
+					),
+				),
+				uiKV(
+					"cold",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_inboundGovernor_cold_int",
+						promMetrics.InboundCold,
+					),
+				),
+				uiKV(
+					"warm",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_inboundGovernor_warm_int",
+						promMetrics.InboundWarm,
+					),
+				),
+				uiKV(
+					"hot",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_inboundGovernor_hot_int",
+						promMetrics.InboundHot,
+					),
+				),
+			)
+		}
+		if hasAnyPromMetric(
+			promMetrics,
+			"cardano_node_metrics_localInboundGovernor_idle_int",
+			"cardano_node_metrics_localInboundGovernor_cold_int",
+			"cardano_node_metrics_localInboundGovernor_warm_int",
+			"cardano_node_metrics_localInboundGovernor_hot_int",
+		) {
+			fmt.Fprintf(
+				&sb,
+				" %s   %s   %s   %s\n",
+				uiKV(
+					"Local N2C idle",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_localInboundGovernor_idle_int",
+						promMetrics.LocalInboundIdle,
+					),
+				),
+				uiKV(
+					"cold",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_localInboundGovernor_cold_int",
+						promMetrics.LocalInboundCold,
+					),
+				),
+				uiKV(
+					"warm",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_localInboundGovernor_warm_int",
+						promMetrics.LocalInboundWarm,
+					),
+				),
+				uiKV(
+					"hot",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_localInboundGovernor_hot_int",
+						promMetrics.LocalInboundHot,
+					),
+				),
 			)
 		}
 		if promMetrics.DingoPeerPromotionsLedger > 0 ||
