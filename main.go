@@ -73,6 +73,7 @@ const (
 	TerminalWidthDefault    = 71
 	DashboardWidthDefault   = 118
 	DashboardHeightDefault  = 30
+	corePaneHeight          = 9
 	ProgressBarGranularity  = 68
 	ProcessDiscoveryRefresh = 30 * time.Second
 	mithrilOverlayPageName  = "mithril-overlay"
@@ -4286,7 +4287,7 @@ func main() {
 		AddItem(connectionTextView, 0, 1, false)
 	centerColumn.
 		AddItem(chainTextView, 10, 0, false).
-		AddItem(coreTextView, 8, 0, false).
+		AddItem(coreTextView, corePaneHeight, 0, false).
 		AddItem(blockTextView, 0, 1, false)
 	rightColumn.
 		AddItem(dingoTextView, 0, 1, false).

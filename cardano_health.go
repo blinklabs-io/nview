@@ -65,10 +65,15 @@ func cardanoKESExpiryStatusAt(
 			uiSeverityMuted
 	}
 	expirySlot := metrics.OpCertExpiryKES * slotsPerPeriod
-	if expirySlot <= metrics.SlotNum {
+	currentSlot, ok := networkSlotAt(now)
+	if !ok {
+		return "period " + strconv.FormatUint(metrics.OpCertExpiryKES, 10),
+			uiSeverityMuted
+	}
+	if expirySlot <= currentSlot {
 		return "expired", uiSeverityCritical
 	}
-	remainingSlots := expirySlot - metrics.SlotNum
+	remainingSlots := expirySlot - currentSlot
 	maxDurationMillis := uint64(math.MaxInt64 / time.Millisecond)
 	if remainingSlots > maxDurationMillis/slotLengthMs {
 		return "period " + strconv.FormatUint(metrics.OpCertExpiryKES, 10),
@@ -80,13 +85,9 @@ func cardanoKESExpiryStatusAt(
 	if remaining <= cardanoKESWarningWindow {
 		severity = uiSeverityWarn
 	}
-	base := metrics.CollectedAt
-	if base.IsZero() {
-		base = now
-	}
 	return fmt.Sprintf(
 		"%s (%s)",
-		base.Add(remaining).Format("2006-01-02"),
+		now.Add(remaining).Format("2006-01-02"),
 		formatCardanoDuration(remaining),
 	), severity
 }
@@ -101,14 +102,21 @@ func formatCardanoDuration(duration time.Duration) string {
 }
 
 func cardanoKESWindow(metrics *PromMetrics) string {
-	if !hasAnyPromMetric(
-		metrics,
-		"cardano_node_metrics_operationalCertificateStartKESPeriod_int",
-		"cardano_node_metrics_operationalCertificateExpiryKESPeriod_int",
-	) {
+	const startMetric = "cardano_node_metrics_operationalCertificateStartKESPeriod_int"
+	const expiryMetric = "cardano_node_metrics_operationalCertificateExpiryKESPeriod_int"
+	if !metrics.hasPromMetric(startMetric) &&
+		!metrics.hasPromMetric(expiryMetric) {
 		return "n/a"
 	}
-	return fmt.Sprintf("%d-%d", metrics.OpCertStartKES, metrics.OpCertExpiryKES)
+	start := "n/a"
+	if metrics.hasPromMetric(startMetric) {
+		start = strconv.FormatUint(metrics.OpCertStartKES, 10)
+	}
+	expiry := "n/a"
+	if metrics.hasPromMetric(expiryMetric) {
+		expiry = strconv.FormatUint(metrics.OpCertExpiryKES, 10)
+	}
+	return start + "-" + expiry
 }
 
 func cardanoKESStateUnavailable(metrics *PromMetrics) bool {

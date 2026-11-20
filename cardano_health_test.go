@@ -22,7 +22,33 @@ import (
 	"time"
 
 	"github.com/blinklabs-io/nview/internal/config"
+	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
 )
+
+func configureCardanoKESClock(
+	t *testing.T,
+	start time.Time,
+	slotLength uint64,
+	slotsPerKESPeriod uint64,
+) {
+	t.Helper()
+	cfg := config.GetConfig()
+	originalByron := cfg.Node.ByronGenesis
+	originalShelley := cfg.Node.ShelleyGenesis
+	originalTransition := cfg.Node.ShelleyTransEpoch
+	t.Cleanup(func() {
+		cfg.Node.ByronGenesis = originalByron
+		cfg.Node.ShelleyGenesis = originalShelley
+		cfg.Node.ShelleyTransEpoch = originalTransition
+	})
+	cfg.Node.ByronGenesis.StartTime = uint64(start.Unix())
+	cfg.Node.ByronGenesis.EpochLength = 1
+	cfg.Node.ByronGenesis.SlotLength = 1000
+	cfg.Node.ShelleyGenesis.SlotLength = slotLength
+	cfg.Node.ShelleyGenesis.SlotsPerKESPeriod = slotsPerKESPeriod
+	cfg.Node.ShelleyTransEpoch = 0
+}
 
 func TestCardanoNodeHealthViewsUseRecordedMetrics(t *testing.T) {
 	cfg := config.GetConfig()
@@ -82,6 +108,27 @@ func TestCardanoNodeHealthViewsUseRecordedMetrics(t *testing.T) {
 		}
 	}
 
+	screen := tcell.NewSimulationScreen("UTF-8")
+	if err := screen.Init(); err != nil {
+		t.Fatalf("initialize simulation screen: %v", err)
+	}
+	t.Cleanup(screen.Fini)
+	screen.SetSize(45, corePaneHeight)
+	view := tview.NewTextView().SetDynamicColors(true)
+	view.SetBorder(true)
+	view.SetRect(0, 0, 45, corePaneHeight)
+	view.SetText(getCoreText(context.Background()))
+	view.Draw(screen)
+	screen.Show()
+	cells, _, _ := screen.GetContents()
+	var visible strings.Builder
+	for _, cell := range cells {
+		visible.WriteString(string(cell.Runes))
+	}
+	if !strings.Contains(visible.String(), "expired") {
+		t.Fatalf("KES expiry is clipped from the Forge pane:\n%s", visible.String())
+	}
+
 	relay := decodeFixture(t, "cardano-node-11.1.3-relay.om.txt")
 	relay.LocalInboundIdle = 1
 	relay.LocalInboundCold = 2
@@ -120,16 +167,8 @@ func TestCardanoNodeHealthViewsUseRecordedMetrics(t *testing.T) {
 }
 
 func TestCardanoKESStateErrorIsNotReportedAsExpiry(t *testing.T) {
-	cfg := config.GetConfig()
-	originalSlotsPerPeriod := cfg.Node.ShelleyGenesis.SlotsPerKESPeriod
-	originalSlotLength := cfg.Node.ShelleyGenesis.SlotLength
-	defer func() {
-		cfg.Node.ShelleyGenesis.SlotsPerKESPeriod = originalSlotsPerPeriod
-		cfg.Node.ShelleyGenesis.SlotLength = originalSlotLength
-	}()
-
-	cfg.Node.ShelleyGenesis.SlotsPerKESPeriod = 100
-	cfg.Node.ShelleyGenesis.SlotLength = 1000
+	now := time.Date(2026, 11, 19, 0, 0, 0, 0, time.UTC)
+	configureCardanoKESClock(t, now.Add(-1000*time.Second), 1000, 100)
 	metrics := &PromMetrics{
 		SlotNum:         1_000,
 		OpCertExpiryKES: 20,
@@ -138,7 +177,7 @@ func TestCardanoKESStateErrorIsNotReportedAsExpiry(t *testing.T) {
 			"cardano_node_metrics_remainingKESPeriods_int":                   true,
 			"cardano_node_metrics_operationalCertificateExpiryKESPeriod_int": true,
 		},
-		CollectedAt: time.Date(2026, 11, 19, 0, 0, 0, 0, time.UTC),
+		CollectedAt: now,
 	}
 	if !cardanoKESStateUnavailable(metrics) {
 		t.Fatal(
@@ -147,7 +186,7 @@ func TestCardanoKESStateErrorIsNotReportedAsExpiry(t *testing.T) {
 	}
 	status, severity := cardanoKESExpiryStatusAt(
 		metrics,
-		time.Date(2026, 11, 19, 0, 0, 0, 0, time.UTC),
+		now,
 	)
 	if status == "expired" || severity == uiSeverityCritical {
 		t.Fatalf(
@@ -158,24 +197,92 @@ func TestCardanoKESStateErrorIsNotReportedAsExpiry(t *testing.T) {
 	}
 }
 
-func TestCardanoKESExpiryRejectsDurationOverflow(t *testing.T) {
-	cfg := config.GetConfig()
-	originalSlotsPerPeriod := cfg.Node.ShelleyGenesis.SlotsPerKESPeriod
-	originalSlotLength := cfg.Node.ShelleyGenesis.SlotLength
-	defer func() {
-		cfg.Node.ShelleyGenesis.SlotsPerKESPeriod = originalSlotsPerPeriod
-		cfg.Node.ShelleyGenesis.SlotLength = originalSlotLength
-	}()
+func TestCardanoKESExpiryUsesWallClockSlot(t *testing.T) {
+	now := time.Date(2026, 11, 19, 0, 0, 0, 0, time.UTC)
+	configureCardanoKESClock(t, now.Add(-1000*time.Second), 1000, 100)
+	metrics := &PromMetrics{
+		SlotNum:         500,
+		OpCertExpiryKES: 20,
+		PromMetricPresent: map[string]bool{
+			"cardano_node_metrics_operationalCertificateExpiryKESPeriod_int": true,
+		},
+		CollectedAt: now.Add(-time.Hour),
+	}
 
-	cfg.Node.ShelleyGenesis.SlotsPerKESPeriod = math.MaxUint32
-	cfg.Node.ShelleyGenesis.SlotLength = math.MaxUint32
+	status, _ := cardanoKESExpiryStatusAt(metrics, now)
+	if status == "expired" {
+		t.Fatalf("certificate expired too early: %q", status)
+	}
+	status, severity := cardanoKESExpiryStatusAt(
+		metrics,
+		now.Add(1001*time.Second),
+	)
+	if status != "expired" || severity != uiSeverityCritical {
+		t.Fatalf("stale snapshot status = %q, severity = %v", status, severity)
+	}
+}
+
+func TestCardanoKESWindowPreservesMissingBounds(t *testing.T) {
+	tests := []struct {
+		name    string
+		metrics PromMetrics
+		want    string
+	}{
+		{
+			name: "start only",
+			metrics: PromMetrics{
+				OpCertStartKES: 1500,
+				PromMetricPresent: map[string]bool{
+					"cardano_node_metrics_operationalCertificateStartKESPeriod_int": true,
+				},
+			},
+			want: "1500-n/a",
+		},
+		{
+			name: "expiry only",
+			metrics: PromMetrics{
+				OpCertExpiryKES: 20,
+				PromMetricPresent: map[string]bool{
+					"cardano_node_metrics_operationalCertificateExpiryKESPeriod_int": true,
+				},
+			},
+			want: "n/a-20",
+		},
+		{
+			name: "explicit zero start",
+			metrics: PromMetrics{
+				OpCertExpiryKES: 20,
+				PromMetricPresent: map[string]bool{
+					"cardano_node_metrics_operationalCertificateStartKESPeriod_int":  true,
+					"cardano_node_metrics_operationalCertificateExpiryKESPeriod_int": true,
+				},
+			},
+			want: "0-20",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := cardanoKESWindow(&tt.metrics); got != tt.want {
+				t.Fatalf("cardanoKESWindow() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCardanoKESExpiryRejectsDurationOverflow(t *testing.T) {
+	configureCardanoKESClock(
+		t,
+		time.Unix(1, 0),
+		math.MaxUint32,
+		math.MaxUint32,
+	)
 	metrics := &PromMetrics{
 		OpCertExpiryKES: math.MaxUint32,
 		PromMetricPresent: map[string]bool{
 			"cardano_node_metrics_operationalCertificateExpiryKESPeriod_int": true,
 		},
 	}
-	status, severity := cardanoKESExpiryStatusAt(metrics, time.Unix(0, 0))
+	status, severity := cardanoKESExpiryStatusAt(metrics, time.Unix(2, 0))
 	if !strings.HasPrefix(status, "period ") || severity != uiSeverityMuted {
 		t.Fatalf("overflow status = %q, severity = %v", status, severity)
 	}
