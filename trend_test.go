@@ -526,3 +526,36 @@ func TestPingPeersRecordsTheRTTTrend(t *testing.T) {
 		t.Fatalf("trend after two quick ticks = %v, expected [60]", got)
 	}
 }
+
+// The tip reference gives the newest block one second to arrive, so a node
+// that is current is not shown as a slot behind.
+func TestSlotTipRefAtAllowsOneSecond(t *testing.T) {
+	cfg := config.GetConfig()
+	originalByron := cfg.Node.ByronGenesis
+	originalShelley := cfg.Node.ShelleyGenesis
+	originalTrans := cfg.Node.ShelleyTransEpoch
+	t.Cleanup(func() {
+		cfg.Node.ByronGenesis = originalByron
+		cfg.Node.ShelleyGenesis = originalShelley
+		cfg.Node.ShelleyTransEpoch = originalTrans
+	})
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	cfg.Node.ByronGenesis = config.ByronGenesisConfig{
+		StartTime:   uint64(start.Unix()),
+		EpochLength: 500,
+		SlotLength:  20000,
+	}
+	cfg.Node.ShelleyGenesis = config.ShelleyGenesisConfig{SlotLength: 1000}
+	cfg.Node.ShelleyTransEpoch = 0
+
+	at := start.Add(10 * time.Second)
+	if slot, ok := networkSlotAt(at); !ok || slot != 10 {
+		t.Fatalf("slot at %v = %d, %v, expected 10", at, slot, ok)
+	}
+	if slot, ok := slotTipRefAt(at); !ok || slot != 9 {
+		t.Fatalf("tip reference at %v = %d, %v, expected 9", at, slot, ok)
+	}
+	if _, ok := slotTipRefAt(start.Add(-time.Hour)); ok {
+		t.Fatal("a time before genesis has a tip reference")
+	}
+}
