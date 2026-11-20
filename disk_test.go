@@ -530,8 +530,14 @@ func TestNodeRootedPathWithoutProc(t *testing.T) {
 // systems band carries the Disk row after a refresh and omits it when the
 // latest refresh found no readable data directory.
 func TestDingoSystemsBandShowsDisk(t *testing.T) {
-	useDingoDashboard(t, t.TempDir())
-	refreshDiskSnapshot(context.Background(), &config.Config{}, processMetrics)
+	originalDisk := latestDisk.Load()
+	t.Cleanup(func() { latestDisk.Store(originalDisk) })
+	dataDir := t.TempDir()
+	refreshDiskSnapshot(
+		context.Background(),
+		&config.Config{Node: config.NodeConfig{DataDir: dataDir}},
+		nil,
+	)
 	got := dingoConsoleSystemsBand(&PromMetrics{}, 120)
 	if !strings.Contains(got, "Disk") {
 		t.Fatalf("expected Disk row in systems band:\n%s", got)
