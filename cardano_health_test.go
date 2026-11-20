@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -154,5 +155,28 @@ func TestCardanoKESStateErrorIsNotReportedAsExpiry(t *testing.T) {
 			status,
 			severity,
 		)
+	}
+}
+
+func TestCardanoKESExpiryRejectsDurationOverflow(t *testing.T) {
+	cfg := config.GetConfig()
+	originalSlotsPerPeriod := cfg.Node.ShelleyGenesis.SlotsPerKESPeriod
+	originalSlotLength := cfg.Node.ShelleyGenesis.SlotLength
+	defer func() {
+		cfg.Node.ShelleyGenesis.SlotsPerKESPeriod = originalSlotsPerPeriod
+		cfg.Node.ShelleyGenesis.SlotLength = originalSlotLength
+	}()
+
+	cfg.Node.ShelleyGenesis.SlotsPerKESPeriod = math.MaxUint32
+	cfg.Node.ShelleyGenesis.SlotLength = math.MaxUint32
+	metrics := &PromMetrics{
+		OpCertExpiryKES: math.MaxUint32,
+		PromMetricPresent: map[string]bool{
+			"cardano_node_metrics_operationalCertificateExpiryKESPeriod_int": true,
+		},
+	}
+	status, severity := cardanoKESExpiryStatusAt(metrics, time.Unix(0, 0))
+	if !strings.HasPrefix(status, "period ") || severity != uiSeverityMuted {
+		t.Fatalf("overflow status = %q, severity = %v", status, severity)
 	}
 }

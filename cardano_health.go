@@ -69,11 +69,12 @@ func cardanoKESExpiryStatusAt(
 		return "expired", uiSeverityCritical
 	}
 	remainingSlots := expirySlot - metrics.SlotNum
-	if remainingSlots > math.MaxInt64/slotLengthMs {
+	maxDurationMillis := uint64(math.MaxInt64 / time.Millisecond)
+	if remainingSlots > maxDurationMillis/slotLengthMs {
 		return "period " + strconv.FormatUint(metrics.OpCertExpiryKES, 10),
 			uiSeverityMuted
 	}
-	// #nosec G115 -- the product is bounded by MaxInt64 above.
+	// #nosec G115 -- the millisecond product is bounded to a time.Duration.
 	remaining := time.Duration(remainingSlots*slotLengthMs) * time.Millisecond
 	severity := uiSeverityOK
 	if remaining <= cardanoKESWarningWindow {
