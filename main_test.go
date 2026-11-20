@@ -4244,3 +4244,53 @@ func TestRefreshAsksForRedrawWhenLeavingTooSmall(t *testing.T) {
 		)
 	}
 }
+
+// Drives the paths the reviewer's repro uses through the real size check: the
+// peer key, the peer overlay refresh and the scrape-driven Mithril update must
+// all leave the message in front, and none of them may stay blocked once the
+// terminal is large enough again.
+func TestOverlayPathsRespectTooSmallEndToEnd(t *testing.T) {
+	countRedraws(t)
+	addTooSmallTestPages(t)
+	dashboardPages.AddPage(peerOverlayPageName, tview.NewBox(), true, false)
+	prevBinary := detectedNodeBinary.Load()
+	detectedNodeBinary.Store(DINGO_BINARY)
+	prevMetrics := promMetrics.Load()
+	promMetrics.Store(&PromMetrics{MithrilSyncStartedAt: 1})
+	prevOverlay := peerOverlayActive.Load()
+	t.Cleanup(func() {
+		promMetrics.Store(prevMetrics)
+		peerOverlayActive.Store(prevOverlay)
+		tooSmallShown.Store(false)
+		if prevBinary != nil {
+			detectedNodeBinary.Store(prevBinary)
+		}
+	})
+	peerOverlayActive.Store(false)
+	ctx := context.Background()
+
+	if !applyTooSmall(DINGO_BINARY, 60, 10) {
+		t.Fatal("60x10 should be too small for Dingo")
+	}
+	togglePeerOverlay(ctx)
+	updatePeerOverlay(ctx)
+	updateMithrilView()
+	if front, _ := dashboardPages.GetFrontPage(); front != tooSmallPageName {
+		t.Fatalf("front page = %q, expected %q", front, tooSmallPageName)
+	}
+	if peerOverlayActive.Load() {
+		t.Fatal("peer key opened an overlay while too small")
+	}
+
+	if applyTooSmall(DINGO_BINARY, 140, 45) {
+		t.Fatal("140x45 should not be too small")
+	}
+	updateMithrilView()
+	if front, _ := dashboardPages.GetFrontPage(); front != mithrilOverlayPageName {
+		t.Fatalf(
+			"front page = %q after growing, expected %q: the guard is stuck",
+			front,
+			mithrilOverlayPageName,
+		)
+	}
+}
