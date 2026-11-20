@@ -3841,3 +3841,248 @@ func TestDingoPartialExportsReportMissingAsUnavailable(t *testing.T) {
 		)
 	}
 }
+
+func TestDashboardTooSmall(t *testing.T) {
+	tests := []struct {
+		name   string
+		binary string
+		cols   int
+		rows   int
+		want   bool
+	}{
+		{"panels narrow", CARDANO_BINARY, DashboardMinWidth - 1, 40, true},
+		{"panels short", CARDANO_BINARY, 140, DashboardMinHeight - 1, true},
+		{
+			"panels minimum",
+			CARDANO_BINARY,
+			DashboardMinWidth,
+			DashboardMinHeight,
+			false,
+		},
+		{"panels normal", CARDANO_BINARY, 150, 45, false},
+		{"amaru narrow", AMARU_BINARY, 80, 40, true},
+		{
+			"amaru minimum",
+			AMARU_BINARY,
+			DashboardMinWidth,
+			DashboardMinHeight,
+			false,
+		},
+		{
+			"dingo below compact minimum",
+			DINGO_BINARY,
+			DingoCompactMinWidth - 1,
+			24,
+			true,
+		},
+		{"dingo short", DINGO_BINARY, 100, DingoCompactMinHeight - 1, true},
+		{
+			"dingo compact minimum",
+			DINGO_BINARY,
+			DingoCompactMinWidth,
+			DingoCompactMinHeight,
+			false,
+		},
+		{"dingo compact breakpoint", DINGO_BINARY, 80, 25, false},
+		{"dingo normal", DINGO_BINARY, 150, 50, false},
+	}
+	for _, tt := range tests {
+		got, _, _ := dashboardTooSmall(tt.binary, tt.cols, tt.rows)
+		if got != tt.want {
+			t.Errorf(
+				"%s: dashboardTooSmall(%s, %d, %d) = %v, expected %v",
+				tt.name, tt.binary, tt.cols, tt.rows, got, tt.want,
+			)
+		}
+	}
+}
+
+// An unreadable terminal falls back to the default dashboard size, which has
+// to clear the minimum or the message would replace a working dashboard.
+func TestDashboardFallbackSizeIsNotTooSmall(t *testing.T) {
+	for _, binary := range []string{CARDANO_BINARY, AMARU_BINARY, DINGO_BINARY} {
+		small, _, _ := dashboardTooSmall(
+			binary,
+			DashboardWidthDefault,
+			DashboardHeightDefault,
+		)
+		if small {
+			t.Errorf("%s: fallback size is below the dashboard minimum", binary)
+		}
+	}
+}
+
+// Dingo's compact console is reached by narrowing the terminal, so its
+// minimum must sit below the breakpoint that selects it.
+func TestDingoMinimumIsBelowCompactBreakpoint(t *testing.T) {
+	if !dingoConsoleCompact(DingoCompactMinWidth, DingoCompactMinHeight) {
+		t.Fatalf(
+			"%dx%d is not compact, so the compact minimum is unreachable",
+			DingoCompactMinWidth,
+			DingoCompactMinHeight,
+		)
+	}
+}
+
+func TestGetTooSmallTextNamesNeededAndCurrentSize(t *testing.T) {
+	tests := []struct {
+		name string
+		cols int
+		rows int
+		want []string
+		not  []string
+	}{
+		{
+			"narrow",
+			90, 40,
+			[]string{
+				"Terminal too small!", "Need 112x30", "have 90x40",
+				"Please increase by 22 columns",
+			},
+			[]string{"lines"},
+		},
+		{
+			"short",
+			140, 24,
+			[]string{"have 140x24", "Please increase by 6 lines"},
+			[]string{"columns"},
+		},
+		{
+			"one short",
+			111, 29,
+			[]string{"Please increase by 1 column and 1 line"},
+			[]string{"1 columns", "1 lines"},
+		},
+		{
+			"both",
+			100, 20,
+			[]string{"Please increase by 12 columns and 10 lines"},
+			nil,
+		},
+	}
+	for _, tt := range tests {
+		plain := stripTviewTags(getTooSmallText(tt.cols, tt.rows, 112, 30))
+		for _, want := range tt.want {
+			if !strings.Contains(plain, want) {
+				t.Errorf("%s: message missing %q:\n%s", tt.name, want, plain)
+			}
+		}
+		for _, not := range tt.not {
+			if strings.Contains(plain, not) {
+				t.Errorf("%s: message has %q:\n%s", tt.name, not, plain)
+			}
+		}
+	}
+}
+
+// The refresh loop must stop at the too-small message instead of drawing the
+// panels over it.
+func TestRefreshDashboardTextShowsTooSmall(t *testing.T) {
+	prevBinary := detectedNodeBinary.Load()
+	detectedNodeBinary.Store(CARDANO_BINARY)
+	prevSize := terminalSizeFunc
+	defer func() {
+		terminalSizeFunc = prevSize
+		if prevBinary != nil {
+			detectedNodeBinary.Store(prevBinary)
+		}
+	}()
+	for _, name := range []string{"panels", "dingo"} {
+		dashboardPages.AddPage(name, tview.NewBox(), true, name == "panels")
+		defer dashboardPages.RemovePage(name)
+	}
+	dashboardPages.AddPage(tooSmallPageName, tooSmallTextView, true, false)
+	defer dashboardPages.RemovePage(tooSmallPageName)
+
+	terminalSizeFunc = func() (int, int) { return 90, 24 }
+	refreshDashboardText(context.Background())
+	if front, _ := dashboardPages.GetFrontPage(); front != tooSmallPageName {
+		t.Fatalf("front page = %q, expected %q", front, tooSmallPageName)
+	}
+	footer := stripTviewTags(footerTextView.GetText(true))
+	if !strings.Contains(footer, "Quit") ||
+		strings.Contains(footer, "Refresh") {
+		t.Fatalf("footer = %q, expected only the quit key", footer)
+	}
+
+	terminalSizeFunc = func() (int, int) {
+		return DashboardMinWidth, DashboardMinHeight
+	}
+	refreshDashboardText(context.Background())
+	if front, _ := dashboardPages.GetFrontPage(); front != "panels" {
+		t.Fatalf("front page = %q at the minimum size, expected panels", front)
+	}
+}
+
+func TestApplyTooSmallSwitchesPages(t *testing.T) {
+	dashboardPages.AddPage("panels", tview.NewBox(), true, true)
+	dashboardPages.AddPage(tooSmallPageName, tooSmallTextView, true, false)
+	dashboardPages.AddPage(peerOverlayPageName, tview.NewBox(), true, true)
+	defer func() {
+		dashboardPages.RemovePage("panels")
+		dashboardPages.RemovePage(tooSmallPageName)
+		dashboardPages.RemovePage(peerOverlayPageName)
+	}()
+
+	if !applyTooSmall(CARDANO_BINARY, 90, 24) {
+		t.Fatal("90x24 should be too small for the panel grid")
+	}
+	if front, _ := dashboardPages.GetFrontPage(); front != tooSmallPageName {
+		t.Fatalf("front page = %q, expected %q", front, tooSmallPageName)
+	}
+
+	if applyTooSmall(CARDANO_BINARY, DashboardMinWidth, DashboardMinHeight) {
+		t.Fatal("the minimum size should not be too small")
+	}
+	if dashboardPages.HasPage(tooSmallPageName) {
+		if front, _ := dashboardPages.GetFrontPage(); front == tooSmallPageName {
+			t.Fatal("too-small page still in front at the minimum size")
+		}
+	}
+}
+
+func TestProgressBarGranularityFitsTerminalWidthDefault(t *testing.T) {
+	if ProgressBarGranularity != TerminalWidthDefault-3 {
+		t.Fatalf(
+			"ProgressBarGranularity = %d, expected TerminalWidthDefault-3 = %d",
+			ProgressBarGranularity,
+			TerminalWidthDefault-3,
+		)
+	}
+	if ProgressBarGranularity != 68 {
+		t.Fatalf(
+			"ProgressBarGranularity = %d, expected the shipped 68",
+			ProgressBarGranularity,
+		)
+	}
+}
+
+// The legacy view's own width check must not be stricter than the dashboard
+// minimum, or a terminal the dashboard accepts could still be refused there.
+func TestLegacyViewWidthWithinDashboardMinimum(t *testing.T) {
+	if TerminalWidthDefault >= DashboardMinWidth {
+		t.Fatalf(
+			"TerminalWidthDefault %d is not below DashboardMinWidth %d",
+			TerminalWidthDefault,
+			DashboardMinWidth,
+		)
+	}
+}
+
+// The minimums come from measuring where each layout starts to clip or wrap,
+// so a change to them should be deliberate.
+func TestDashboardMinimumsAreMeasuredValues(t *testing.T) {
+	for binary, want := range map[string][2]int{
+		CARDANO_BINARY: {112, 30},
+		AMARU_BINARY:   {112, 30},
+		DINGO_BINARY:   {70, 12},
+	} {
+		cols, rows := dashboardMinimumSizeFor(binary)
+		if cols != want[0] || rows != want[1] {
+			t.Errorf(
+				"%s minimum = %dx%d, expected %dx%d",
+				binary, cols, rows, want[0], want[1],
+			)
+		}
+	}
+}

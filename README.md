@@ -192,7 +192,10 @@ If nview shows "Cardano Node" instead of the expected implementation:
 ### Display Issues
 
 - Ensure terminal supports Unicode characters
-- Check terminal width (minimum 112 columns recommended)
+- Check the terminal size: cardano-node and Amaru need at least 112x30, and
+  Dingo needs at least 70x12 (it switches to a compact view below 92 columns
+  or 28 rows). Below the minimum, nview shows "Terminal too small" with the
+  size it needs instead of a broken layout.
 - For color issues, ensure terminal supports 256 colors
 
 ## GeoLocation

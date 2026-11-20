@@ -70,13 +70,32 @@ const (
 	RTTUnreachable = 99999 // Sentinel value for unreachable peers
 
 	// UI layout constants
-	TerminalWidthDefault    = 71
-	DashboardWidthDefault   = 118
-	DashboardHeightDefault  = 30
-	ProgressBarGranularity  = 68
+	TerminalWidthDefault   = 71
+	DashboardWidthDefault  = 118
+	DashboardHeightDefault = 30
+	// ProgressBarGranularity is the cell count of a progress bar in the
+	// TerminalWidthDefault view: that width less the three columns taken by
+	// the pane border and padding. Deriving it keeps a bar from outgrowing
+	// the pane when either constant changes.
+	ProgressBarGranularity  = TerminalWidthDefault - 3
 	ProcessDiscoveryRefresh = 30 * time.Second
 	mithrilOverlayPageName  = "mithril-overlay"
 	peerOverlayPageName     = "peer-overlay"
+	tooSmallPageName        = "too-small"
+
+	// DashboardMinWidth and DashboardMinHeight are the smallest terminal the
+	// operator panel grid renders without clipped or overlapping panes. The
+	// fallback size used when the terminal cannot be read must not be smaller
+	// than these, or an unreadable size would show the too-small message.
+	DashboardMinWidth  = 112
+	DashboardMinHeight = 30
+
+	// DingoCompactMinWidth and DingoCompactMinHeight bound the Dingo compact
+	// console, which is the Dingo layout below dingoConsoleCompact's
+	// thresholds. Its pages scroll, so the height only has to hold the header,
+	// one panel and the footer.
+	DingoCompactMinWidth  = 70
+	DingoCompactMinHeight = 12
 )
 
 var (
@@ -222,6 +241,16 @@ var dingoTextView = tview.NewTextView().
 	})
 
 var dingoConsoleTextView = tview.NewTextView().
+	SetDynamicColors(true).
+	SetWrap(false).
+	SetChangedFunc(func() {
+		app.Draw()
+	})
+
+// tooSmallTextView redraws on every change because the header and footer
+// views have no change hook of their own and are only repainted alongside a
+// view that has one.
+var tooSmallTextView = tview.NewTextView().
 	SetDynamicColors(true).
 	SetWrap(false).
 	SetChangedFunc(func() {
@@ -555,8 +584,88 @@ func setTextIfChanged(view *tview.TextView, current *string, next string) {
 	view.SetText(next)
 }
 
+// dashboardMinimumSizeFor returns the smallest terminal the layout used for
+// binary can render. Dingo switches to a compact console on small terminals
+// (see dingoConsoleCompact), so it has a lower minimum than the panel grid
+// that cardano-node and Amaru always use.
+func dashboardMinimumSizeFor(binary string) (int, int) {
+	if binary == DINGO_BINARY {
+		return DingoCompactMinWidth, DingoCompactMinHeight
+	}
+	return DashboardMinWidth, DashboardMinHeight
+}
+
+// dashboardTooSmall reports whether a cols x rows terminal is below the
+// minimum for binary's layout, along with that minimum.
+func dashboardTooSmall(binary string, cols, rows int) (bool, int, int) {
+	minCols, minRows := dashboardMinimumSizeFor(binary)
+	return cols < minCols || rows < minRows, minCols, minRows
+}
+
+func tooSmallShortfall(missing int, unit string) string {
+	if missing != 1 {
+		unit += "s"
+	}
+	return uiSeverityValue(strconv.Itoa(missing), uiSeverityWarn) + " " + unit
+}
+
+func getTooSmallText(cols, rows, minCols, minRows int) string {
+	var short []string
+	if cols < minCols {
+		short = append(short, tooSmallShortfall(minCols-cols, "column"))
+	}
+	if rows < minRows {
+		short = append(short, tooSmallShortfall(minRows-rows, "line"))
+	}
+	text := fmt.Sprintf(
+		"\n %s\n %s %s, %s %s\n",
+		uiSeverityValue("Terminal too small!", uiSeverityCritical),
+		uiMuted("Need"),
+		uiValue(fmt.Sprintf("%dx%d", minCols, minRows)),
+		uiMuted("have"),
+		uiValue(fmt.Sprintf("%dx%d", cols, rows)),
+	)
+	if len(short) > 0 {
+		text += fmt.Sprintf(
+			" Please increase by %s\n",
+			strings.Join(short, " and "),
+		)
+	}
+	return text
+}
+
+// terminalSizeFunc reads the terminal size for showTooSmall. The size comes
+// from the stdout file descriptor, which a test cannot resize, so tests
+// replace it.
+var terminalSizeFunc = dashboardTerminalSize
+
+// showTooSmall replaces the dashboard with a message when the terminal is
+// below the layout minimum and reports whether it did. The overlays are hidden
+// with the dashboard because they are laid out for the same width.
+func showTooSmall() bool {
+	cols, rows := terminalSizeFunc()
+	return applyTooSmall(getEffectiveNodeBinary(), cols, rows)
+}
+
+func applyTooSmall(binary string, cols, rows int) bool {
+	small, minCols, minRows := dashboardTooSmall(binary, cols, rows)
+	if !small {
+		dashboardPages.HidePage(tooSmallPageName)
+		return false
+	}
+	tooSmallTextView.SetText(getTooSmallText(cols, rows, minCols, minRows))
+	footerTextView.SetText(getMinimalFooterText())
+	dashboardPages.HidePage(peerOverlayPageName)
+	dashboardPages.HidePage(mithrilOverlayPageName)
+	dashboardPages.SwitchToPage(tooSmallPageName)
+	return true
+}
+
 func refreshDashboardText(ctx context.Context) {
 	refreshChrome()
+	if showTooSmall() {
+		return
+	}
 	if getEffectiveNodeBinary() == DINGO_BINARY {
 		dashboardPages.SwitchToPage("dingo")
 		refreshDiskSnapshot(ctx, config.GetConfig(), processMetrics)
@@ -4193,6 +4302,7 @@ func main() {
 		AddItem(layout, 0, 1, true)
 	dashboardPages.AddPage("panels", panelBody, true, true)
 	dashboardPages.AddPage("dingo", dingoConsoleTextView, true, false)
+	dashboardPages.AddPage(tooSmallPageName, tooSmallTextView, true, false)
 	dashboardPages.AddPage(
 		mithrilOverlayPageName,
 		newMithrilOverlayPrimitive(dashboardContentWidth()),
