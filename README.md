@@ -109,8 +109,9 @@ The following environment variables control the behavior of the application.
   `auto`, `unicode`, `plain`, or `nerd`. The default is `auto`. In the YAML
   file this is `app.visualMode`.
 - `NVIEW_IMAGE_PROTOCOL` - Controls terminal image protocol detection for
-  future enhanced visuals: `auto`, `none`, `kitty`, `iterm2`, or `sixel`.
-  The default is `auto`. In the YAML file this is `app.imageProtocol`.
+  the header status badge strip: `auto`, `none`, `kitty`, `iterm2`, or
+  `sixel`. The default is `auto`. In the YAML file this is
+  `app.imageProtocol`. Unsupported terminals retain the text-only header.
 
 #### Configuration (YAML)
 

@@ -209,7 +209,9 @@ var cmdlineFlags struct {
 
 // Global tview application and pages
 var (
-	app   = tview.NewApplication()
+	app = newDashboardApplication(
+		terminalVisualCapabilities{ImageProtocol: "none"},
+	)
 	pages = tview.NewPages()
 )
 
@@ -484,7 +486,7 @@ func dashboardHealth() (string, uiSeverity) {
 func getHeaderText() string {
 	healthLabel, healthSeverity := dashboardHealth()
 	visuals := currentTerminalVisuals()
-	return dashboardChromeText(fmt.Sprintf(
+	return dashboardChromeText(terminalImageHeaderPrefix(visuals.ImageProtocol) + fmt.Sprintf(
 		" %s %s  %s  %s  %s  %s",
 		uiInlineSection("nview"),
 		uiMuted(version.GetVersionString()),
@@ -4221,6 +4223,7 @@ func main() {
 		fmt.Printf("Failed to load config: %s\n", err)
 		os.Exit(1)
 	}
+	app = newDashboardApplication(currentTerminalVisuals())
 
 	// Initialize logger with buffer
 	baseHandler := slog.NewTextHandler(
