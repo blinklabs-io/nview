@@ -662,12 +662,15 @@ func showTooSmall() bool {
 func applyTooSmall(binary string, cols, rows int) bool {
 	small, minCols, minRows := dashboardTooSmall(binary, cols, rows)
 	tooSmallShown.Store(small)
+	// refreshChrome ran before this with the previous state, so the footer
+	// has to be rebuilt here: left alone, the minimal footer would outlive the
+	// message until the next refresh.
+	footerTextView.SetText(getFooterText())
 	if !small {
 		dashboardPages.HidePage(tooSmallPageName)
 		return false
 	}
 	tooSmallTextView.SetText(getTooSmallText(cols, rows, minCols, minRows))
-	footerTextView.SetText(getMinimalFooterText())
 	dashboardPages.HidePage(peerOverlayPageName)
 	dashboardPages.HidePage(mithrilOverlayPageName)
 	dashboardPages.SwitchToPage(tooSmallPageName)

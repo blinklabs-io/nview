@@ -4294,3 +4294,50 @@ func TestOverlayPathsRespectTooSmallEndToEnd(t *testing.T) {
 		)
 	}
 }
+
+// Leaving the message must bring the normal footer back at once. The refresh
+// builds the chrome before it learns the terminal grew, so the footer has to
+// be recomputed when the state changes.
+func TestFooterRecoversWhenLeavingTooSmall(t *testing.T) {
+	countRedraws(t)
+	prevBinary := detectedNodeBinary.Load()
+	detectedNodeBinary.Store(CARDANO_BINARY)
+	prevSize := terminalSizeFunc
+	prevOverlay := peerOverlayActive.Load()
+	peerOverlayActive.Store(false)
+	t.Cleanup(func() {
+		terminalSizeFunc = prevSize
+		tooSmallShown.Store(false)
+		peerOverlayActive.Store(prevOverlay)
+		if prevBinary != nil {
+			detectedNodeBinary.Store(prevBinary)
+		}
+	})
+	for _, name := range []string{"panels", "dingo"} {
+		dashboardPages.AddPage(name, tview.NewBox(), true, name == "panels")
+		defer dashboardPages.RemovePage(name)
+	}
+	dashboardPages.AddPage(tooSmallPageName, tooSmallTextView, true, false)
+	defer dashboardPages.RemovePage(tooSmallPageName)
+	footer := func() string {
+		return stripTviewTags(footerTextView.GetText(true))
+	}
+
+	terminalSizeFunc = func() (int, int) { return 90, 24 }
+	refreshDashboardText(context.Background())
+	if got := footer(); !strings.Contains(got, "Quit") ||
+		strings.Contains(got, "Refresh") {
+		t.Fatalf("footer while too small = %q, expected only the quit key", got)
+	}
+
+	terminalSizeFunc = func() (int, int) {
+		return DashboardMinWidth, DashboardMinHeight
+	}
+	refreshDashboardText(context.Background())
+	got := footer()
+	for _, want := range []string{"Quit", "Refresh", "Peers"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("footer after growing = %q, missing %q", got, want)
+		}
+	}
+}
