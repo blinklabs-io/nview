@@ -96,12 +96,14 @@ func (b *terminalStatusBanner) Draw(screen tcell.Screen) {
 		return
 	}
 
-	cellWidth, cellHeight := 8, 16
-	if windowSize, sizeErr := tty.WindowSize(); sizeErr == nil {
-		if width, height := windowSize.CellDimensions(); width > 0 &&
-			height > 0 {
-			cellWidth, cellHeight = width, height
-		}
+	windowSize, sizeErr := tty.WindowSize()
+	cellWidth, cellHeight, ok := terminalStatusBannerCellSize(
+		b.protocol,
+		windowSize,
+		sizeErr,
+	)
+	if !ok {
+		return
 	}
 	severities := terminalStatusSeverities()
 	cols, rows := screen.Size()
@@ -138,6 +140,23 @@ func (b *terminalStatusBanner) Draw(screen tcell.Screen) {
 	}
 	b.lastScreen = screen
 	b.lastSignature = signature
+}
+
+func terminalStatusBannerCellSize(
+	protocol string,
+	windowSize tcell.WindowSize,
+	windowErr error,
+) (int, int, bool) {
+	if windowErr == nil {
+		if width, height := windowSize.CellDimensions(); width > 0 &&
+			height > 0 {
+			return width, height, true
+		}
+	}
+	if protocol == "sixel" {
+		return 0, 0, false
+	}
+	return 8, 16, true
 }
 
 func terminalStatusBannerPayload(

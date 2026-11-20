@@ -20,6 +20,8 @@ import (
 	"image/png"
 	"strings"
 	"testing"
+
+	"github.com/gdamore/tcell/v2"
 )
 
 func TestDashboardApplicationConfiguresImageRenderer(t *testing.T) {
@@ -126,5 +128,41 @@ func TestTerminalImageHeaderPrefix(t *testing.T) {
 				terminalStatusBannerCells,
 			)
 		}
+	}
+}
+
+func TestTerminalStatusBannerCellSize(t *testing.T) {
+	windowSize := tcell.WindowSize{
+		Width:       80,
+		Height:      24,
+		PixelWidth:  800,
+		PixelHeight: 480,
+	}
+	width, height, ok := terminalStatusBannerCellSize(
+		"sixel",
+		windowSize,
+		nil,
+	)
+	if !ok || width != 10 || height != 20 {
+		t.Fatalf("known cell size = %dx%d, %t", width, height, ok)
+	}
+
+	windowSize.PixelWidth = 0
+	windowSize.PixelHeight = 0
+	if _, _, ok := terminalStatusBannerCellSize(
+		"sixel",
+		windowSize,
+		nil,
+	); ok {
+		t.Fatal("Sixel banner accepted unknown cell dimensions")
+	}
+
+	width, height, ok = terminalStatusBannerCellSize(
+		"kitty",
+		windowSize,
+		nil,
+	)
+	if !ok || width != 8 || height != 16 {
+		t.Fatalf("Kitty fallback size = %dx%d, %t", width, height, ok)
 	}
 }
