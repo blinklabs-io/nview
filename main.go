@@ -70,13 +70,35 @@ const (
 	RTTUnreachable = 99999 // Sentinel value for unreachable peers
 
 	// UI layout constants
-	TerminalWidthDefault    = 71
-	DashboardWidthDefault   = 118
-	DashboardHeightDefault  = 30
-	ProgressBarGranularity  = 68
+	TerminalWidthDefault   = 71
+	DashboardWidthDefault  = 118
+	DashboardHeightDefault = 30
+	corePaneHeight         = 9
+	// ProgressBarGranularity is the cell count of a progress bar in the
+	// TerminalWidthDefault view: that width less the three columns taken by
+	// the pane border and padding. Deriving it keeps a bar from outgrowing
+	// the pane when either constant changes.
+	ProgressBarGranularity  = TerminalWidthDefault - 3
 	ProcessDiscoveryRefresh = 30 * time.Second
 	mithrilOverlayPageName  = "mithril-overlay"
 	peerOverlayPageName     = "peer-overlay"
+	tooSmallPageName        = "too-small"
+
+	// DashboardMinWidth and DashboardMinHeight are the smallest terminal the
+	// operator panel grid draws with every pane, border and the footer
+	// intact. At this size the flexible panes can still wrap or cut a line of
+	// text. The fallback size used when the terminal cannot be read must not
+	// be smaller than these, or an unreadable size would show the too-small
+	// message.
+	DashboardMinWidth  = 112
+	DashboardMinHeight = 30
+
+	// DingoCompactMinWidth and DingoCompactMinHeight bound the Dingo compact
+	// console, which is the Dingo layout below dingoConsoleCompact's
+	// thresholds. Its pages scroll, so the height only has to hold the header,
+	// one panel and the footer.
+	DingoCompactMinWidth  = 70
+	DingoCompactMinHeight = 12
 )
 
 var (
@@ -177,6 +199,7 @@ var (
 	lastDingoSampleMu    sync.Mutex
 	compactDingoPage     atomic.Int32
 	peerOverlayActive    atomic.Bool
+	tooSmallShown        atomic.Bool
 )
 
 // Global command line flags
@@ -186,7 +209,9 @@ var cmdlineFlags struct {
 
 // Global tview application and pages
 var (
-	app   = tview.NewApplication()
+	app = newDashboardApplication(
+		terminalVisualCapabilities{ImageProtocol: "none"},
+	)
 	pages = tview.NewPages()
 )
 
@@ -227,6 +252,21 @@ var dingoConsoleTextView = tview.NewTextView().
 	SetChangedFunc(func() {
 		app.Draw()
 	})
+
+// tooSmallTextView redraws on every change because the header and footer
+// views have no change hook of their own and are only repainted alongside a
+// view that has one.
+var tooSmallTextView = tview.NewTextView().
+	SetDynamicColors(true).
+	SetWrap(false).
+	SetChangedFunc(func() {
+		app.Draw()
+	})
+
+// requestRedraw asks the application to repaint from the refresh path. Tests
+// replace it because Draw queues onto an event loop that tests do not run, and
+// blocks the caller once that queue is full.
+var requestRedraw = func() { app.Draw() }
 
 var peerOverlayTextView = tview.NewTextView().
 	SetDynamicColors(true).
@@ -446,7 +486,7 @@ func dashboardHealth() (string, uiSeverity) {
 func getHeaderText() string {
 	healthLabel, healthSeverity := dashboardHealth()
 	visuals := currentTerminalVisuals()
-	return dashboardChromeText(fmt.Sprintf(
+	return dashboardChromeText(terminalImageHeaderPrefix(visuals.ImageProtocol) + fmt.Sprintf(
 		" %s %s  %s  %s  %s  %s",
 		uiInlineSection("nview"),
 		uiMuted(version.GetVersionString()),
@@ -458,6 +498,9 @@ func getHeaderText() string {
 }
 
 func getFooterText() string {
+	if tooSmallShown.Load() {
+		return getMinimalFooterText()
+	}
 	if peerOverlayActive.Load() {
 		return dashboardChromeText(" " + strings.Join([]string{
 			uiKey("esc", "Close"),
@@ -555,8 +598,98 @@ func setTextIfChanged(view *tview.TextView, current *string, next string) {
 	view.SetText(next)
 }
 
+// dashboardMinimumSizeFor returns the smallest terminal the layout used for
+// binary can render. Dingo switches to a compact console on small terminals
+// (see dingoConsoleCompact), so it has a lower minimum than the panel grid
+// that cardano-node and Amaru always use.
+func dashboardMinimumSizeFor(binary string) (int, int) {
+	if binary == DINGO_BINARY {
+		return DingoCompactMinWidth, DingoCompactMinHeight
+	}
+	return DashboardMinWidth, DashboardMinHeight
+}
+
+// dashboardTooSmall reports whether a cols x rows terminal is below the
+// minimum for binary's layout, along with that minimum.
+func dashboardTooSmall(binary string, cols, rows int) (bool, int, int) {
+	minCols, minRows := dashboardMinimumSizeFor(binary)
+	return cols < minCols || rows < minRows, minCols, minRows
+}
+
+func tooSmallShortfall(missing int, unit string) string {
+	if missing != 1 {
+		unit += "s"
+	}
+	return uiSeverityValue(strconv.Itoa(missing), uiSeverityWarn) + " " + unit
+}
+
+func getTooSmallText(cols, rows, minCols, minRows int) string {
+	var short []string
+	if cols < minCols {
+		short = append(short, tooSmallShortfall(minCols-cols, "column"))
+	}
+	if rows < minRows {
+		short = append(short, tooSmallShortfall(minRows-rows, "line"))
+	}
+	text := fmt.Sprintf(
+		"\n %s\n %s %s, %s %s\n",
+		uiSeverityValue("Terminal too small!", uiSeverityCritical),
+		uiMuted("Need"),
+		uiValue(fmt.Sprintf("%dx%d", minCols, minRows)),
+		uiMuted("have"),
+		uiValue(fmt.Sprintf("%dx%d", cols, rows)),
+	)
+	if len(short) > 0 {
+		text += fmt.Sprintf(
+			" Please increase by %s\n",
+			strings.Join(short, " and "),
+		)
+	}
+	return text
+}
+
+// terminalSizeFunc reads the terminal size for showTooSmall. The size comes
+// from the stdout file descriptor, which a test cannot resize, so tests
+// replace it.
+var terminalSizeFunc = dashboardTerminalSize
+
+// showTooSmall replaces the dashboard with a message when the terminal is
+// below the layout minimum and reports whether it did. The overlays are hidden
+// with the dashboard because they are laid out for the same width.
+func showTooSmall() bool {
+	cols, rows := terminalSizeFunc()
+	return applyTooSmall(getEffectiveNodeBinary(), cols, rows)
+}
+
+func applyTooSmall(binary string, cols, rows int) bool {
+	small, minCols, minRows := dashboardTooSmall(binary, cols, rows)
+	tooSmallShown.Store(small)
+	// refreshChrome ran before this with the previous state, so the footer
+	// has to be rebuilt here: left alone, the minimal footer would outlive the
+	// message until the next refresh.
+	footerTextView.SetText(getFooterText())
+	if !small {
+		dashboardPages.HidePage(tooSmallPageName)
+		return false
+	}
+	tooSmallTextView.SetText(getTooSmallText(cols, rows, minCols, minRows))
+	dashboardPages.HidePage(peerOverlayPageName)
+	dashboardPages.HidePage(mithrilOverlayPageName)
+	dashboardPages.SwitchToPage(tooSmallPageName)
+	return true
+}
+
 func refreshDashboardText(ctx context.Context) {
 	refreshChrome()
+	wasTooSmall := tooSmallShown.Load()
+	if showTooSmall() {
+		return
+	}
+	if wasTooSmall {
+		// Switching pages does not repaint, and the panel text may be
+		// unchanged since before the message, so ask for the frame.
+		defer requestRedraw()
+	}
 	if getEffectiveNodeBinary() == DINGO_BINARY {
 		dashboardPages.SwitchToPage("dingo")
 		refreshDiskSnapshot(ctx, config.GetConfig(), processMetrics)
@@ -597,6 +730,9 @@ func refreshDashboardText(ctx context.Context) {
 }
 
 func togglePeerOverlay(ctx context.Context) {
+	if tooSmallShown.Load() {
+		return
+	}
 	if peerOverlayActive.Load() {
 		hidePeerOverlay()
 		refreshChrome()
@@ -618,7 +754,8 @@ func hidePeerOverlay() {
 }
 
 func updatePeerOverlay(ctx context.Context) {
-	if !peerOverlayActive.Load() || isMithrilSyncActive() {
+	if tooSmallShown.Load() || !peerOverlayActive.Load() ||
+		isMithrilSyncActive() {
 		dashboardPages.HidePage(peerOverlayPageName)
 		return
 	}
@@ -736,6 +873,20 @@ func corePaneSeverity() uiSeverity {
 	}
 	if promMetrics.DidntAdopt > 0 {
 		return uiSeverityCritical
+	}
+	if promMetrics.CouldNotForge > 0 || promMetrics.ForgedInvalid > 0 ||
+		promMetrics.AdoptionThreadDied > 0 ||
+		cardanoKESStateUnavailable(promMetrics) {
+		return uiSeverityCritical
+	}
+	if getEffectiveNodeBinary() == CARDANO_BINARY {
+		_, severity := cardanoKESExpiryStatusAt(promMetrics, time.Now())
+		if severity == uiSeverityCritical {
+			return uiSeverityCritical
+		}
+		if severity == uiSeverityWarn {
+			return uiSeverityWarn
+		}
 	}
 	if promMetrics.IsLeader != promMetrics.Adopted ||
 		promMetrics.MissedSlots > 0 {
@@ -917,6 +1068,12 @@ func getOverviewText(ctx context.Context) string {
 
 	tipGap, tipSeverity := currentTipGap(promMetrics)
 	epochProgress := float64(getEpochProgress(promMetrics))
+	gsmBadge := ""
+	if getEffectiveNodeBinary() == CARDANO_BINARY {
+		if label, severity, ok := cardanoGSMStatus(promMetrics); ok {
+			gsmBadge = "   " + uiPill("sync", label, severity)
+		}
+	}
 	fmt.Fprintf(&sb, " %s   %s   %s\n",
 		uiKV("Block", uiValue(strconv.FormatUint(promMetrics.BlockNum, 10))),
 		uiKV("Slot", uiValue(strconv.FormatUint(promMetrics.SlotNum, 10))),
@@ -928,7 +1085,7 @@ func getOverviewText(ctx context.Context) string {
 	)
 	fmt.Fprintf(
 		&sb,
-		" %s   %s   %s\n",
+		" %s   %s   %s%s\n",
 		uiPercentBar(
 			"Epoch",
 			epochProgress,
@@ -937,6 +1094,7 @@ func getOverviewText(ctx context.Context) string {
 		),
 		uiKVAligned(9, "Remaining", uiValue(formatEpochRemaining(promMetrics))),
 		uiKVAligned(9, "Peers", peerStateSegmentBar(promMetrics, 12)),
+		gsmBadge,
 	)
 	if getEffectiveNodeBinary() == DINGO_BINARY {
 		forgeLabel := "disabled"
@@ -1162,6 +1320,34 @@ func getOperatorFocusText(ctx context.Context) string {
 		uiKV("Mempool", uiValue(strconv.FormatUint(promMetrics.MempoolTx, 10))),
 		uiKV("Forks", uiValue(strconv.FormatUint(promMetrics.Forks, 10))),
 	)
+	if hasAnyPromMetric(
+		promMetrics,
+		"cardano_node_metrics_blockReplayProgress_real",
+		"cardano_node_metrics_utxoSize_int",
+	) {
+		sb.WriteString(uiSection("Ledger"))
+		replay := uiMuted("n/a")
+		if promMetrics.hasPromMetric(
+			"cardano_node_metrics_blockReplayProgress_real",
+		) {
+			replay = uiValue(
+				fmt.Sprintf("%.3f%%", promMetrics.BlockReplayProgress),
+			)
+		}
+		fmt.Fprintf(
+			&sb,
+			" %s   %s\n",
+			uiKV("Replay", replay),
+			uiKV(
+				"UTxO",
+				cardanoMetricValue(
+					promMetrics,
+					"cardano_node_metrics_utxoSize_int",
+					promMetrics.UTxOSize,
+				),
+			),
+		)
+	}
 	sb.WriteString(uiSection("Block Service"))
 	lateSeverity := dingoCounterSeverity(promMetrics.BlocksLate, uiSeverityWarn)
 	fmt.Fprintf(
@@ -1173,6 +1359,64 @@ func getOperatorFocusText(ctx context.Context) string {
 		),
 		uiKV("Late", formatSeverityCount(promMetrics.BlocksLate, lateSeverity)),
 	)
+	if hasAnyPromMetric(
+		promMetrics,
+		"cardano_node_metrics_served_header_counter",
+		"cardano_node_metrics_ChainSync_HeadersServed_counter",
+	) {
+		fmt.Fprintf(
+			&sb,
+			" %s   %s\n",
+			uiKV(
+				"Headers",
+				cardanoMetricValue(
+					promMetrics,
+					"cardano_node_metrics_served_header_counter",
+					promMetrics.HeadersServed,
+				),
+			),
+			uiKV(
+				"ChainSync",
+				cardanoMetricValue(
+					promMetrics,
+					"cardano_node_metrics_ChainSync_HeadersServed_counter",
+					promMetrics.ChainSyncHeadersServed,
+				),
+			),
+		)
+	}
+	if hasAnyPromMetric(
+		promMetrics,
+		"cardano_node_metrics_txsSyncDuration_int",
+		"cardano_node_metrics_txsMempoolTimeoutSoft_counter",
+	) {
+		sb.WriteString(uiSection("Mempool Pressure"))
+		timeoutSeverity := dingoCounterSeverity(
+			promMetrics.TxMempoolTimeoutSoft,
+			uiSeverityWarn,
+		)
+		fmt.Fprintf(
+			&sb,
+			" %s   %s\n",
+			uiKV(
+				"Sync duration",
+				cardanoMetricValue(
+					promMetrics,
+					"cardano_node_metrics_txsSyncDuration_int",
+					promMetrics.TxSyncDuration,
+				),
+			),
+			uiKV(
+				"Soft timeout",
+				cardanoMetricSeverityCount(
+					promMetrics,
+					"cardano_node_metrics_txsMempoolTimeoutSoft_counter",
+					promMetrics.TxMempoolTimeoutSoft,
+					timeoutSeverity,
+				),
+			),
+		)
+	}
 	if getEffectiveNodeBinary() == AMARU_BINARY {
 		sb.WriteString(amaruIntakeText(promMetrics))
 		prev, _ := dingoPreviousSample(promMetrics)
@@ -3977,6 +4221,7 @@ func main() {
 		fmt.Printf("Failed to load config: %s\n", err)
 		os.Exit(1)
 	}
+	app = newDashboardApplication(currentTerminalVisuals())
 
 	// Initialize logger with buffer
 	baseHandler := slog.NewTextHandler(
@@ -4177,7 +4422,7 @@ func main() {
 		AddItem(connectionTextView, 0, 1, false)
 	centerColumn.
 		AddItem(chainTextView, 10, 0, false).
-		AddItem(coreTextView, 8, 0, false).
+		AddItem(coreTextView, corePaneHeight, 0, false).
 		AddItem(blockTextView, 0, 1, false)
 	rightColumn.
 		AddItem(dingoTextView, 0, 1, false).
@@ -4191,6 +4436,7 @@ func main() {
 		AddItem(layout, 0, 1, true)
 	dashboardPages.AddPage("panels", panelBody, true, true)
 	dashboardPages.AddPage("dingo", dingoConsoleTextView, true, false)
+	dashboardPages.AddPage(tooSmallPageName, tooSmallTextView, true, false)
 	dashboardPages.AddPage(
 		mithrilOverlayPageName,
 		newMithrilOverlayPrimitive(dashboardContentWidth()),
@@ -5038,6 +5284,10 @@ func updateMithrilView() {
 		dashboardPages.HidePage(mithrilOverlayPageName)
 		return
 	}
+	if tooSmallShown.Load() {
+		dashboardPages.HidePage(mithrilOverlayPageName)
+		return
+	}
 
 	width := dashboardContentWidth()
 	setTextIfChanged(
@@ -5875,6 +6125,111 @@ func getCoreText(ctx context.Context) string {
 				missedSeverity,
 			),
 		)
+		if getEffectiveNodeBinary() == CARDANO_BINARY {
+			if hasAnyPromMetric(
+				promMetrics,
+				"cardano_node_metrics_Forge_could_not_forge_counter",
+				"cardano_node_metrics_Forge_forged_invalid_counter",
+				"cardano_node_metrics_Forge_adoption_thread_died_counter",
+			) {
+				couldNotSeverity := dingoCounterSeverity(
+					promMetrics.CouldNotForge,
+					uiSeverityCritical,
+				)
+				forgedInvalidSeverity := dingoCounterSeverity(
+					promMetrics.ForgedInvalid,
+					uiSeverityCritical,
+				)
+				adoptionSeverity := dingoCounterSeverity(
+					promMetrics.AdoptionThreadDied,
+					uiSeverityCritical,
+				)
+				fmt.Fprintf(
+					&sb,
+					" %s   %s   %s\n",
+					uiKV(
+						"Cannot",
+						cardanoMetricSeverityCount(
+							promMetrics,
+							"cardano_node_metrics_Forge_could_not_forge_counter",
+							promMetrics.CouldNotForge,
+							couldNotSeverity,
+						),
+					),
+					uiKV(
+						"Bad",
+						cardanoMetricSeverityCount(
+							promMetrics,
+							"cardano_node_metrics_Forge_forged_invalid_counter",
+							promMetrics.ForgedInvalid,
+							forgedInvalidSeverity,
+						),
+					),
+					uiKV(
+						"Adopt",
+						cardanoMetricSeverityCount(
+							promMetrics,
+							"cardano_node_metrics_Forge_adoption_thread_died_counter",
+							promMetrics.AdoptionThreadDied,
+							adoptionSeverity,
+						),
+					),
+				)
+			}
+			if hasAnyPromMetric(
+				promMetrics,
+				"cardano_node_metrics_Forge_node_not_leader_counter",
+				"cardano_node_metrics_forgedSlotLast_int",
+			) {
+				fmt.Fprintf(
+					&sb,
+					" %s   %s\n",
+					uiKV(
+						"Not leader",
+						cardanoMetricValue(
+							promMetrics,
+							"cardano_node_metrics_Forge_node_not_leader_counter",
+							promMetrics.NodeNotLeader,
+						),
+					),
+					uiKV(
+						"Last forged",
+						uiValue(cardanoLastForged(promMetrics)),
+					),
+				)
+			}
+			expiry, expirySeverity := cardanoKESExpiryStatusAt(
+				promMetrics,
+				time.Now(),
+			)
+			if cardanoKESStateUnavailable(promMetrics) {
+				expiry = "state unavailable; " + expiry
+				expirySeverity = uiSeverityCritical
+			}
+			fmt.Fprintf(
+				&sb,
+				" %s   %s\n",
+				uiKV("KES window", uiValue(cardanoKESWindow(promMetrics))),
+				uiKV("KES expiry", uiSeverityValue(expiry, expirySeverity)),
+			)
+		} else {
+			fmt.Fprintf(
+				&sb,
+				" %s   %s\n",
+				uiKVSeverityAligned(
+					10,
+					"KES period",
+					strconv.FormatUint(promMetrics.KesPeriod, 10),
+					forgeRowSeverity,
+				),
+				uiKVSeverityAligned(
+					10,
+					"KES remain",
+					strconv.FormatUint(promMetrics.RemainingKesPeriods, 10),
+					forgeRowSeverity,
+				),
+			)
+		}
 		kesLifetime, kesLifetimeSeverity := kesLifetimeStatus(promMetrics, 7)
 		fmt.Fprintf(&sb, " %s\n", uiKVStyledAligned(
 			8,
@@ -6366,6 +6721,160 @@ func getPeerText(ctx context.Context) string {
 				uiKV("Hot", uiValue(strconv.FormatUint(promMetrics.PeersHot, 10))),
 				uiKV("Warm", uiValue(strconv.FormatUint(promMetrics.PeersWarm, 10))),
 				uiKV("Cold", uiValue(strconv.FormatUint(promMetrics.PeersCold, 10))),
+			)
+		}
+		if hasAnyPromMetric(
+			promMetrics,
+			"cardano_node_metrics_peerSelection_KnownBigLedgerPeers_int",
+			"cardano_node_metrics_peerSelection_EstablishedBigLedgerPeers_int",
+			"cardano_node_metrics_peerSelection_ActiveBigLedgerPeers_int",
+		) {
+			fmt.Fprintf(&sb, " %s   %s   %s\n",
+				uiKV(
+					"Big known",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_peerSelection_KnownBigLedgerPeers_int",
+						promMetrics.BigLedgerKnown,
+					),
+				),
+				uiKV(
+					"est",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_peerSelection_EstablishedBigLedgerPeers_int",
+						promMetrics.BigLedgerEstablished,
+					),
+				),
+				uiKV(
+					"active",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_peerSelection_ActiveBigLedgerPeers_int",
+						promMetrics.BigLedgerActive,
+					),
+				),
+			)
+		}
+		if hasAnyPromMetric(
+			promMetrics,
+			"cardano_node_metrics_peerSelection_KnownLocalRootPeers_int",
+			"cardano_node_metrics_peerSelection_EstablishedLocalRootPeers_int",
+			"cardano_node_metrics_peerSelection_ActiveLocalRootPeers_int",
+		) {
+			fmt.Fprintf(&sb, " %s   %s   %s\n",
+				uiKV(
+					"Local roots",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_peerSelection_ActiveLocalRootPeers_int",
+						promMetrics.LocalRootsActive,
+					)+uiUnit(" active"),
+				),
+				uiKV(
+					"known",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_peerSelection_KnownLocalRootPeers_int",
+						promMetrics.LocalRootsKnown,
+					),
+				),
+				uiKV(
+					"est",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_peerSelection_EstablishedLocalRootPeers_int",
+						promMetrics.LocalRootsEstablished,
+					),
+				),
+			)
+		}
+		if hasAnyPromMetric(
+			promMetrics,
+			"cardano_node_metrics_inboundGovernor_idle_int",
+			"cardano_node_metrics_inboundGovernor_cold_int",
+			"cardano_node_metrics_inboundGovernor_warm_int",
+			"cardano_node_metrics_inboundGovernor_hot_int",
+		) {
+			fmt.Fprintf(
+				&sb,
+				" %s   %s   %s   %s\n",
+				uiKV(
+					"Inbound idle",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_inboundGovernor_idle_int",
+						promMetrics.InboundIdle,
+					),
+				),
+				uiKV(
+					"cold",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_inboundGovernor_cold_int",
+						promMetrics.InboundCold,
+					),
+				),
+				uiKV(
+					"warm",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_inboundGovernor_warm_int",
+						promMetrics.InboundWarm,
+					),
+				),
+				uiKV(
+					"hot",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_inboundGovernor_hot_int",
+						promMetrics.InboundHot,
+					),
+				),
+			)
+		}
+		if hasAnyPromMetric(
+			promMetrics,
+			"cardano_node_metrics_localInboundGovernor_idle_int",
+			"cardano_node_metrics_localInboundGovernor_cold_int",
+			"cardano_node_metrics_localInboundGovernor_warm_int",
+			"cardano_node_metrics_localInboundGovernor_hot_int",
+		) {
+			fmt.Fprintf(
+				&sb,
+				" %s   %s   %s   %s\n",
+				uiKV(
+					"Local N2C idle",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_localInboundGovernor_idle_int",
+						promMetrics.LocalInboundIdle,
+					),
+				),
+				uiKV(
+					"cold",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_localInboundGovernor_cold_int",
+						promMetrics.LocalInboundCold,
+					),
+				),
+				uiKV(
+					"warm",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_localInboundGovernor_warm_int",
+						promMetrics.LocalInboundWarm,
+					),
+				),
+				uiKV(
+					"hot",
+					cardanoMetricValue(
+						promMetrics,
+						"cardano_node_metrics_localInboundGovernor_hot_int",
+						promMetrics.LocalInboundHot,
+					),
+				),
 			)
 		}
 		if promMetrics.DingoPeerPromotionsLedger > 0 ||

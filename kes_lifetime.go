@@ -38,7 +38,12 @@ func kesLifetimeStatus(
 		return uiMuted("n/a"), uiSeverityMuted
 	}
 	percent, progressKnown := kesRemainingPercent(metrics)
-	if metrics.RemainingKesPeriods == 0 && !progressKnown {
+	expired := metrics.PromMetricPresent[kesCurrentMetric] &&
+		metrics.PromMetricPresent[kesStartMetric] &&
+		metrics.PromMetricPresent[kesExpiryMetric] &&
+		metrics.OpCertExpiryKES > metrics.OpCertStartKES &&
+		metrics.KesPeriod >= metrics.OpCertExpiryKES
+	if metrics.RemainingKesPeriods == 0 && !progressKnown && !expired {
 		return uiMuted("n/a"), uiSeverityMuted
 	}
 
@@ -79,8 +84,11 @@ func kesLifetimeStatus(
 
 	result := strings.Join(parts, uiUnit(" / "))
 	if progressKnown {
-		result += "  " +
-			uiSeverityValue(fmt.Sprintf("%.1f%%", percent), severity) +
+		percentage := fmt.Sprintf("%.1f%%", percent)
+		if percent == 100 {
+			percentage = "100%"
+		}
+		result += "  " + uiSeverityValue(percentage, severity) +
 			" " + uiProgressBar(percent, barWidth, severity)
 	}
 	return result, severity

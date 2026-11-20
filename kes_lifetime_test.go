@@ -187,3 +187,36 @@ func TestKESLifetimeRender(t *testing.T) {
 		t.Errorf("KES lifetime render mismatch:\n%s", got)
 	}
 }
+
+func TestKESLifetimeCompleteWindow(t *testing.T) {
+	setTestVisuals(t, "plain", "none")
+	for _, tc := range []struct {
+		name               string
+		current, remaining uint64
+		severity           uiSeverity
+		text               string
+		bar                bool
+	}{
+		{"activation", 100, 60, uiSeverityOK, "60 periods / 90.0d", true},
+		{"active", 110, 50, uiSeverityOK, "50 periods / 75.0d", true},
+		{"expiry", 160, 0, uiSeverityCritical, "0 periods / 0.0d", true},
+		{"expired", 161, 0, uiSeverityCritical, "0 periods / 0.0d", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			metrics := decodeKESLifetimeMetrics(t)
+			metrics.KesPeriod, metrics.RemainingKesPeriods = tc.current, tc.remaining
+			value, severity := kesLifetimeStatus(metrics, 7)
+			plain := stripTviewTags(value)
+			if severity != tc.severity || !strings.Contains(plain, tc.text) {
+				t.Fatalf("KES lifetime = %q, severity %d; want %q, severity %d", plain, severity, tc.text, tc.severity)
+			}
+			if strings.Contains(plain, "%") != tc.bar {
+				t.Fatalf("KES lifetime progress = %q, expected known %v", plain, tc.bar)
+			}
+			row := " " + uiKVStyledAligned(8, "KES left", value, severity)
+			if width := tview.TaggedStringWidth(row); width > 43 {
+				t.Fatalf("KES row has %d columns, want at most 43: %q", width, plain)
+			}
+		})
+	}
+}
