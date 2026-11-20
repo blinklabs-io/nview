@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -1580,6 +1581,70 @@ cardano_node_metrics_blockfetchclient_blockdelay_real 0.25
 	}
 	if metrics.BlockDelay != 0.25 {
 		t.Errorf("BlockDelay = %v, expected 0.25", metrics.BlockDelay)
+	}
+}
+
+func TestPromMetricsCardanoNode11OptionalHealthNames(t *testing.T) {
+	prom := []byte(
+		`# TYPE cardano_node_metrics_Forge_could_not_forge_counter counter
+cardano_node_metrics_Forge_could_not_forge_counter 2
+# TYPE cardano_node_metrics_Forge_forged_invalid_counter counter
+cardano_node_metrics_Forge_forged_invalid_counter 3
+# TYPE cardano_node_metrics_Forge_adoption_thread_died_counter counter
+cardano_node_metrics_Forge_adoption_thread_died_counter 4
+# TYPE cardano_node_metrics_localInboundGovernor_idle_int gauge
+cardano_node_metrics_localInboundGovernor_idle_int 5
+# TYPE cardano_node_metrics_localInboundGovernor_cold_int gauge
+cardano_node_metrics_localInboundGovernor_cold_int 6
+# TYPE cardano_node_metrics_localInboundGovernor_warm_int gauge
+cardano_node_metrics_localInboundGovernor_warm_int 7
+# TYPE cardano_node_metrics_localInboundGovernor_hot_int gauge
+cardano_node_metrics_localInboundGovernor_hot_int 8
+# TYPE cardano_node_metrics_txsMempoolTimeoutSoft_counter counter
+cardano_node_metrics_txsMempoolTimeoutSoft_counter 9
+# EOF
+`,
+	)
+	encoded, err := prom2jsonWithContentType(
+		prom,
+		"application/openmetrics-text; version=1.0.0; charset=utf-8",
+	)
+	if err != nil {
+		t.Fatalf("prom2jsonWithContentType() error = %v", err)
+	}
+	var metrics PromMetrics
+	if err := json.Unmarshal(encoded, &metrics); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	counts := []struct {
+		name string
+		got  uint64
+		want uint64
+	}{
+		{"CouldNotForge", metrics.CouldNotForge, 2},
+		{"ForgedInvalid", metrics.ForgedInvalid, 3},
+		{"AdoptionThreadDied", metrics.AdoptionThreadDied, 4},
+		{"LocalInboundIdle", metrics.LocalInboundIdle, 5},
+		{"LocalInboundCold", metrics.LocalInboundCold, 6},
+		{"LocalInboundWarm", metrics.LocalInboundWarm, 7},
+		{"LocalInboundHot", metrics.LocalInboundHot, 8},
+		{"TxMempoolTimeoutSoft", metrics.TxMempoolTimeoutSoft, 9},
+	}
+	for _, tt := range counts {
+		if tt.got != tt.want {
+			t.Errorf("%s = %d, expected %d", tt.name, tt.got, tt.want)
+		}
+	}
+	for name := range optionalCardanoMetrics {
+		if strings.Contains(name, "localInboundGovernor") ||
+			strings.Contains(name, "Forge_could_not_forge") ||
+			strings.Contains(name, "Forge_forged_invalid") ||
+			strings.Contains(name, "Forge_adoption_thread_died") ||
+			strings.Contains(name, "txsMempoolTimeoutSoft") {
+			if !metrics.hasPromMetric(name) {
+				t.Errorf("hasPromMetric(%q) = false", name)
+			}
+		}
 	}
 }
 

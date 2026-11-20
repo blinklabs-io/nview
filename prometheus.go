@@ -24,6 +24,7 @@ import (
 	"mime"
 	"net/http"
 	"slices"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -93,51 +94,79 @@ var promMetrics atomic.Pointer[PromMetrics]
 // It includes metrics for blocks, epochs, slots, memory, connections, and more.
 // The struct fields are tagged with JSON names corresponding to Prometheus metric names.
 type PromMetrics struct {
-	Network             string  `json:"network"`
-	BlockNum            uint64  `json:"cardano_node_metrics_blockNum_int"`
-	EpochNum            uint64  `json:"cardano_node_metrics_epoch_int"`
-	SlotInEpoch         uint64  `json:"cardano_node_metrics_slotInEpoch_int"`
-	SlotNum             uint64  `json:"cardano_node_metrics_slotNum_int"`
-	Density             float64 `json:"cardano_node_metrics_density_real"`
-	TxProcessed         uint64  `json:"cardano_node_metrics_txsProcessedNum_int"`
-	MempoolTx           uint64  `json:"cardano_node_metrics_txsInMempool_int"`
-	MempoolBytes        uint64  `json:"cardano_node_metrics_mempoolBytes_int"`
-	BlocksForged        uint64  `json:"cardano_node_metrics_blocksForgedNum_int"`
-	ForgingEnabled      uint64  `json:"cardano_node_metrics_forging_enabled"`
-	NodeStartTime       uint64  `json:"cardano_node_metrics_nodeStartTime_int"`
-	KesPeriod           uint64  `json:"cardano_node_metrics_currentKESPeriod_int"`
-	RemainingKesPeriods uint64  `json:"cardano_node_metrics_remainingKESPeriods_int"`
-	IsLeader            uint64  `json:"cardano_node_metrics_Forge_node_is_leader_int"`
-	Adopted             uint64  `json:"cardano_node_metrics_Forge_adopted_int"`
-	DidntAdopt          uint64  `json:"cardano_node_metrics_Forge_didnt_adopt_int"`
-	AboutToLead         uint64  `json:"cardano_node_metrics_Forge_forge_about_to_lead_int"`
-	MissedSlots         uint64  `json:"cardano_node_metrics_slotsMissedNum_int"`
-	MemLive             uint64  `json:"cardano_node_metrics_RTS_gcLiveBytes_int"`
-	MemHeap             uint64  `json:"cardano_node_metrics_RTS_gcHeapBytes_int"`
-	GcMinor             uint64  `json:"cardano_node_metrics_RTS_gcMinorNum_int"`
-	GcMajor             uint64  `json:"cardano_node_metrics_RTS_gcMajorNum_int"`
-	Forks               uint64  `json:"cardano_node_metrics_forks_int"`
-	BlockDelay          float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_s"`
-	BlocksServed        uint64  `json:"cardano_node_metrics_served_block_count_int"`
-	BlocksLate          uint64  `json:"cardano_node_metrics_blockfetchclient_lateblocks"`
-	BlocksW1s           float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_cdfOne"`
-	BlocksW3s           float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_cdfThree"`
-	BlocksW5s           float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_cdfFive"`
-	PeersCold           uint64  `json:"cardano_node_metrics_peerSelection_cold"`
-	PeersWarm           uint64  `json:"cardano_node_metrics_peerSelection_warm"`
-	PeersHot            uint64  `json:"cardano_node_metrics_peerSelection_hot"`
-	PeersKnown          uint64  `json:"cardano_node_metrics_peerSelection_KnownPeers"`
-	PeersEstablished    uint64  `json:"cardano_node_metrics_peerSelection_EstablishedPeers"`
-	PeersActive         uint64  `json:"cardano_node_metrics_peerSelection_ActivePeers"`
-	PeerWarmPromotions  uint64  `json:"cardano_node_metrics_peerSelection_WarmPeersPromotions"`
-	PeerWarmDemotions   uint64  `json:"cardano_node_metrics_peerSelection_WarmPeersDemotions"`
-	PeerChurnKnownUp    uint64  `json:"cardano_node_metrics_peerSelection_churn_IncreasedKnownPeers"`
-	PeerChurnKnownDown  uint64  `json:"cardano_node_metrics_peerSelection_churn_DecreasedKnownPeers"`
-	ConnIncoming        uint64  `json:"cardano_node_metrics_connectionManager_incomingConns"`
-	ConnOutgoing        uint64  `json:"cardano_node_metrics_connectionManager_outgoingConns"`
-	ConnUniDir          uint64  `json:"cardano_node_metrics_connectionManager_unidirectionalConns"`
-	ConnBiDir           uint64  `json:"cardano_node_metrics_connectionManager_duplexConns"`
-	ConnFullDuplex      uint64  `json:"cardano_node_metrics_connectionManager_fullDuplexConns"`
+	Network                string  `json:"network"`
+	BlockNum               uint64  `json:"cardano_node_metrics_blockNum_int"`
+	EpochNum               uint64  `json:"cardano_node_metrics_epoch_int"`
+	SlotInEpoch            uint64  `json:"cardano_node_metrics_slotInEpoch_int"`
+	SlotNum                uint64  `json:"cardano_node_metrics_slotNum_int"`
+	Density                float64 `json:"cardano_node_metrics_density_real"`
+	TxProcessed            uint64  `json:"cardano_node_metrics_txsProcessedNum_int"`
+	MempoolTx              uint64  `json:"cardano_node_metrics_txsInMempool_int"`
+	MempoolBytes           uint64  `json:"cardano_node_metrics_mempoolBytes_int"`
+	BlocksForged           uint64  `json:"cardano_node_metrics_blocksForgedNum_int"`
+	ForgingEnabled         uint64  `json:"cardano_node_metrics_forging_enabled"`
+	NodeStartTime          uint64  `json:"cardano_node_metrics_nodeStartTime_int"`
+	KesPeriod              uint64  `json:"cardano_node_metrics_currentKESPeriod_int"`
+	RemainingKesPeriods    uint64  `json:"cardano_node_metrics_remainingKESPeriods_int"`
+	GSMState               uint64  `json:"cardano_node_metrics_GSM_state_int"`
+	OpCertStartKES         uint64  `json:"cardano_node_metrics_operationalCertificateStartKESPeriod_int"`
+	OpCertExpiryKES        uint64  `json:"cardano_node_metrics_operationalCertificateExpiryKESPeriod_int"`
+	ForgedSlotLast         uint64  `json:"cardano_node_metrics_forgedSlotLast_int"`
+	IsLeader               uint64  `json:"cardano_node_metrics_Forge_node_is_leader_int"`
+	NodeNotLeader          uint64  `json:"cardano_node_metrics_Forge_node_not_leader_counter"`
+	CouldNotForge          uint64  `json:"cardano_node_metrics_Forge_could_not_forge_counter"`
+	ForgedInvalid          uint64  `json:"cardano_node_metrics_Forge_forged_invalid_counter"`
+	AdoptionThreadDied     uint64  `json:"cardano_node_metrics_Forge_adoption_thread_died_counter"`
+	Adopted                uint64  `json:"cardano_node_metrics_Forge_adopted_int"`
+	DidntAdopt             uint64  `json:"cardano_node_metrics_Forge_didnt_adopt_int"`
+	AboutToLead            uint64  `json:"cardano_node_metrics_Forge_forge_about_to_lead_int"`
+	MissedSlots            uint64  `json:"cardano_node_metrics_slotsMissedNum_int"`
+	MemLive                uint64  `json:"cardano_node_metrics_RTS_gcLiveBytes_int"`
+	MemHeap                uint64  `json:"cardano_node_metrics_RTS_gcHeapBytes_int"`
+	GcMinor                uint64  `json:"cardano_node_metrics_RTS_gcMinorNum_int"`
+	GcMajor                uint64  `json:"cardano_node_metrics_RTS_gcMajorNum_int"`
+	Forks                  uint64  `json:"cardano_node_metrics_forks_int"`
+	BlockDelay             float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_s"`
+	BlocksServed           uint64  `json:"cardano_node_metrics_served_block_count_int"`
+	BlocksLate             uint64  `json:"cardano_node_metrics_blockfetchclient_lateblocks"`
+	BlocksW1s              float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_cdfOne"`
+	BlocksW3s              float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_cdfThree"`
+	BlocksW5s              float64 `json:"cardano_node_metrics_blockfetchclient_blockdelay_cdfFive"`
+	PeersCold              uint64  `json:"cardano_node_metrics_peerSelection_cold"`
+	PeersWarm              uint64  `json:"cardano_node_metrics_peerSelection_warm"`
+	PeersHot               uint64  `json:"cardano_node_metrics_peerSelection_hot"`
+	PeersKnown             uint64  `json:"cardano_node_metrics_peerSelection_KnownPeers"`
+	PeersEstablished       uint64  `json:"cardano_node_metrics_peerSelection_EstablishedPeers"`
+	PeersActive            uint64  `json:"cardano_node_metrics_peerSelection_ActivePeers"`
+	BigLedgerKnown         uint64  `json:"cardano_node_metrics_peerSelection_KnownBigLedgerPeers_int"`
+	BigLedgerEstablished   uint64  `json:"cardano_node_metrics_peerSelection_EstablishedBigLedgerPeers_int"`
+	BigLedgerActive        uint64  `json:"cardano_node_metrics_peerSelection_ActiveBigLedgerPeers_int"`
+	LocalRootsKnown        uint64  `json:"cardano_node_metrics_peerSelection_KnownLocalRootPeers_int"`
+	LocalRootsEstablished  uint64  `json:"cardano_node_metrics_peerSelection_EstablishedLocalRootPeers_int"`
+	LocalRootsActive       uint64  `json:"cardano_node_metrics_peerSelection_ActiveLocalRootPeers_int"`
+	InboundIdle            uint64  `json:"cardano_node_metrics_inboundGovernor_idle_int"`
+	InboundCold            uint64  `json:"cardano_node_metrics_inboundGovernor_cold_int"`
+	InboundWarm            uint64  `json:"cardano_node_metrics_inboundGovernor_warm_int"`
+	InboundHot             uint64  `json:"cardano_node_metrics_inboundGovernor_hot_int"`
+	LocalInboundIdle       uint64  `json:"cardano_node_metrics_localInboundGovernor_idle_int"`
+	LocalInboundCold       uint64  `json:"cardano_node_metrics_localInboundGovernor_cold_int"`
+	LocalInboundWarm       uint64  `json:"cardano_node_metrics_localInboundGovernor_warm_int"`
+	LocalInboundHot        uint64  `json:"cardano_node_metrics_localInboundGovernor_hot_int"`
+	PeerWarmPromotions     uint64  `json:"cardano_node_metrics_peerSelection_WarmPeersPromotions"`
+	PeerWarmDemotions      uint64  `json:"cardano_node_metrics_peerSelection_WarmPeersDemotions"`
+	PeerChurnKnownUp       uint64  `json:"cardano_node_metrics_peerSelection_churn_IncreasedKnownPeers"`
+	PeerChurnKnownDown     uint64  `json:"cardano_node_metrics_peerSelection_churn_DecreasedKnownPeers"`
+	ConnIncoming           uint64  `json:"cardano_node_metrics_connectionManager_incomingConns"`
+	ConnOutgoing           uint64  `json:"cardano_node_metrics_connectionManager_outgoingConns"`
+	ConnUniDir             uint64  `json:"cardano_node_metrics_connectionManager_unidirectionalConns"`
+	ConnBiDir              uint64  `json:"cardano_node_metrics_connectionManager_duplexConns"`
+	ConnFullDuplex         uint64  `json:"cardano_node_metrics_connectionManager_fullDuplexConns"`
+	HeadersServed          uint64  `json:"cardano_node_metrics_served_header_counter"`
+	ChainSyncHeadersServed uint64  `json:"cardano_node_metrics_ChainSync_HeadersServed_counter"`
+	TxSyncDuration         uint64  `json:"cardano_node_metrics_txsSyncDuration_int"`
+	TxMempoolTimeoutSoft   uint64  `json:"cardano_node_metrics_txsMempoolTimeoutSoft_counter"`
+	BlockReplayProgress    float64 `json:"cardano_node_metrics_blockReplayProgress_real"`
+	UTxOSize               uint64  `json:"cardano_node_metrics_utxoSize_int"`
 	// Go runtime metrics for Dingo
 	GoMemAlloc            uint64 `json:"go_memstats_alloc_bytes"`
 	GoHeapIdle            uint64 `json:"go_memstats_heap_idle_bytes"`
@@ -330,6 +359,9 @@ type PromMetrics struct {
 	PeerSelectionExported bool               `json:"peer_selection_metrics_present"`
 	CollectedAt           time.Time          `json:"-"`
 	DingoCounterWindow    DingoCounterWindow `json:"-"`
+	History               *MetricHistory     `json:"-"`
+	MetricSeries          []PromMetricSeries `json:"metric_series"`
+	MetricSeriesTruncated bool               `json:"metric_series_truncated"`
 
 	// DingoPresentMetrics records which optional Dingo series the scrape
 	// carried, so a series a node does not export is not read as a zero.
@@ -371,6 +403,8 @@ func getPromMetrics(ctx context.Context) (*PromMetrics, error) {
 		return &metrics, fmt.Errorf("failed JSON unmarshal: %w", err)
 	}
 	metrics.CollectedAt = time.Now()
+	globalPromMetricHistory.Observe(metrics.CollectedAt, &metrics)
+	metrics.History = globalPromMetricHistory
 	globalDingoForgeCounterHistory.Apply(&metrics, metrics.CollectedAt)
 
 	// Detect node type based on metrics
@@ -460,7 +494,13 @@ func prometheusText2json(prom []byte) ([]byte, error) {
 	if err != nil {
 		return b, err
 	}
-	for _, val := range families {
+	familyNames := make([]string, 0, len(families))
+	for name := range families {
+		familyNames = append(familyNames, name)
+	}
+	sort.Strings(familyNames)
+	for _, familyName := range familyNames {
+		val := families[familyName]
 		for _, m := range val.GetMetric() {
 			name := val.GetName()
 			switch val.GetType() {
@@ -470,6 +510,7 @@ func prometheusText2json(prom []byte) ([]byte, error) {
 					name,
 					m.GetCounter().GetValue(),
 					m.GetLabel(),
+					PromMetricCounter,
 				)
 			case dto.MetricType_GAUGE:
 				setPromMetricValueWithLabels(
@@ -477,6 +518,7 @@ func prometheusText2json(prom []byte) ([]byte, error) {
 					name,
 					m.GetGauge().GetValue(),
 					m.GetLabel(),
+					PromMetricGauge,
 				)
 			case dto.MetricType_UNTYPED:
 				setPromMetricValueWithLabels(
@@ -484,22 +526,47 @@ func prometheusText2json(prom []byte) ([]byte, error) {
 					name,
 					m.GetUntyped().GetValue(),
 					m.GetLabel(),
+					promMetricSeriesKind(name, nil),
 				)
 			case dto.MetricType_SUMMARY:
-				// Extract count from SUMMARY metrics (e.g. go_gc_duration_seconds_count)
+				// Extract sum and count from SUMMARY metrics.
+				recordPromMetricSeries(
+					out,
+					name+"_count",
+					float64(m.GetSummary().GetSampleCount()),
+					m.GetLabel(),
+					PromMetricCounter,
+				)
 				setPromMetricValue(
 					out,
 					name+"_count",
 					float64(m.GetSummary().GetSampleCount()),
 				)
+				recordPromMetricSeries(
+					out,
+					name+"_sum",
+					m.GetSummary().GetSampleSum(),
+					m.GetLabel(),
+					PromMetricCounter,
+				)
+				setPromMetricValue(
+					out,
+					name+"_sum",
+					m.GetSummary().GetSampleSum(),
+				)
 			case dto.MetricType_HISTOGRAM,
 				dto.MetricType_GAUGE_HISTOGRAM:
+				kind := PromMetricCounter
+				if val.GetType() == dto.MetricType_GAUGE_HISTOGRAM {
+					kind = PromMetricGauge
+				}
 				setPromHistogramValueWithLabels(
 					out,
 					name,
 					histogramSampleCount(m.GetHistogram()),
 					m.GetHistogram().GetSampleSum(),
 					m.GetLabel(),
+					kind,
 				)
 			default:
 				// Skip unknown types
@@ -688,6 +755,7 @@ func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
 		return nil, errors.New("unsupported OpenMetrics format")
 	}
 	out := make(map[string]any)
+	metricTypes := make(map[string]model.MetricType)
 	var parsedLabels labels.Labels
 	for {
 		entry, err := parser.Next()
@@ -696,6 +764,11 @@ func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
 		}
 		if err != nil {
 			return nil, err
+		}
+		if entry == textparse.EntryType {
+			name, metricType := parser.Type()
+			metricTypes[string(name)] = metricType
+			continue
 		}
 		if entry != textparse.EntrySeries {
 			continue
@@ -714,13 +787,22 @@ func openMetrics2json(prom []byte, contentType string) ([]byte, error) {
 				&dto.LabelPair{Name: &name, Value: &labelValue},
 			)
 		})
-		setPromMetricValueWithLabels(out, name, value, metricLabels)
+		setPromMetricValueWithLabels(
+			out,
+			name,
+			value,
+			metricLabels,
+			promMetricSeriesKind(name, metricTypes),
+		)
 	}
 	applyPromMetricAliases(out)
 	return json.MarshalIndent(out, "", "    ")
 }
 
 func setPromMetricValue(out map[string]any, name string, value float64) {
+	if name == promMetricSeriesKey || name == promMetricSeriesTruncatedKey {
+		return
+	}
 	if shouldAggregatePromMetric(name) {
 		if prev, ok := out[name].(float64); ok {
 			value += prev
@@ -734,10 +816,12 @@ func setPromMetricValueWithLabels(
 	name string,
 	value float64,
 	labels []*dto.LabelPair,
+	kind PromMetricKind,
 ) {
 	if math.IsNaN(value) || math.IsInf(value, 0) {
 		return
 	}
+	recordPromMetricSeries(out, name, value, labels, kind)
 	if network := strings.TrimSpace(labelValue(labels, "network")); network != "" {
 		if existing, ok := out["network"].(string); !ok || existing == "" {
 			out["network"] = network
@@ -760,6 +844,9 @@ func setPromMetricValueWithLabels(
 			out["dingo_present_metrics"] = present
 		}
 		present[name] = true
+	}
+	if _, ok := optionalCardanoMetrics[name]; ok {
+		markPromMetricPresent(out, name)
 	}
 	if isLeiosPromMetric(name) {
 		setNamedMetricValue(out, "leios_metrics", name, value, labels)
@@ -875,7 +962,10 @@ func setPromHistogramValueWithLabels(
 	count float64,
 	sum float64,
 	labels []*dto.LabelPair,
+	kind PromMetricKind,
 ) {
+	recordPromMetricSeries(out, name+"_count", count, labels, kind)
+	recordPromMetricSeries(out, name+"_sum", sum, labels, kind)
 	if isLeiosPromMetric(name) {
 		setNamedMetricValue(out, "leios_metrics", name+"_count", count, labels)
 		setNamedMetricValue(out, "leios_metrics", name+"_sum", sum, labels)
@@ -963,6 +1053,43 @@ var presenceTrackedPromMetrics = map[string]struct{}{
 	"host_memory_used":                              {},
 	"amaru_consensus_header_total":                  {},
 	"amaru_metrics_mempoolTxInsertionsNum_int":      {},
+}
+
+var optionalCardanoMetrics = map[string]struct{}{
+	"cardano_node_metrics_GSM_state_int":                               {},
+	"cardano_node_metrics_operationalCertificateStartKESPeriod_int":    {},
+	"cardano_node_metrics_operationalCertificateExpiryKESPeriod_int":   {},
+	"cardano_node_metrics_forgedSlotLast_int":                          {},
+	"cardano_node_metrics_Forge_node_not_leader_counter":               {},
+	"cardano_node_metrics_Forge_could_not_forge_counter":               {},
+	"cardano_node_metrics_Forge_forged_invalid_counter":                {},
+	"cardano_node_metrics_Forge_adoption_thread_died_counter":          {},
+	"cardano_node_metrics_peerSelection_KnownBigLedgerPeers_int":       {},
+	"cardano_node_metrics_peerSelection_EstablishedBigLedgerPeers_int": {},
+	"cardano_node_metrics_peerSelection_ActiveBigLedgerPeers_int":      {},
+	"cardano_node_metrics_peerSelection_KnownLocalRootPeers_int":       {},
+	"cardano_node_metrics_peerSelection_EstablishedLocalRootPeers_int": {},
+	"cardano_node_metrics_peerSelection_ActiveLocalRootPeers_int":      {},
+	"cardano_node_metrics_inboundGovernor_idle_int":                    {},
+	"cardano_node_metrics_inboundGovernor_cold_int":                    {},
+	"cardano_node_metrics_inboundGovernor_warm_int":                    {},
+	"cardano_node_metrics_inboundGovernor_hot_int":                     {},
+	"cardano_node_metrics_localInboundGovernor_idle_int":               {},
+	"cardano_node_metrics_localInboundGovernor_cold_int":               {},
+	"cardano_node_metrics_localInboundGovernor_warm_int":               {},
+	"cardano_node_metrics_localInboundGovernor_hot_int":                {},
+	"cardano_node_metrics_served_header_counter":                       {},
+	"cardano_node_metrics_ChainSync_HeadersServed_counter":             {},
+	"cardano_node_metrics_txsSyncDuration_int":                         {},
+	"cardano_node_metrics_txsMempoolTimeoutSoft_counter":               {},
+	"cardano_node_metrics_blockReplayProgress_real":                    {},
+	"cardano_node_metrics_utxoSize_int":                                {},
+	"cardano_node_metrics_currentKESPeriod_int":                        {},
+	"cardano_node_metrics_remainingKESPeriods_int":                     {},
+}
+
+func (m *PromMetrics) hasPromMetric(name string) bool {
+	return m != nil && m.PromMetricPresent[name]
 }
 
 // exports reports whether the scrape carried the named series.
