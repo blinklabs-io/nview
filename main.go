@@ -388,8 +388,13 @@ func applyDefaultSecondaryView() {
 	}
 }
 
+// dashboardShowsPeers reports whether peer data is wanted. Every detected node
+// shows it: Dingo's console always has peer panels, and the Command Deck
+// charts mean peer RTT without any peer view open.
 func dashboardShowsPeers() bool {
-	return getEffectiveNodeBinary() == DINGO_BINARY || peerOverlayActive.Load()
+	return getEffectiveNodeBinary() == DINGO_BINARY ||
+		nodeBinaryDetected() ||
+		peerOverlayActive.Load()
 }
 
 func dashboardShowsDingoSystems() bool {
@@ -1098,6 +1103,14 @@ func getOverviewText(ctx context.Context) string {
 		uiKVAligned(9, "Peers", peerStateSegmentBar(promMetrics, 12)),
 		gsmBadge,
 	)
+	if getEffectiveNodeBinary() != DINGO_BINARY {
+		sb.WriteString(getTrendText(
+			promMetrics,
+			getEffectiveNodeBinary(),
+			tipSeverity,
+			peerRTTTrend(),
+		))
+	}
 	if getEffectiveNodeBinary() == DINGO_BINARY {
 		forgeLabel := "disabled"
 		forgeSeverity := uiSeverityMuted
@@ -1529,6 +1542,10 @@ type dingoMetricCell struct {
 	Value         string
 	LabelSeverity uiSeverity
 	Span          int
+	// Trend is drawn after Value as a chart, trimmed to the room left in the
+	// cell.
+	Trend         []float64
+	TrendSeverity uiSeverity
 }
 
 func dingoPanel(
@@ -1775,6 +1792,17 @@ func dingoMetricCellText(cell dingoMetricCell, width int) string {
 	) +
 		" " +
 		cell.Value
+	if len(cell.Trend) >= trendMinSamples {
+		room := width - tview.TaggedStringWidth(text) - 1
+		if chart := uiBrailleChartFit(
+			cell.Trend,
+			0,
+			cell.TrendSeverity,
+			room,
+		); chart != "" {
+			text += " " + chart
+		}
+	}
 	return dingoPadTaggedRight(text, width)
 }
 
@@ -2389,16 +2417,7 @@ func dingoConsoleDashboardCompact(metrics *PromMetrics, width int) string {
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
-				dingoMetricStyled(
-					"Tip Gap",
-					uiSeverityValue(
-						strconv.FormatUint(tipGap, 10),
-						tipSeverity,
-					)+uiUnit(
-						" slots",
-					),
-					tipSeverity,
-				),
+				dingoTipGapCell(metrics, tipGap, tipSeverity),
 				dingoMetric(
 					"Remaining",
 					uiValue(formatEpochRemaining(metrics)),
@@ -2877,16 +2896,7 @@ func dingoConsoleChainLane(metrics *PromMetrics, width int) string {
 					"Slot",
 					uiValue(strconv.FormatUint(metrics.SlotNum, 10)),
 				),
-				dingoMetricStyled(
-					"Tip Gap",
-					uiSeverityValue(
-						strconv.FormatUint(tipGap, 10),
-						tipSeverity,
-					)+uiUnit(
-						" slots",
-					),
-					tipSeverity,
-				),
+				dingoTipGapCell(metrics, tipGap, tipSeverity),
 			),
 			dingoMetricRow(
 				innerWidth,
@@ -2958,16 +2968,7 @@ func dingoConsoleChainCompact(metrics *PromMetrics, width int) string {
 			dingoMetricRowColumns(
 				innerWidth,
 				2,
-				dingoMetricStyled(
-					"Tip Gap",
-					uiSeverityValue(
-						strconv.FormatUint(tipGap, 10),
-						tipSeverity,
-					)+uiUnit(
-						" slots",
-					),
-					tipSeverity,
-				),
+				dingoTipGapCell(metrics, tipGap, tipSeverity),
 				dingoMetric("Epoch", uiValue(strconv.FormatUint(epoch, 10))),
 			),
 			dingoMetricRowColumns(

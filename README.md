@@ -107,7 +107,10 @@ The following environment variables control the behavior of the application.
   when polling a Cardano Node for Prometheus metrics, default is 3
 - `NVIEW_VISUAL_MODE` - Controls optional terminal glyphs for the TUI:
   `auto`, `unicode`, `plain`, or `nerd`. The default is `auto`. In the YAML
-  file this is `app.visualMode`.
+  file this is `app.visualMode`. Trend charts for the tip gap, mempool size and
+  mean peer RTT are drawn with braille cells in `unicode` and `nerd` modes,
+  and as an ASCII sparkline in `plain` mode. If your terminal font draws
+  braille as empty boxes, use `plain`.
 - `NVIEW_IMAGE_PROTOCOL` - Controls terminal image protocol detection for
   the header status badge strip: `auto`, `none`, `kitty`, `iterm2`, or
   `sixel`. The default is `auto`. In the YAML file this is

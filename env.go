@@ -108,8 +108,15 @@ func getNodeMetrics(ctx context.Context) ([]byte, int, string, error) {
 
 // Calculate slot number
 func getSlotTipRef() uint64 {
-	slot, _ := networkSlotAt(time.Now().Add(-time.Second))
+	slot, _ := slotTipRefAt(time.Now())
 	return slot
+}
+
+// slotTipRefAt is the slot the network tip should have reached at the given
+// time. It allows one second for the newest block to arrive, so a node that
+// is current is never shown as a slot behind.
+func slotTipRefAt(at time.Time) (uint64, bool) {
+	return networkSlotAt(at.Add(-time.Second))
 }
 
 func networkSlotAt(now time.Time) (uint64, bool) {
