@@ -3458,7 +3458,7 @@ func TestDingoConsoleViewsShowAnomalies(t *testing.T) {
 				t.Errorf("%s view missing %q:\n%s", name, expected, text)
 			}
 		}
-		if strings.Count(text, " +") != 1 {
+		if countCounterDeltas(text) != 1 {
 			t.Errorf(
 				"%s view should show exactly one anomaly delta:\n%s",
 				name,
@@ -3470,7 +3470,7 @@ func TestDingoConsoleViewsShowAnomalies(t *testing.T) {
 	// With no earlier scrape the totals are shown without a delta.
 	reset(nil)
 	for name, text := range render(dingoSyncExported(&PromMetrics{DingoChainselectionStalled: 10})) {
-		if !strings.Contains(text, "Stalled") || strings.Contains(text, " +") {
+		if !strings.Contains(text, "Stalled") || countCounterDeltas(text) != 0 {
 			t.Errorf(
 				"%s view with no previous scrape should show totals only:\n%s",
 				name,
@@ -3478,6 +3478,16 @@ func TestDingoConsoleViewsShowAnomalies(t *testing.T) {
 			)
 		}
 	}
+}
+
+func countCounterDeltas(text string) int {
+	count := 0
+	for index := 0; index+1 < len(text); index++ {
+		if text[index] == '+' && text[index+1] >= '0' && text[index+1] <= '9' {
+			count++
+		}
+	}
+	return count
 }
 
 // dingoSyncExported marks the sync and anomaly metrics as exported, the way a
