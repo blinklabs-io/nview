@@ -23,6 +23,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -3978,6 +3979,7 @@ func TestGetTooSmallTextNamesNeededAndCurrentSize(t *testing.T) {
 // The refresh loop must stop at the too-small message instead of drawing the
 // panels over it.
 func TestRefreshDashboardTextShowsTooSmall(t *testing.T) {
+	countRedraws(t)
 	prevBinary := detectedNodeBinary.Load()
 	detectedNodeBinary.Store(CARDANO_BINARY)
 	prevSize := terminalSizeFunc
@@ -4084,5 +4086,161 @@ func TestDashboardMinimumsAreMeasuredValues(t *testing.T) {
 				binary, cols, rows, want[0], want[1],
 			)
 		}
+	}
+}
+
+// withTooSmallShown marks the too-small message as showing for one test and
+// restores every flag the overlay paths read.
+func withTooSmallShown(t *testing.T) {
+	t.Helper()
+	prevOverlay := peerOverlayActive.Load()
+	tooSmallShown.Store(true)
+	t.Cleanup(func() {
+		tooSmallShown.Store(false)
+		peerOverlayActive.Store(prevOverlay)
+	})
+}
+
+func addTooSmallTestPages(t *testing.T) {
+	t.Helper()
+	dashboardPages.AddPage("panels", tview.NewBox(), true, false)
+	dashboardPages.AddPage(tooSmallPageName, tooSmallTextView, true, true)
+	t.Cleanup(func() {
+		dashboardPages.RemovePage("panels")
+		dashboardPages.RemovePage(tooSmallPageName)
+		dashboardPages.RemovePage(peerOverlayPageName)
+		dashboardPages.RemovePage(mithrilOverlayPageName)
+	})
+}
+
+func TestApplyTooSmallTracksState(t *testing.T) {
+	addTooSmallTestPages(t)
+	t.Cleanup(func() { tooSmallShown.Store(false) })
+
+	applyTooSmall(CARDANO_BINARY, 90, 24)
+	if !tooSmallShown.Load() {
+		t.Fatal("tooSmallShown is false while the message is showing")
+	}
+	applyTooSmall(CARDANO_BINARY, DashboardMinWidth, DashboardMinHeight)
+	if tooSmallShown.Load() {
+		t.Fatal("tooSmallShown is still true at the minimum size")
+	}
+}
+
+// The peer key must not open an overlay over the message, or leave the
+// overlay open for when the terminal grows back.
+func TestTogglePeerOverlayIgnoredWhenTooSmall(t *testing.T) {
+	addTooSmallTestPages(t)
+	withTooSmallShown(t)
+	peerOverlayActive.Store(false)
+
+	togglePeerOverlay(context.Background())
+	if peerOverlayActive.Load() {
+		t.Fatal("peer overlay was opened while the terminal is too small")
+	}
+	if front, _ := dashboardPages.GetFrontPage(); front != tooSmallPageName {
+		t.Fatalf("front page = %q, expected %q", front, tooSmallPageName)
+	}
+}
+
+func TestUpdatePeerOverlayStaysHiddenWhenTooSmall(t *testing.T) {
+	addTooSmallTestPages(t)
+	withTooSmallShown(t)
+	peerOverlayActive.Store(true)
+
+	updatePeerOverlay(context.Background())
+	if front, _ := dashboardPages.GetFrontPage(); front != tooSmallPageName {
+		t.Fatalf("front page = %q, expected %q", front, tooSmallPageName)
+	}
+}
+
+// The scrape loop calls updateMithrilView on its own schedule, so the guard
+// has to be in the function and not only in the refresh path.
+func TestUpdateMithrilViewStaysHiddenWhenTooSmall(t *testing.T) {
+	addTooSmallTestPages(t)
+	withTooSmallShown(t)
+	prevBinary := detectedNodeBinary.Load()
+	detectedNodeBinary.Store(DINGO_BINARY)
+	prevMetrics := promMetrics.Load()
+	promMetrics.Store(&PromMetrics{MithrilSyncStartedAt: 1})
+	t.Cleanup(func() {
+		promMetrics.Store(prevMetrics)
+		if prevBinary != nil {
+			detectedNodeBinary.Store(prevBinary)
+		}
+	})
+
+	updateMithrilView()
+	if front, _ := dashboardPages.GetFrontPage(); front != tooSmallPageName {
+		t.Fatalf("front page = %q, expected %q", front, tooSmallPageName)
+	}
+}
+
+func TestFooterStaysMinimalWhenTooSmall(t *testing.T) {
+	withTooSmallShown(t)
+	peerOverlayActive.Store(true)
+
+	if got, want := getFooterText(), getMinimalFooterText(); got != want {
+		t.Fatalf("footer = %q, expected the minimal footer %q", got, want)
+	}
+}
+
+// countRedraws replaces requestRedraw for one test and returns the number of
+// repaints requested so far.
+func countRedraws(t *testing.T) func() int {
+	t.Helper()
+	prev := requestRedraw
+	var n atomic.Int32
+	requestRedraw = func() { n.Add(1) }
+	t.Cleanup(func() { requestRedraw = prev })
+	return func() int { return int(n.Load()) }
+}
+
+// Switching back from the message does not repaint on its own, so the refresh
+// has to ask for it, or an unchanged frame can linger.
+func TestRefreshAsksForRedrawWhenLeavingTooSmall(t *testing.T) {
+	redraws := countRedraws(t)
+	prevBinary := detectedNodeBinary.Load()
+	detectedNodeBinary.Store(CARDANO_BINARY)
+	prevSize := terminalSizeFunc
+	t.Cleanup(func() {
+		terminalSizeFunc = prevSize
+		tooSmallShown.Store(false)
+		if prevBinary != nil {
+			detectedNodeBinary.Store(prevBinary)
+		}
+	})
+	for _, name := range []string{"panels", "dingo"} {
+		dashboardPages.AddPage(name, tview.NewBox(), true, name == "panels")
+		defer dashboardPages.RemovePage(name)
+	}
+	dashboardPages.AddPage(tooSmallPageName, tooSmallTextView, true, false)
+	defer dashboardPages.RemovePage(tooSmallPageName)
+
+	terminalSizeFunc = func() (int, int) { return 90, 24 }
+	refreshDashboardText(context.Background())
+	afterShrink := redraws()
+
+	terminalSizeFunc = func() (int, int) {
+		return DashboardMinWidth, DashboardMinHeight
+	}
+	refreshDashboardText(context.Background())
+	afterGrow := redraws()
+	if afterGrow <= afterShrink {
+		t.Fatalf(
+			"no redraw requested when leaving the message (%d then %d)",
+			afterShrink,
+			afterGrow,
+		)
+	}
+
+	before := redraws()
+	refreshDashboardText(context.Background())
+	if redraws() != before {
+		t.Fatalf(
+			"redraw requested with no message transition (%d then %d)",
+			before,
+			redraws(),
+		)
 	}
 }

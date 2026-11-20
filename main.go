@@ -199,6 +199,7 @@ var (
 	lastDingoSampleMu    sync.Mutex
 	compactDingoPage     atomic.Int32
 	peerOverlayActive    atomic.Bool
+	tooSmallShown        atomic.Bool
 )
 
 // Global command line flags
@@ -259,6 +260,11 @@ var tooSmallTextView = tview.NewTextView().
 	SetChangedFunc(func() {
 		app.Draw()
 	})
+
+// requestRedraw asks the application to repaint from the refresh path. Tests
+// replace it because Draw queues onto an event loop that tests do not run, and
+// blocks the caller once that queue is full.
+var requestRedraw = func() { app.Draw() }
 
 var peerOverlayTextView = tview.NewTextView().
 	SetDynamicColors(true).
@@ -490,6 +496,9 @@ func getHeaderText() string {
 }
 
 func getFooterText() string {
+	if tooSmallShown.Load() {
+		return getMinimalFooterText()
+	}
 	if peerOverlayActive.Load() {
 		return dashboardChromeText(" " + strings.Join([]string{
 			uiKey("esc", "Close"),
@@ -652,6 +661,7 @@ func showTooSmall() bool {
 
 func applyTooSmall(binary string, cols, rows int) bool {
 	small, minCols, minRows := dashboardTooSmall(binary, cols, rows)
+	tooSmallShown.Store(small)
 	if !small {
 		dashboardPages.HidePage(tooSmallPageName)
 		return false
@@ -666,8 +676,14 @@ func applyTooSmall(binary string, cols, rows int) bool {
 
 func refreshDashboardText(ctx context.Context) {
 	refreshChrome()
+	wasTooSmall := tooSmallShown.Load()
 	if showTooSmall() {
 		return
+	}
+	if wasTooSmall {
+		// Switching pages does not repaint, and the panel text may be
+		// unchanged since before the message, so ask for the frame.
+		defer requestRedraw()
 	}
 	if getEffectiveNodeBinary() == DINGO_BINARY {
 		dashboardPages.SwitchToPage("dingo")
@@ -709,6 +725,9 @@ func refreshDashboardText(ctx context.Context) {
 }
 
 func togglePeerOverlay(ctx context.Context) {
+	if tooSmallShown.Load() {
+		return
+	}
 	if peerOverlayActive.Load() {
 		hidePeerOverlay()
 		refreshChrome()
@@ -730,7 +749,8 @@ func hidePeerOverlay() {
 }
 
 func updatePeerOverlay(ctx context.Context) {
-	if !peerOverlayActive.Load() || isMithrilSyncActive() {
+	if tooSmallShown.Load() || !peerOverlayActive.Load() ||
+		isMithrilSyncActive() {
 		dashboardPages.HidePage(peerOverlayPageName)
 		return
 	}
@@ -5257,6 +5277,10 @@ func updateMithrilView() {
 	if getEffectiveNodeBinary() != DINGO_BINARY || !isMithrilSyncActive() {
 		mithrilOverlayText = ""
 		mithrilViewAutoActive.Store(false)
+		dashboardPages.HidePage(mithrilOverlayPageName)
+		return
+	}
+	if tooSmallShown.Load() {
 		dashboardPages.HidePage(mithrilOverlayPageName)
 		return
 	}
