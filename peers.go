@@ -45,7 +45,7 @@ const (
 	// useful window instead of one burst of probe results.
 	peerRTTTrendEvery   = 3 * time.Second
 	peerRTTTrendSamples = defaultMetricHistorySamples
-	// peerRTTTrendStale is three ping cycles: past it nothing is sampling.
+	// peerRTTTrendStale is three ping cycles.
 	peerRTTTrendStale = 30 * time.Second
 	peerProbeStaleFor = 30 * time.Second
 )
@@ -188,6 +188,9 @@ func mergePeerDirections(existing, next string) string {
 	return next
 }
 
+// pingPeers probes a bounded batch of stale peers on every tick once a node is
+// detected, whichever view is showing, because the Command Deck's RTT chart
+// needs samples even when no peer view is open.
 func pingPeers(ctx context.Context) {
 	if !dashboardShowsPeers() && getActiveSecondaryView() != viewPeers {
 		return
@@ -397,9 +400,9 @@ func recordPeerRTTTrendLocked(at time.Time) {
 	}
 }
 
-// peerRTTTrend returns a copy of the retained mean-RTT samples. Peers are only
-// probed while a peer view is shown, so samples older than peerRTTTrendStale
-// are no longer current and are not returned.
+// peerRTTTrend returns a copy of the retained mean-RTT samples. Samples older
+// than peerRTTTrendStale mean nothing is being sampled any more, such as when
+// the node has no peers, so they are not returned.
 func peerRTTTrend() []float64 {
 	peerStatsMu.Lock()
 	defer peerStatsMu.Unlock()

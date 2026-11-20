@@ -474,11 +474,22 @@ func TestOverviewShowsPeerRTTTrend(t *testing.T) {
 }
 
 // pingPeers runs on every refresh tick, so it is where the RTT samples are
-// taken: the chart must grow from there, once per spacing interval.
+// taken: the chart must grow from there, once per spacing interval, whichever
+// view is showing. The default cardano-node Command Deck has no peer view.
 func TestPingPeersRecordsTheRTTTrend(t *testing.T) {
+	for _, binary := range []string{DINGO_BINARY, CARDANO_BINARY} {
+		t.Run(binary, func(t *testing.T) {
+			testPingPeersRecordsTheRTTTrend(t, binary)
+		})
+	}
+}
+
+func testPingPeersRecordsTheRTTTrend(t *testing.T, binary string) {
 	cfg := config.GetConfig()
 	originalBinary := cfg.Node.Binary
 	originalDetected, _ := detectedNodeBinary.Load().(string)
+	originalOverlay := peerOverlayActive.Load()
+	originalActive := activeSecondary.Load()
 	peerStatsMu.Lock()
 	originalStats := peerStats
 	peerStatsMu.Unlock()
@@ -488,6 +499,8 @@ func TestPingPeersRecordsTheRTTTrend(t *testing.T) {
 	t.Cleanup(func() {
 		cfg.Node.Binary = originalBinary
 		detectedNodeBinary.Store(originalDetected)
+		peerOverlayActive.Store(originalOverlay)
+		activeSecondary.Store(originalActive)
 		peerStatsMu.Lock()
 		peerStats = originalStats
 		peerStatsMu.Unlock()
@@ -497,7 +510,9 @@ func TestPingPeersRecordsTheRTTTrend(t *testing.T) {
 	})
 
 	cfg.Node.Binary = ""
-	detectedNodeBinary.Store(DINGO_BINARY)
+	detectedNodeBinary.Store(binary)
+	peerOverlayActive.Store(false)
+	setActiveSecondaryView(viewNone)
 	peersFilteredMu.Lock()
 	peersFiltered = []string{"198.51.100.10;3001;o"}
 	peersFilteredMu.Unlock()

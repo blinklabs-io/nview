@@ -386,8 +386,13 @@ func applyDefaultSecondaryView() {
 	}
 }
 
+// dashboardShowsPeers reports whether peer data is wanted. Every detected node
+// shows it: Dingo's console always has peer panels, and the Command Deck
+// charts mean peer RTT without any peer view open.
 func dashboardShowsPeers() bool {
-	return getEffectiveNodeBinary() == DINGO_BINARY || peerOverlayActive.Load()
+	return getEffectiveNodeBinary() == DINGO_BINARY ||
+		nodeBinaryDetected() ||
+		peerOverlayActive.Load()
 }
 
 func dashboardShowsDingoSystems() bool {
