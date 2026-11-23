@@ -13,6 +13,6 @@ on:
 
 jobs:
   orchestrate:
-    uses: blinklabs-io/actions/.github/workflows/reuseable-ci-docker-multiarch.yml@main
+    uses: blinklabs-io/shared-actions/.github/workflows/reuseable-ci-docker-multiarch.yml@d90d0eef9c2d00ecac430e1b184ac2993ac768fb
     with:
       image-name: blinklabs-io/nview
